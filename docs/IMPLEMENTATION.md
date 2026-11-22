@@ -8,7 +8,7 @@ Status: `todo` · `in progress` · `awaiting approval` · `done`
 
 ## 0. Rendering spike
 
-- Status: todo
+- Status: done
 
 Decide how the game is drawn, before anything is built on it. In `spikes/rendering/`, render the prototype's scene (`docs/prototype/demo.html`: a scrolling level, about 30 glowing moving glyphs, particles, CRT overlay, glitch) in a Quickshell window two ways: QML `Canvas` with the static level cached as an image, and Qt Quick `Text` items with `MultiEffect` glow. Measure frame times for both, with full and reduced effects, at 1080p. Also confirm that QML can import a plain `.mjs` module that `node --test` can import too.
 

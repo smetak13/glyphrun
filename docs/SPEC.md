@@ -12,8 +12,8 @@ This document records every decision agreed during the design session. `docs/IMP
 |---|---|
 | Host | Omarchy shell plugin (Quickshell, Qt 6.12). Kinds `bar-widget` and `panel`, like Omatris. |
 | UI | QML. The game window is a Quickshell `FloatingWindow`: an ordinary application window, tiled or floating by the workspace's layout and Hyprland window rules, resizable. |
-| Rendering | Decided by the rendering spike (IMPLEMENTATION task 0): QML `Canvas` (Context2D) or Qt Quick items with `MultiEffect`. The game loop is a `FrameAnimation`. |
-| Game logic | Pure JavaScript ES modules (`.mjs`) with no QML or Qt imports, imported by QML and by tests alike. |
+| Rendering | Qt Quick items: one `Text` item per glyph, positioned each frame from the logic state. Static parts (level, hexdump background) are cached with `layer.enabled`; glow and glitch use `MultiEffect`. No custom shaders. Chosen by the rendering spike, see `docs/spikes/rendering.md`. The game loop is a `FrameAnimation`. |
+| Game logic | Pure JavaScript ES modules (`.mjs`) with no QML or Qt imports, imported by QML and by tests alike. Written in the JavaScript that Qt's QML engine supports, which is older than Node's: no object spread or rest, class fields, `??=`/`||=`, `Array.prototype.at`/`flat`/`flatMap`, `Object.fromEntries` and others (list in `docs/spikes/rendering.md`). |
 | Tests | `node --test` (Node built-in runner). No npm dependencies. |
 | Clipboard | `wl-copy`, run as a process, as other Omarchy plugins do. |
 | Dependencies | None at runtime beyond the Omarchy shell. Installable with `omarchy plugin add <repo url>`. |
