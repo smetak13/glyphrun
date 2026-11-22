@@ -81,7 +81,9 @@ All texts here are defaults and may be tuned during implementation.
 - Coyote time: a jump is still accepted for a few frames after walking off a ledge.
 - Jump buffer: a jump pressed a few frames before landing fires on landing.
 - No other abilities in the MVP.
-- Physics constants (gravity, run speed, acceleration, jump velocity, jump cut) live in one module. The envelope (maximum jump height, maximum gap at full speed, maximum gap with a height difference) is computed from them, never written by hand.
+- Ground and solid blocks stop the hero from every side. Platforms `[===]` are one-way: the hero jumps up through them and lands on top.
+- The hero stands on a ledge as long as any part of it is over the ledge, so the widest gap it can clear is the distance flown plus its own width.
+- Physics constants (gravity, run speed, acceleration, jump velocity, jump cut) live in one module. The envelope (maximum jump height, maximum gap at full speed, maximum gap with a height difference) is computed from them, never written by hand: by simulating a full-speed jump with jump held, taken from the ground without coyote time.
 - Physics runs at a fixed timestep, independent of the display frame rate, so the game plays the same at 60 fps and 144 fps and the validator can simulate it exactly.
 
 ## 5. Health, lives and sudo

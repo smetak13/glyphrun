@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { levelGlyphs, levelSections, parseLevel, SECTION_OVERHANG, SECTION_WIDTH } from "../logic/level.mjs";
+import { checkpointGlyphs, levelGlyphs, levelSections, parseLevel, SECTION_OVERHANG, SECTION_WIDTH } from "../logic/level.mjs";
 import { TEST_LEVEL } from "../logic/testLevel.mjs";
 import { TILE } from "../logic/screen.mjs";
 
@@ -62,4 +62,24 @@ test("sections cover the level and every glyph starts inside its section", () =>
   for (const section of sections) {
     for (const glyph of section.glyphs) assert.ok(glyph.x >= 0 && glyph.x < SECTION_WIDTH + SECTION_OVERHANG);
   }
+});
+
+test("bits in the map are listed with their value and are not drawn with the level", () => {
+  const rows = withRow(blankRows(5), 10, ".1.0.");
+
+  const level = parseLevel(rows);
+
+  assert.deepEqual(level.bits, [{ col: 1, row: 10, text: "1" }, { col: 3, row: 10, text: "0" }]);
+  assert.deepEqual(levelGlyphs(level), []);
+});
+
+test("the checkpoint flag is muted until it is lit", () => {
+  const checkpoint = { col: 2, row: 18 };
+
+  const unlit = checkpointGlyphs(checkpoint, false);
+  const lit = checkpointGlyphs(checkpoint, true);
+
+  assert.deepEqual(unlit.map(g => g.text), ["│", "│", "│", "▷"]);
+  assert.deepEqual(lit.map(g => g.text), ["│", "│", "│", "▶"]);
+  assert.ok(unlit.every(g => g.role === "muted") && lit.every(g => g.role === "cyan"));
 });

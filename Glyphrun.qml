@@ -13,10 +13,14 @@ Item {
   readonly property string pluginId: "smetak13.glyphrun"
   readonly property bool opened: window.visible
   property bool closingFromHost: false
-  property var world: World.createWorld(Level.parseLevel(TestLevel.TEST_LEVEL))
+  readonly property var level: Level.parseLevel(TestLevel.TEST_LEVEL)
+  property var world: World.createWorld(level)
   property var clock: Clock.createClock()
   property bool leftHeld: false
   property bool rightHeld: false
+  property bool jumpHeld: false
+  property bool jumpPressed: false
+  property bool paused: false
 
   function open(payloadJson) {
     window.visible = true
@@ -32,8 +36,40 @@ Item {
   function setHeld(key, held) {
     if (key === Qt.Key_Left) leftHeld = held
     else if (key === Qt.Key_Right) rightHeld = held
-    else return false
+    else if (key === Qt.Key_Space || key === Qt.Key_Up) {
+      if (held && !jumpHeld) jumpPressed = true
+      jumpHeld = held
+    } else return false
     return true
+  }
+
+  function releaseKeys() {
+    leftHeld = false
+    rightHeld = false
+    jumpHeld = false
+    jumpPressed = false
+  }
+
+  function restartLevel() {
+    world = World.createWorld(level)
+    clock = Clock.createClock()
+    gameView.sync()
+  }
+
+  function frame(frameTime) {
+    if (paused) return
+    if (world.finished) {
+      if (jumpPressed) restartLevel()
+      jumpPressed = false
+      return
+    }
+    const steps = Clock.stepsFor(clock, frameTime)
+    for (let i = 0; i < steps; i++) {
+      const input = { direction: (rightHeld ? 1 : 0) - (leftHeld ? 1 : 0), jumpHeld: jumpHeld, jumpPressed: jumpPressed }
+      World.stepWorld(world, input, Clock.STEP_SECONDS)
+      jumpPressed = false
+    }
+    gameView.sync()
   }
 
   Theme {
@@ -50,8 +86,7 @@ Item {
 
     onVisibleChanged: {
       if (visible) return
-      root.leftHeld = false
-      root.rightHeld = false
+      root.releaseKeys()
       if (!root.closingFromHost && root.shell) root.shell.hide(root.pluginId)
     }
 
@@ -61,7 +96,10 @@ Item {
       focus: true
 
       Keys.onPressed: function(event) {
-        if (!event.isAutoRepeat) event.accepted = root.setHeld(event.key, true)
+        if (event.key === Qt.Key_P) {
+          if (!event.isAutoRepeat) root.paused = !root.paused
+          event.accepted = true
+        } else if (!event.isAutoRepeat) event.accepted = root.setHeld(event.key, true)
       }
       Keys.onReleased: function(event) {
         if (!event.isAutoRepeat) event.accepted = root.setHeld(event.key, false)
@@ -71,6 +109,7 @@ Item {
         id: gameView
         anchors.fill: parent
         world: root.world
+        paused: root.paused
         colors: theme.colors
         pixelRatio: window.devicePixelRatio
       }
@@ -78,12 +117,7 @@ Item {
 
     FrameAnimation {
       running: window.visible
-      onTriggered: {
-        const input = { direction: (root.rightHeld ? 1 : 0) - (root.leftHeld ? 1 : 0) }
-        const steps = Clock.stepsFor(root.clock, frameTime)
-        for (let i = 0; i < steps; i++) World.stepWorld(root.world, input, Clock.STEP_SECONDS)
-        gameView.sync()
-      }
+      onTriggered: root.frame(frameTime)
     }
   }
 }

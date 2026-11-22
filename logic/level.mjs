@@ -9,12 +9,13 @@ const BLOCK = "B";
 const HERO = "@";
 const CHECKPOINT = "C";
 const EXIT = "X";
+const BITS = "01";
 const BOTTOM_ROW = SCREEN_ROWS - 1;
 
 export function parseLevel(rows) {
   if (rows.length !== SCREEN_ROWS) throw new Error("a level has " + SCREEN_ROWS + " rows, got " + rows.length);
   const cols = rows[0].length;
-  const level = { cols, rows, start: null, checkpoint: null, exit: null };
+  const level = { cols, rows, start: null, checkpoint: null, exit: null, bits: [] };
   rows.forEach((line, row) => {
     if (line.length !== cols) throw new Error("level row " + row + " has " + line.length + " columns, expected " + cols);
     for (let col = 0; col < cols; col++) {
@@ -22,6 +23,7 @@ export function parseLevel(rows) {
       if (tile === HERO) level.start = { col, row };
       else if (tile === CHECKPOINT) level.checkpoint = { col, row };
       else if (tile === EXIT) level.exit = { col, row };
+      else if (BITS.indexOf(tile) >= 0) level.bits.push({ col, row, text: tile });
     }
   });
   return level;
@@ -57,14 +59,17 @@ export function levelGlyphs(level) {
       }
     }
   }
-  if (level.checkpoint) addCheckpoint(add, level.checkpoint);
   if (level.exit) addExit(add, level.exit);
   return glyphs;
 }
 
-function addCheckpoint(add, { col, row }) {
-  for (let r = row - 2; r <= row; r++) add(col * TILE, r * TILE, "│", "muted", 24);
-  add(col * TILE + 10, (row - 2) * TILE - 4, "▷", "muted", 18);
+export function checkpointGlyphs(checkpoint, lit) {
+  const role = lit ? "cyan" : "muted";
+  const x = checkpoint.col * TILE;
+  const glyphs = [];
+  for (let row = checkpoint.row - 2; row <= checkpoint.row; row++) glyphs.push({ x, y: row * TILE, text: "│", role, size: 24 });
+  glyphs.push({ x: x + 10, y: (checkpoint.row - 2) * TILE - 4, text: lit ? "▶" : "▷", role, size: 18 });
+  return glyphs;
 }
 
 function addExit(add, { col, row }) {

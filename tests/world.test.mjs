@@ -1,23 +1,138 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, stepWorld } from "../logic/world.mjs";
+import { createWorld, stepWorld, CAMERA_LEAD } from "../logic/world.mjs";
+import { createClock, stepsFor, STEP_SECONDS } from "../logic/clock.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { TEST_LEVEL } from "../logic/testLevel.mjs";
 import { SCREEN_WIDTH, TILE } from "../logic/screen.mjs";
 
-test("the hero stands on the start tile", () => {
+const IDLE = { direction: 0, jumpHeld: false, jumpPressed: false };
+const RIGHT = { direction: 1, jumpHeld: false, jumpPressed: false };
+
+function levelFrom(bottomRows) {
+  const cols = bottomRows[0].length;
+  const rows = [];
+  for (let i = 0; i < 22 - bottomRows.length; i++) rows.push(".".repeat(cols));
+  return parseLevel(rows.concat(bottomRows));
+}
+
+function steps(world, input, count) {
+  for (let i = 0; i < count; i++) stepWorld(world, input, STEP_SECONDS);
+}
+
+function stepUntil(world, input, done) {
+  for (let i = 0; i < 10000 && !done(world); i++) stepWorld(world, input, STEP_SECONDS);
+}
+
+function playAtFrameRate(framesPerSecond, timeline, seconds) {
+  const world = createWorld(parseLevel(TEST_LEVEL));
+  const clock = createClock();
+  let jumpPressed = false;
+  let held = IDLE;
+  for (let frame = 0; frame < seconds * framesPerSecond; frame++) {
+    const now = frame / framesPerSecond;
+    for (const change of timeline) {
+      if (Math.abs(change.at - now) < 1e-9) {
+        if (change.input.jumpHeld && !held.jumpHeld) jumpPressed = true;
+        held = change.input;
+      }
+    }
+    const count = stepsFor(clock, 1 / framesPerSecond);
+    for (let i = 0; i < count; i++) {
+      stepWorld(world, { direction: held.direction, jumpHeld: held.jumpHeld, jumpPressed }, STEP_SECONDS);
+      jumpPressed = false;
+    }
+  }
+  return world;
+}
+
+test("the hero starts standing on the start tile", () => {
   const world = createWorld(parseLevel(TEST_LEVEL));
 
-  assert.deepEqual(world.hero, { x: 2.5 * TILE, y: 19 * TILE });
+  assert.deepEqual([world.hero.x, world.hero.y, world.hero.grounded], [2.5 * TILE, 19 * TILE, true]);
 });
 
-test("the camera stops at both ends of the level", () => {
-  const world = createWorld(parseLevel(TEST_LEVEL));
+test("the same input plays out identically at different frame rates", () => {
+  const timeline = [
+    { at: 0, input: RIGHT },
+    { at: 1, input: { direction: 1, jumpHeld: true, jumpPressed: false } },
+    { at: 1.25, input: RIGHT },
+    { at: 2, input: { direction: -1, jumpHeld: true, jumpPressed: false } },
+    { at: 2.5, input: IDLE },
+  ];
 
-  stepWorld(world, { direction: -1 }, 1);
-  const left = world.cameraX;
-  stepWorld(world, { direction: 1 }, 100);
-  const right = world.cameraX;
+  const worlds = [60, 120, 144].map(rate => playAtFrameRate(rate, timeline, 3));
 
-  assert.deepEqual([left, right], [0, 78 * TILE - SCREEN_WIDTH]);
+  assert.deepEqual(worlds[1], worlds[0]);
+  assert.deepEqual(worlds[2], worlds[0]);
+});
+
+test("the camera follows the hero and stops at both ends of the level", () => {
+  const world = createWorld(levelFrom([".@" + ".".repeat(98), "#".repeat(100)]));
+  const atStart = world.cameraX;
+
+  steps(world, RIGHT, 240);
+  const following = world.hero.x - world.cameraX;
+  stepUntil(world, RIGHT, w => w.hero.vx === 0 && w.cameraX > 100 * TILE - SCREEN_WIDTH - 1);
+
+  assert.equal(atStart, 0);
+  assert.ok(Math.abs(following - CAMERA_LEAD) < 2 * TILE);
+  assert.ok(Math.abs(world.cameraX - (100 * TILE - SCREEN_WIDTH)) < 1);
+});
+
+test("the hero cannot leave the level at either end", () => {
+  const world = createWorld(levelFrom(["@...", "####"]));
+
+  steps(world, { direction: -1, jumpHeld: false, jumpPressed: false }, 120);
+  const left = world.hero.x;
+  steps(world, RIGHT, 240);
+
+  assert.ok(left > 0 && world.hero.x < 4 * TILE);
+});
+
+test("falling into a pit puts the hero back at the start", () => {
+  const world = createWorld(levelFrom([".@......C...", "####..######"]));
+
+  stepUntil(world, RIGHT, w => w.hero.y > 21 * TILE);
+  steps(world, IDLE, 240);
+
+  assert.deepEqual([world.hero.x, world.hero.y], [1.5 * TILE, 21 * TILE]);
+});
+
+test("after the checkpoint, falling into a pit puts the hero back at the checkpoint", () => {
+  const world = createWorld(levelFrom([".@C.........", "#####..#####"]));
+
+  stepUntil(world, RIGHT, w => w.hero.y > 21 * TILE);
+  steps(world, IDLE, 240);
+
+  assert.equal(world.checkpointReached, true);
+  assert.deepEqual([world.hero.x, world.hero.y], [2.5 * TILE, 21 * TILE]);
+});
+
+test("reaching the exit finishes the level and stops the world", () => {
+  const world = createWorld(levelFrom([".@....X...", "##########"]));
+
+  stepUntil(world, RIGHT, w => w.finished);
+  const x = world.hero.x;
+  steps(world, RIGHT, 60);
+
+  assert.equal(world.finished, true);
+  assert.equal(world.hero.x, x);
+});
+
+test("running through a bit collects it once", () => {
+  const world = createWorld(levelFrom([".@..1.0...", "##########"]));
+
+  stepUntil(world, RIGHT, w => w.hero.x > 5 * TILE);
+
+  assert.deepEqual(world.bits.map(b => b.collected), [true, false]);
+  assert.equal(world.bitsCollected, 1);
+});
+
+test("a bit out of reach stays", () => {
+  const world = createWorld(levelFrom(["...1......", "..........", "..........", ".@........", "##########"]));
+
+  stepUntil(world, RIGHT, w => w.hero.x > 6 * TILE);
+
+  assert.equal(world.bitsCollected, 0);
 });

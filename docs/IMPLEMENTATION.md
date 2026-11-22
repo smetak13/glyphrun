@@ -29,7 +29,7 @@ Done when: the window opens from the bar, shows the test level in the current th
 
 ## 2. Hero, physics and level basics
 
-- Status: todo
+- Status: done
 
 The hero plays. Physics module (constants, fixed-step integration, tile collisions) and the envelope computed from it. Input: arrows, Space or Arrow Up to jump, variable jump height, coyote time, jump buffer. Camera following the hero. Pits kill, the checkpoint saves, the exit finishes the level. Bits can be collected. P freezes the game.
 
