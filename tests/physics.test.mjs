@@ -7,6 +7,7 @@ import {
   COYOTE_TIME,
   GRAVITY,
   HERO_HEIGHT,
+  BIG_HERO_HEIGHT,
   HERO_WIDTH,
   JUMP_BUFFER_TIME,
   JUMP_VELOCITY,
@@ -194,6 +195,24 @@ test("a ceiling stops a jump without letting the hero through", () => {
   assert.ok(hero.y - HERO_HEIGHT >= 19 * TILE);
   run(hero, level, IDLE, 120);
   assert.deepEqual([hero.y, hero.grounded], [21 * TILE, true]);
+});
+
+test("a big hero bumps its head a tile lower than a small one", () => {
+  const level = levelFrom(["#####", ".....", ".....", ".....", "#####"]);
+  const small = standingHero(2, 21);
+  const big = standingHero(2, 21);
+  big.big = true;
+
+  const peak = hero => {
+    let top = hero.y;
+    for (let i = 0; i < 60; i++) {
+      run(hero, level, JUMP, 1);
+      top = Math.min(top, hero.y);
+    }
+    return top;
+  };
+
+  assert.deepEqual([peak(small), peak(big)], [18 * TILE + HERO_HEIGHT, 18 * TILE + BIG_HERO_HEIGHT]);
 });
 
 test("the hero jumps up through a platform and lands on top of it", () => {

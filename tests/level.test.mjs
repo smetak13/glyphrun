@@ -69,7 +69,16 @@ test("bits in the map are listed with their value and are not drawn with the lev
 
   const level = parseLevel(rows);
 
-  assert.deepEqual(level.bits, [{ col: 1, row: 10, text: "1" }, { col: 3, row: 10, text: "0" }]);
+  assert.deepEqual(level.bits, [{ col: 1, row: 10, text: "1", sudo: false }, { col: 3, row: 10, text: "0", sudo: false }]);
+  assert.deepEqual(levelGlyphs(level), []);
+});
+
+test("the sudo bit is listed as a bit that holds sudo and looks like any other", () => {
+  const rows = withRow(blankRows(5), 10, ".0S..");
+
+  const level = parseLevel(rows);
+
+  assert.deepEqual(level.bits, [{ col: 1, row: 10, text: "0", sudo: false }, { col: 2, row: 10, text: "1", sudo: true }]);
   assert.deepEqual(levelGlyphs(level), []);
 });
 

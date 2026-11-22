@@ -59,7 +59,7 @@ The story is told only on transition screens, never during play:
   ```
 - **Title card** before each level: the level's title and subtitle.
 - **Level summary**: presented as a commit, with a random message from a list (`fix bugs (hopefully)`, `remove console.log`, `it works, don't touch it`, …), followed by the score breakdown.
-- **Game over**: `Segmentation fault (core dumped)` and a random tip at the bottom (`Tip: have you tried turning it off and on again?`, `Tip: it's not a bug, it's a feature.`, …).
+- **Game over**: `Segmentation fault (core dumped)`, the cause of the last death with the level reached, and a random tip at the bottom (`Tip: have you tried turning it off and on again?`, `Tip: it's not a bug, it's a feature.`, …).
 - **Victory** after the boss, a Pyrrhic one:
   1. The screen goes black and a boot log scrolls in theme colours. The numbers are the run's real statistics:
      ```
@@ -92,11 +92,14 @@ All texts here are defaults and may be tuned during implementation.
 - A hit while big: the hero shrinks to `@` and blinks, invulnerable for a short moment.
 - A hit while small: a life is lost.
 - Falling into a pit (`/dev/null`) loses a life whether big or small.
-- After losing a life the hero respawns at the last checkpoint (level start or the mid-level checkpoint), small.
-- **sudo**: exactly one bit per level holds it. It looks like every other bit. Collected while small: the hero grows to `@@`. Collected while already big: score bonus only (`already root`). The generator always places it on a completable path, possibly in a harder spot.
+- After losing a life the hero respawns at the last checkpoint (level start or the mid-level checkpoint), small, after a short death beat (1.2 s). Bits already collected stay collected.
+- The invulnerability after shrinking lasts 1.5 s. A pit costs a life even while invulnerable.
+- The big hero is about two tiles tall and bumps its head on ceilings that the small one passes under.
+- **sudo**: exactly one bit per level holds it. It looks like every other bit. Collected while small: the hero grows to `@@`. Collected while already big: score bonus only (`already root`). The sudo bit scores as sudo, not as a bit, and is not counted among the bits. The generator always places it on a completable path, possibly in a harder spot.
 - sudo carries over into the next level until the hero is hit or loses a life.
 - **Checkpoint**: one in the middle of each level, `│▸`, lit when passed (`snapshot saved`).
 - No time limit. Time only feeds the score.
+- Losing the last life shows no toast: after the death beat the game over screen names the cause and the level (`/dev/null: write successful · level 2/5`).
 - When the last life is lost the run is over: the game over screen offers **Retry this seed from level 1**, **New seed**, **Copy seed** and **Main menu**.
 
 ## 6. Enemies and traps
@@ -213,14 +216,14 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 
 ## 9. Scoring and high scores
 
-- Points for bits, kills, sudo, boss hits and a time bonus per level. Initial values (tunable): bit 10, kill 100, small fork bomb 50, memory leak 200, sudo 250 (500 when already big), boss hit 1,000, boss defeated 5,000, time bonus per second under the level's par time.
+- Points for bits, kills, sudo, boss hits and a time bonus per level. Initial values (tunable): bit 10, kill 100, small fork bomb 50, memory leak 200, sudo 250 (500 when already big), boss hit 1,000, boss defeated 5,000, time bonus of 20 per whole second under the level's par time (60 s until the generator sets a par per level).
 - Local top 10: score, seed, level reached, date. From the list a seed can be copied or started directly.
 
 ## 10. Screens, menus and controls
 
 - **Main menu**: Continue (only when a run is in progress), New run, Enter seed, High scores, Settings. There is no quit item: the window is closed like Omatris, from the bar icon or the window manager. Going to the main menu from a run keeps the run for Continue.
 - **P**: freeze. The game stops in place with `[ PAUSED ]`; P again resumes.
-- **Esc**: in-game menu, pausing the game: Resume, Restart level, Copy seed, Main menu.
+- **Esc**: in-game menu, pausing the game: Resume, Copy seed, Main menu. There is no restart of a single level: a run is one attempt, and starting over means retrying the seed from level 1.
 - **Closing the window** during play hides it and opens the in-game menu, so nothing runs in the background. Opening it again from the bar shows that menu.
 - **Between levels**: the level summary (section 3).
 - **Game over** and **victory**: section 3 and section 5. Both offer Copy seed.

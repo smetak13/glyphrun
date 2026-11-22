@@ -1,5 +1,5 @@
 import { TILE, SCREEN_WIDTH, SCREEN_HEIGHT } from "./screen.mjs";
-import { createHero, stepHero, HERO_WIDTH, HERO_HEIGHT } from "./physics.mjs";
+import { createHero, stepHero, heroHeight, HERO_WIDTH } from "./physics.mjs";
 
 export const CAMERA_LEAD = 320;
 export const CAMERA_FOLLOW_RATE = 6;
@@ -10,7 +10,7 @@ export function createWorld(level) {
     level,
     cameraX: 0,
     hero: null,
-    bits: level.bits.map(bit => ({ col: bit.col, row: bit.row, text: bit.text, collected: false })),
+    bits: level.bits.map(bit => ({ col: bit.col, row: bit.row, text: bit.text, sudo: bit.sudo, collected: false })),
     bitsCollected: 0,
     checkpointReached: false,
     finished: false,
@@ -39,16 +39,21 @@ function keepInsideLevel(hero, level) {
   }
 }
 
-function collectBits(world) {
+export function respawnHero(world) {
+  placeHero(world, world.checkpointReached ? world.level.checkpoint : world.level.start);
+}
+
+function collectBits(world, events) {
   const hero = world.hero;
   for (const bit of world.bits) {
     if (bit.collected) continue;
     const touchesX = Math.abs((bit.col + 0.5) * TILE - hero.x) < HERO_WIDTH / 2 + BIT_REACH;
     const centerY = (bit.row + 0.5) * TILE;
-    const touchesY = centerY > hero.y - HERO_HEIGHT - BIT_REACH && centerY < hero.y + BIT_REACH;
+    const touchesY = centerY > hero.y - heroHeight(hero) - BIT_REACH && centerY < hero.y + BIT_REACH;
     if (touchesX && touchesY) {
       bit.collected = true;
-      world.bitsCollected++;
+      if (!bit.sudo) world.bitsCollected++;
+      events.push({ type: "bit", bit });
     }
   }
 }
@@ -58,17 +63,22 @@ function reached(world, tile) {
 }
 
 export function stepWorld(world, input, seconds) {
-  if (world.finished) return;
+  const events = [];
+  if (world.finished) return events;
   world.time += seconds;
   const hero = world.hero;
   stepHero(hero, input, world.level, seconds);
   keepInsideLevel(hero, world.level);
-  collectBits(world);
-  if (!world.checkpointReached && reached(world, world.level.checkpoint)) world.checkpointReached = true;
-  if (reached(world, world.level.exit)) world.finished = true;
-  if (hero.y - HERO_HEIGHT > SCREEN_HEIGHT) {
-    placeHero(world, world.checkpointReached ? world.level.checkpoint : world.level.start);
-    return;
+  collectBits(world, events);
+  if (!world.checkpointReached && reached(world, world.level.checkpoint)) {
+    world.checkpointReached = true;
+    events.push({ type: "checkpoint" });
   }
+  if (reached(world, world.level.exit)) {
+    world.finished = true;
+    events.push({ type: "exit" });
+  }
+  if (hero.y - heroHeight(hero) > SCREEN_HEIGHT) events.push({ type: "pit" });
   world.cameraX += (cameraTarget(world) - world.cameraX) * Math.min(1, seconds * CAMERA_FOLLOW_RATE);
+  return events;
 }

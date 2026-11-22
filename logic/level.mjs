@@ -10,6 +10,8 @@ const HERO = "@";
 const CHECKPOINT = "C";
 const EXIT = "X";
 const BITS = "01";
+const SUDO_BIT = "S";
+const SUDO_BIT_TEXT = "1";
 const BOTTOM_ROW = SCREEN_ROWS - 1;
 
 export function parseLevel(rows) {
@@ -23,7 +25,8 @@ export function parseLevel(rows) {
       if (tile === HERO) level.start = { col, row };
       else if (tile === CHECKPOINT) level.checkpoint = { col, row };
       else if (tile === EXIT) level.exit = { col, row };
-      else if (BITS.indexOf(tile) >= 0) level.bits.push({ col, row, text: tile });
+      else if (BITS.indexOf(tile) >= 0) level.bits.push({ col, row, text: tile, sudo: false });
+      else if (tile === SUDO_BIT) level.bits.push({ col, row, text: SUDO_BIT_TEXT, sudo: true });
     }
   });
   return level;

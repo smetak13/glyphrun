@@ -4,6 +4,7 @@ import Quickshell
 ShellRoot {
   Glyphrun {
     id: game
+    devTools: true
     shell: QtObject {
       function hide(pluginId) { Qt.quit() }
     }

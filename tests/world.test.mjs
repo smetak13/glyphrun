@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, stepWorld, CAMERA_LEAD } from "../logic/world.mjs";
+import { createWorld, respawnHero, stepWorld, CAMERA_LEAD } from "../logic/world.mjs";
 import { createClock, stepsFor, STEP_SECONDS } from "../logic/clock.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { TEST_LEVEL } from "../logic/testLevel.mjs";
@@ -90,21 +90,41 @@ test("the hero cannot leave the level at either end", () => {
   assert.ok(left > 0 && world.hero.x < 4 * TILE);
 });
 
-test("falling into a pit puts the hero back at the start", () => {
+function stepUntilEvent(world, input, type) {
+  for (let i = 0; i < 10000; i++) {
+    const events = stepWorld(world, input, STEP_SECONDS);
+    if (events.some(e => e.type === type)) return events;
+  }
+  return [];
+}
+
+test("falling into a pit is reported once the hero has left the screen", () => {
   const world = createWorld(levelFrom([".@......C...", "####..######"]));
 
-  stepUntil(world, RIGHT, w => w.hero.y > 21 * TILE);
-  steps(world, IDLE, 240);
+  const events = stepUntilEvent(world, RIGHT, "pit");
 
-  assert.deepEqual([world.hero.x, world.hero.y], [1.5 * TILE, 21 * TILE]);
+  assert.deepEqual(events.map(e => e.type), ["pit"]);
+  assert.ok(world.hero.y > 22 * TILE);
 });
 
-test("after the checkpoint, falling into a pit puts the hero back at the checkpoint", () => {
+test("respawning puts the hero back at the start, small", () => {
+  const world = createWorld(levelFrom([".@......C...", "####..######"]));
+  world.hero.big = true;
+  stepUntilEvent(world, RIGHT, "pit");
+
+  respawnHero(world);
+
+  assert.deepEqual([world.hero.x, world.hero.y, world.hero.big], [1.5 * TILE, 21 * TILE, false]);
+});
+
+test("after the checkpoint, respawning puts the hero back at the checkpoint", () => {
   const world = createWorld(levelFrom([".@C.........", "#####..#####"]));
+  const events = stepUntilEvent(world, RIGHT, "checkpoint");
+  stepUntilEvent(world, RIGHT, "pit");
 
-  stepUntil(world, RIGHT, w => w.hero.y > 21 * TILE);
-  steps(world, IDLE, 240);
+  respawnHero(world);
 
+  assert.deepEqual(events.map(e => e.type), ["checkpoint"]);
   assert.equal(world.checkpointReached, true);
   assert.deepEqual([world.hero.x, world.hero.y], [2.5 * TILE, 21 * TILE]);
 });
@@ -127,6 +147,35 @@ test("running through a bit collects it once", () => {
 
   assert.deepEqual(world.bits.map(b => b.collected), [true, false]);
   assert.equal(world.bitsCollected, 1);
+});
+
+test("collecting a bit reports it", () => {
+  const world = createWorld(levelFrom([".@..1.....", "##########"]));
+
+  const events = stepUntilEvent(world, RIGHT, "bit");
+
+  assert.equal(events[0].bit, world.bits[0]);
+});
+
+test("the sudo bit is reported but not counted among the bits", () => {
+  const world = createWorld(levelFrom([".@..S.....", "##########"]));
+
+  const events = stepUntilEvent(world, RIGHT, "bit");
+
+  assert.equal(events[0].bit.sudo, true);
+  assert.equal(world.bitsCollected, 0);
+});
+
+test("a big hero collects bits at its head height that a small one passes under", () => {
+  const rows = [".....1....", ".@........", "##########"];
+  const small = createWorld(levelFrom(rows));
+  const big = createWorld(levelFrom(rows));
+  big.hero.big = true;
+
+  stepUntil(small, RIGHT, w => w.hero.x > 6 * TILE);
+  stepUntil(big, RIGHT, w => w.hero.x > 6 * TILE);
+
+  assert.deepEqual([small.bitsCollected, big.bitsCollected], [0, 1]);
 });
 
 test("a bit out of reach stays", () => {

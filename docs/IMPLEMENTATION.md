@@ -39,9 +39,9 @@ Done when: the test level can be played from start to exit by keyboard and feels
 
 ## 3. Run state, HUD and messages
 
-- Status: todo
+- Status: done
 
-Lives, respawn at the last checkpoint, sudo (grow, shrink on hit with invulnerability blink, carry-over between levels, `already root` bonus), scoring, the HUD, hit and event toasts, kill messages under score popups (SPEC 6.4). Esc in-game menu (Resume, Restart level, Copy seed, Main menu) and the rule that hiding the window opens it. Copy seed via `wl-copy`.
+Lives, respawn at the last checkpoint, sudo (grow, shrink on hit with invulnerability blink, carry-over between levels, `already root` bonus), scoring, the HUD, hit and event toasts, kill messages under score popups (SPEC 6.4). Esc in-game menu (Resume, Copy seed, Main menu) and the rule that hiding the window opens it. Copy seed via `wl-copy`.
 
 Tests: lives and respawn rules, sudo rules, score rules, message selection per source.
 

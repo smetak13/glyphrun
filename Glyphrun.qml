@@ -3,8 +3,10 @@ import Quickshell
 import "ui"
 import "logic/clock.mjs" as Clock
 import "logic/level.mjs" as Level
+import "logic/messages.mjs" as Messages
+import "logic/run.mjs" as Run
+import "logic/seed.mjs" as Seed
 import "logic/testLevel.mjs" as TestLevel
-import "logic/world.mjs" as World
 
 Item {
   id: root
@@ -13,14 +15,23 @@ Item {
   readonly property string pluginId: "smetak13.glyphrun"
   readonly property bool opened: window.visible
   property bool closingFromHost: false
+  property bool devTools: false
   readonly property var level: Level.parseLevel(TestLevel.TEST_LEVEL)
-  property var world: World.createWorld(level)
+  property var run: Run.createRun(newSeed(), level)
+  property var world: run.world
   property var clock: Clock.createClock()
   property bool leftHeld: false
   property bool rightHeld: false
   property bool jumpHeld: false
   property bool jumpPressed: false
   property bool paused: false
+  property bool menuOpen: false
+  property int menuIndex: 0
+  readonly property var menuItems: ["Resume", "Copy seed", "Main menu"]
+  readonly property var devKills: Messages.KILLABLE_SOURCES.map(function(source) { return { source: source, small: false } })
+    .concat([{ source: "fork", small: true }])
+  property int devHitIndex: 0
+  property int devKillIndex: 0
 
   function open(payloadJson) {
     window.visible = true
@@ -50,25 +61,82 @@ Item {
     jumpPressed = false
   }
 
-  function restartLevel() {
-    world = World.createWorld(level)
+  function newSeed() {
+    return Math.floor(Math.random() * 0x100000000)
+  }
+
+  function showWorld() {
+    world = run.world
     clock = Clock.createClock()
     gameView.sync()
   }
 
-  function frame(frameTime) {
-    if (paused) return
-    if (world.finished) {
-      if (jumpPressed) restartLevel()
-      jumpPressed = false
+  function startRun(seed) {
+    run = Run.createRun(seed, level)
+    showWorld()
+  }
+
+  function finishWaiting() {
+    if (run.over) startRun(run.seed)
+    else if (run.levelNumber === Run.LEVEL_COUNT) startRun(newSeed())
+    else {
+      Run.nextLevel(run, level)
+      showWorld()
+    }
+  }
+
+  function openMenu() {
+    if (run.over) return
+    releaseKeys()
+    paused = false
+    menuIndex = 0
+    menuOpen = true
+  }
+
+  function copySeed() {
+    Quickshell.execDetached(["wl-copy", "--", Seed.formatSeed(run.seed)])
+    Run.showToast(run, Messages.EVENTS.seedCopied, "cyan")
+    gameView.sync()
+  }
+
+  function activateMenu() {
+    const item = menuItems[menuIndex]
+    if (item === "Copy seed") {
+      copySeed()
       return
     }
+    menuOpen = false
+    if (item === "Main menu") startRun(newSeed())
+  }
+
+  function menuKey(key) {
+    if (key === Qt.Key_Escape) menuOpen = false
+    else if (key === Qt.Key_Up) menuIndex = (menuIndex + menuItems.length - 1) % menuItems.length
+    else if (key === Qt.Key_Down) menuIndex = (menuIndex + 1) % menuItems.length
+    else if (key === Qt.Key_Return || key === Qt.Key_Enter || key === Qt.Key_Space) activateMenu()
+  }
+
+  function devKey(key) {
+    if (key === Qt.Key_H) {
+      Run.hitHero(run, Messages.ENEMY_SOURCES[devHitIndex++ % Messages.ENEMY_SOURCES.length])
+    } else if (key === Qt.Key_K) {
+      const kill = devKills[devKillIndex++ % devKills.length]
+      Run.killEnemy(run, kill.source, world.hero.x, world.hero.y - 60, kill.small)
+    } else return false
+    return true
+  }
+
+  function frame(frameTime) {
+    if (paused || menuOpen) return
+    const waiting = run.over || world.finished
     const steps = Clock.stepsFor(clock, frameTime)
     for (let i = 0; i < steps; i++) {
-      const input = { direction: (rightHeld ? 1 : 0) - (leftHeld ? 1 : 0), jumpHeld: jumpHeld, jumpPressed: jumpPressed }
-      World.stepWorld(world, input, Clock.STEP_SECONDS)
-      jumpPressed = false
+      const input = { direction: (rightHeld ? 1 : 0) - (leftHeld ? 1 : 0), jumpHeld: jumpHeld, jumpPressed: jumpPressed && !waiting }
+      Run.stepRun(run, input, Clock.STEP_SECONDS)
+      if (!waiting) jumpPressed = false
     }
+    if (waiting && jumpPressed) finishWaiting()
+    jumpPressed = false
     gameView.sync()
   }
 
@@ -87,6 +155,7 @@ Item {
     onVisibleChanged: {
       if (visible) return
       root.releaseKeys()
+      root.openMenu()
       if (!root.closingFromHost && root.shell) root.shell.hide(root.pluginId)
     }
 
@@ -96,7 +165,15 @@ Item {
       focus: true
 
       Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_P) {
+        if (root.menuOpen) {
+          if (!event.isAutoRepeat || event.key === Qt.Key_Up || event.key === Qt.Key_Down) root.menuKey(event.key)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Escape) {
+          if (!event.isAutoRepeat) root.openMenu()
+          event.accepted = true
+        } else if (root.devTools && !event.isAutoRepeat && root.devKey(event.key)) {
+          event.accepted = true
+        } else if (event.key === Qt.Key_P) {
           if (!event.isAutoRepeat) root.paused = !root.paused
           event.accepted = true
         } else if (!event.isAutoRepeat) event.accepted = root.setHeld(event.key, true)
@@ -108,8 +185,12 @@ Item {
       GameView {
         id: gameView
         anchors.fill: parent
+        run: root.run
         world: root.world
         paused: root.paused
+        menuOpen: root.menuOpen
+        menuIndex: root.menuIndex
+        menuItems: root.menuItems
         colors: theme.colors
         pixelRatio: window.devicePixelRatio
       }

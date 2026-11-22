@@ -13,17 +13,22 @@ export const COYOTE_TIME = 0.1;
 export const JUMP_BUFFER_TIME = 0.12;
 export const HERO_WIDTH = 16;
 export const HERO_HEIGHT = 22;
+export const BIG_HERO_HEIGHT = 44;
 
 const HALF_WIDTH = HERO_WIDTH / 2;
 const EDGE = 1e-6;
 const ENVELOPE_STEP = 1 / 120;
 
 export function createHero(x, y) {
-  return { x, y, vx: 0, vy: 0, grounded: true, jumping: false, coyote: 0, buffer: 0 };
+  return { x, y, vx: 0, vy: 0, big: false, grounded: true, jumping: false, coyote: 0, buffer: 0 };
 }
 
 export function isSolid(tile) {
   return tile === "#" || tile === "B";
+}
+
+export function heroHeight(hero) {
+  return hero.big ? BIG_HERO_HEIGHT : HERO_HEIGHT;
 }
 
 function approach(value, target, delta) {
@@ -31,7 +36,7 @@ function approach(value, target, delta) {
 }
 
 function rowsOf(hero) {
-  return [Math.floor((hero.y - HERO_HEIGHT) / TILE), Math.floor((hero.y - EDGE) / TILE)];
+  return [Math.floor((hero.y - heroHeight(hero)) / TILE), Math.floor((hero.y - EDGE) / TILE)];
 }
 
 function colsOf(hero) {
@@ -81,9 +86,9 @@ function moveY(hero, dy, level) {
       hero.grounded = true;
     }
   } else if (dy < 0) {
-    const row = Math.floor((hero.y - HERO_HEIGHT) / TILE);
+    const row = Math.floor((hero.y - heroHeight(hero)) / TILE);
     if (rowHas(level, row, cols, isSolid)) {
-      hero.y = (row + 1) * TILE + HERO_HEIGHT;
+      hero.y = (row + 1) * TILE + heroHeight(hero);
       hero.vy = 0;
     }
   }
