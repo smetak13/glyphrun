@@ -230,7 +230,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 ## 11. Visuals and theme
 
 - The look of `docs/prototype/demo.html`: a world of glyphs with glow, particles on jumps, landings and kills, score popups, screen shake on hits and stomps, an RGB-split glitch on damage and death, a parallax hexdump background, CRT scanlines and a vignette.
-- Colours come from the active Omarchy theme's 16-colour terminal palette (`color0`–`color15` in its `colors.toml`), so the game looks like a live terminal in every theme. If a theme lacks the palette, the shell's colour roles are used instead. Colours update live when the theme changes.
+- Colours come from the active Omarchy theme's 16-colour terminal palette, so the game looks like a live terminal in every theme. Omarchy themes name these colours in `colors.toml` the way Omarchy's terminal templates read them: `color0` `background`, `color1`–`color6` `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `color7` `foreground`, `color8` `muted`, `color9`–`color14` the `bright_` variants, `color15` `bright_foreground`. Numbered keys `color0`–`color15` are accepted too and win over the names. A missing bright colour falls back to its normal colour; anything else missing falls back to the shell's colour roles. Colours update live when the theme changes.
 
 | Element | Palette colour |
 |---|---|

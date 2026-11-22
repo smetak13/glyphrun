@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "smetak13.glyphrun",
+  "name": "Glyphrun",
+  "version": "0.1.0",
+  "author": "Simon Smejkal",
+  "description": "Retro platformer made in ASCII, living in your Omarchy theme.",
+  "kinds": [
+    "bar-widget",
+    "panel"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "panel": "Glyphrun.qml"
+  },
+  "barWidget": {
+    "displayName": "Glyphrun",
+    "description": "Open the Glyphrun game window",
+    "category": "Fun",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/smetak13/glyphrun",
+  "repository": "https://github.com/smetak13/glyphrun"
+}

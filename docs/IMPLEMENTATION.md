@@ -19,7 +19,7 @@ Done when:
 
 ## 1. Plugin skeleton and theme
 
-- Status: todo
+- Status: done
 
 The plugin exists and opens. Manifest (`smetak13.glyphrun`, kinds `bar-widget` and `panel`, `keepLoaded`), bar widget, `FloatingWindow` with the fixed 960 × 540 logical screen scaled to the window, `FrameAnimation` loop with a fixed physics timestep. Theme module: reads `color0`–`color15` from the active theme's `colors.toml`, falls back to shell roles, and updates live on theme change. A hand-written test level (the prototype's layout) is drawn with the chosen renderer. Dev tooling: `scripts/run-dev.sh` (temporary Quickshell window, as Omatris does), `scripts/link-dev.sh` (symlinks the repo to `~/.config/omarchy/plugins/smetak13.glyphrun`), `scripts/check.sh` (`omarchy plugin validate` plus `node --test`). README with install and development instructions.
 
