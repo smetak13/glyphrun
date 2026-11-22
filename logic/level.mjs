@@ -13,11 +13,13 @@ const BITS = "01";
 const SUDO_BIT = "S";
 const SUDO_BIT_TEXT = "1";
 const BOTTOM_ROW = SCREEN_ROWS - 1;
+const SPIKES = "^";
+const ENEMY_KINDS = { b: "bug", z: "zombie", o: "ping", v: "hang" };
 
 export function parseLevel(rows) {
   if (rows.length !== SCREEN_ROWS) throw new Error("a level has " + SCREEN_ROWS + " rows, got " + rows.length);
   const cols = rows[0].length;
-  const level = { cols, rows, start: null, checkpoint: null, exit: null, bits: [] };
+  const level = { cols, rows, start: null, checkpoint: null, exit: null, bits: [], enemies: [] };
   rows.forEach((line, row) => {
     if (line.length !== cols) throw new Error("level row " + row + " has " + line.length + " columns, expected " + cols);
     for (let col = 0; col < cols; col++) {
@@ -27,9 +29,17 @@ export function parseLevel(rows) {
       else if (tile === EXIT) level.exit = { col, row };
       else if (BITS.indexOf(tile) >= 0) level.bits.push({ col, row, text: tile, sudo: false });
       else if (tile === SUDO_BIT) level.bits.push({ col, row, text: SUDO_BIT_TEXT, sudo: true });
+      else if (ENEMY_KINDS[tile]) level.enemies.push({ kind: ENEMY_KINDS[tile], col, row });
+      else if (tile === SPIKES && line[col - 1] !== SPIKES) level.enemies.push({ kind: "spikes", col, row, tiles: spikeRun(line, col) });
     }
   });
   return level;
+}
+
+function spikeRun(line, col) {
+  let tiles = 1;
+  while (line[col + tiles] === SPIKES) tiles++;
+  return tiles;
 }
 
 export function tileAt(level, col, row) {

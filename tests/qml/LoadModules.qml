@@ -1,5 +1,6 @@
 import QtQuick
 import "../../logic/clock.mjs" as Clock
+import "../../logic/enemies.mjs" as Enemies
 import "../../logic/level.mjs" as Level
 import "../../logic/messages.mjs" as Messages
 import "../../logic/physics.mjs" as Physics
@@ -27,6 +28,7 @@ QtObject {
       Run.hitHero(run, Messages.ENEMY_SOURCES[0])
       Run.killEnemy(run, Messages.KILLABLE_SOURCES[0], 0, 0, false)
       Score.timeBonus(10)
+      Enemies.pingHeight(1)
       Level.checkpointGlyphs(level.checkpoint, world.checkpointReached)
       const envelope = Physics.computeEnvelope()
       console.log("GLYPHRUN_MODULES_OK " + Seed.formatSeed(run.seed) + " " + run.score + " " + Screen.SCREEN_WIDTH + " " + world.hero.y + " " + envelope.maxGap)

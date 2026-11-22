@@ -49,7 +49,7 @@ Done when: on the test level the hero can grow, shrink, die, respawn and lose th
 
 ## 4. Basic enemies
 
-- Status: todo
+- Status: done
 
 The five basic enemies of SPEC 6.1: bug, zombie process, kernel spikes, ping, hang. Shared enemy framework: placement on tiles, turning at walls, other enemies and ledges, stomp detection, hit detection, kill messages. Each enemy is placed on the test level for playing.
 

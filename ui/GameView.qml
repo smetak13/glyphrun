@@ -83,6 +83,7 @@ Item {
       item.visible = !world.bits[i].collected
       item.y = item.restY + Math.sin(world.time * 3 + item.x) * 3
     }
+    for (let i = 0; i < enemies.count; i++) enemies.itemAt(i).sync(world.enemies[i], world.time)
     checkpointLit = world.checkpointReached
     finished = world.finished
     over = run.over
@@ -161,6 +162,17 @@ Item {
           text: modelData.text
           size: modelData.size
           color: view.colors[modelData.role]
+        }
+      }
+
+      Repeater {
+        id: enemies
+        model: view.world.enemies
+
+        Enemy {
+          required property var modelData
+          enemy: modelData
+          colors: view.colors
         }
       }
 

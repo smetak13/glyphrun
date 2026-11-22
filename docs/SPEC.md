@@ -113,8 +113,8 @@ Ten in the MVP. Basic ones appear from level 1; advanced ones join from level 3.
 | 1 | `ж` | bug | Walks back and forth on the ground. | Stomp from above. |
 | 2 | `Z` | zombie process | Floats slowly back and forth over a short stretch, bobbing, labelled `<defunct>`. | Stomp from above. |
 | 3 | `^^^` | kernel spikes | Static spikes on the ground or on a platform. | No. |
-| 4 | `o` | ping | Hops in place at a fixed rhythm. Pass under it while it is up, or jump over it while it is down. | Stomp while it is on the ground. |
-| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen. Drops when the hero passes beneath, lies on the ground for a moment, then slowly winds back up. | Stomp while it lies on the ground. |
+| 4 | `o` | ping | Hops in place at a fixed rhythm. Pass under it while it is up, or jump over it while it is down. | Stomp from above, on the ground or mid-hop. |
+| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen. Drops when the hero passes beneath, lies on the ground for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
 
 ### 6.2 Advanced
 
@@ -125,6 +125,8 @@ Ten in the MVP. Basic ones appear from level 1; advanced ones join from level 3.
 | 8 | `*`, `-->` | dangling pointer | An emitter `*` fires `-->` horizontally across the screen, at one or two tiles above the ground. The emitter blinks before each shot. Fires only while on screen. | No. |
 | 9 | `&` | fork bomb | Walks like a bug. Stomped, it splits into two small `&` that run in opposite directions, faster, bouncing off obstacles. A small one dies to one stomp and does not split. | Stomp; small ones too. |
 | 10 | `%`, `~~~` | memory leak | A source `%` drips and a puddle `~~~` grows from it at a constant speed once it is on screen. Its maximum extent is always drawn as a dotted frame labelled `malloc(n)`, so the player sees how far it will reach. Touching the puddle is a hit. | Stomp the source: the puddle disappears. |
+
+A stomp bounces the hero up; holding jump makes the bounce higher, like a jump. Touching a killable enemy is a stomp when the hero was above it a moment before, even if the enemy is moving up into the hero; otherwise it is a hit. Spikes always hit. After the hero loses a life, the enemies still alive return to where they started; killed ones stay dead.
 
 The memory leak's source sits at the far end of its frame, on a one-tile target, so stomping it is about as hard as jumping the whole puddle. Killing it is worth more than any other kill, so it is a real choice rather than always jumping over.
 

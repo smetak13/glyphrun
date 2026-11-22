@@ -115,6 +115,10 @@ function handleEvent(run, event) {
     run.score += run.timeBonus;
   } else if (event.type === "pit") {
     loseLife(run, "pit");
+  } else if (event.type === "hit") {
+    hitHero(run, event.source);
+  } else if (event.type === "kill") {
+    killEnemy(run, event.source, event.x, event.y, false);
   }
 }
 
