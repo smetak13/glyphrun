@@ -44,6 +44,14 @@ test("a run of platform tiles is drawn as one bracketed platform", () => {
   assert.deepEqual(glyphs, [{ x: TILE, y: 10 * TILE + 2, text: "[====]", role: "platform", size: 20 }]);
 });
 
+test("a pipe is drawn as one cyan pipe with a rim on top", () => {
+  const rows = withRow(withRow(blankRows(4), 19, ".HH."), 20, ".HH.");
+
+  const glyphs = levelGlyphs(parseLevel(rows));
+
+  assert.deepEqual(glyphs.map(g => [g.text, g.x, g.y, g.role]), [["╓──╖", TILE, 19 * TILE, "cyan"], ["║  ║", TILE, 20 * TILE, "cyan"]]);
+});
+
 test("each pit is labelled /dev/null at its first column", () => {
   const rows = withRow(blankRows(8), 21, "##..#..#");
 

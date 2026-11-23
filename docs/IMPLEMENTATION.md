@@ -83,13 +83,15 @@ Notes: `node scripts/pass-rate.mjs 1000` gives a first-attempt pass rate of 98.5
 
 ## 7. Advanced enemies and levels 3–5
 
-- Status: todo
+- Status: done
 
 The five advanced enemies of SPEC 6.2: cron job, pipe daemon, dangling pointer, fork bomb, memory leak, with their warnings and messages. Chunks for them, the advanced part of the draft, levels 3–5 in the generator with the full difficulty table, validator support for the new chunks.
 
 Tests: per enemy as in task 4, plus the cron rhythm and warning, pipe timing with jitter, pointer firing only on screen, fork split and the small ones' rules, leak growth to the marked maximum and its kill; per-chunk safe passage for every new hazard chunk; full-run generation over many seeds.
 
 Done when: a full five-level run without the boss can be played from generated seeds.
+
+Notes: after the first round of play, cron lost its warning and its column grew past jump height, the pipe grew to three tiles so an emerged daemon cannot be jumped, small fork bombs dash apart after a split and ignore the hero until it has landed clear of them, and the memory leak became a cycle whose full puddle cannot be jumped: lone leaks are 7 or 10 tiles, small ones come only in a row of three. From level 3 spikes also come as a run of five and as a row of three pairs. `node scripts/pass-rate.mjs 1000` gives a first-attempt pass rate of 95.2 % (level 1: 96.5 %, 2: 97.3 %, 3: 89.5 %, 4: 95.2 %, 5: 97.5 %), every failure on the difficulty rule, no fallback needed. Level 5 reaches about 3.2 enemies per screen with the current chunks, so its table value is 3.25 instead of 3.5. The chunk safe-passage test now covers about 660 chunk and enemy combinations and takes about 18 s.
 
 ## 8. KERNEL PANIC
 
@@ -121,7 +123,22 @@ Tests: the frame-rate watcher's switching rule.
 
 Done when: the game looks like `docs/prototype/demo.html` with full effects and stays smooth with reduced effects on weaker hardware.
 
-## 11. Release preparation
+## 11. Terrain, difficulty and run length
+
+- Status: todo
+
+The levels are too easy and the terrain too bland: even level 5 is easy to finish, and a whole run takes about three minutes. Make the generated levels varied and hard, so that reaching the boss is a real challenge, closer to the difficulty of a classic platformer. To be shaped by a grilling session before it starts; the starting points:
+
+- New terrain obstacles and chunks, so each level looks and plays differently every time: more gaps in a row, varied heights, and other terrain features to be decided.
+- A higher concentration of hazards and enemies, with the difficulty table and the validator's hazard ranges retuned.
+- Combination chunks that put several enemies together on one screen: for example several dangling pointers firing at different heights, or memory leaks in a row with only a small gap between them. Difficulty comes from terrain and enemy combinations together, not from enemies alone.
+- More levels and longer later levels, with the story, title cards and difficulty table extended to match.
+
+Tests: to be decided with the scope; at least the validator over a large seed sample, per-chunk safe passage for every new hazard chunk and the pass-rate report.
+
+Done when: generated runs are varied, a full run is challenging to the user, and every level offered is still completable.
+
+## 12. Release preparation
 
 - Status: todo
 

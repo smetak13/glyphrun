@@ -14,7 +14,9 @@ const SUDO_BIT = "S";
 const SUDO_BIT_TEXT = "1";
 const BOTTOM_ROW = SCREEN_ROWS - 1;
 const SPIKES = "^";
-export const ENEMY_KINDS = { b: "bug", z: "zombie", o: "ping", v: "hang" };
+const PIPE = "H";
+const PUDDLE = "~";
+export const ENEMY_KINDS = { b: "bug", z: "zombie", o: "ping", v: "hang", c: "cron", p: "pipe", d: "pointer", f: "fork", m: "leak" };
 
 export function parseLevel(rows) {
   if (rows.length !== SCREEN_ROWS) throw new Error("a level has " + SCREEN_ROWS + " rows, got " + rows.length);
@@ -29,16 +31,24 @@ export function parseLevel(rows) {
       else if (tile === EXIT) level.exit = { col, row };
       else if (BITS.indexOf(tile) >= 0) level.bits.push({ col, row, text: tile, sudo: false });
       else if (tile === SUDO_BIT) level.bits.push({ col, row, text: SUDO_BIT_TEXT, sudo: true });
+      else if (ENEMY_KINDS[tile] === "pipe") level.enemies.push({ kind: "pipe", col, row, tiles: runRight(rows[row + 1], col, PIPE) });
+      else if (ENEMY_KINDS[tile] === "leak") level.enemies.push({ kind: "leak", col, row, extent: runLeft(line, col - 1, PUDDLE) });
       else if (ENEMY_KINDS[tile]) level.enemies.push({ kind: ENEMY_KINDS[tile], col, row });
-      else if (tile === SPIKES && line[col - 1] !== SPIKES) level.enemies.push({ kind: "spikes", col, row, tiles: spikeRun(line, col) });
+      else if (tile === SPIKES && line[col - 1] !== SPIKES) level.enemies.push({ kind: "spikes", col, row, tiles: runRight(line, col, SPIKES) });
     }
   });
   return level;
 }
 
-function spikeRun(line, col) {
-  let tiles = 1;
-  while (line[col + tiles] === SPIKES) tiles++;
+function runRight(line, col, tile) {
+  let tiles = 0;
+  while (line[col + tiles] === tile) tiles++;
+  return tiles;
+}
+
+function runLeft(line, col, tile) {
+  let tiles = 0;
+  while (line[col - tiles] === tile) tiles++;
   return tiles;
 }
 
@@ -62,6 +72,8 @@ export function levelGlyphs(level) {
         else add(col * TILE, row * TILE - 2, "▀", "ground", 26);
       } else if (tile === BLOCK) {
         add(col * TILE, row * TILE - 2, "▓", "block", 26);
+      } else if (tile === PIPE && tileAt(level, col - 1, row) !== PIPE) {
+        add(col * TILE, row * TILE, pipeGlyph(level, col, row), "cyan", 20);
       } else if (tile === PLATFORM && tileAt(level, col - 1, row) !== PLATFORM) {
         let length = 1;
         while (tileAt(level, col + length, row) === PLATFORM) length++;
@@ -74,6 +86,13 @@ export function levelGlyphs(level) {
   }
   if (level.exit) addExit(add, level.exit);
   return glyphs;
+}
+
+function pipeGlyph(level, col, row) {
+  let width = 1;
+  while (tileAt(level, col + width, row) === PIPE) width++;
+  const inner = width * 2 - 2;
+  return tileAt(level, col, row - 1) === PIPE ? "║" + " ".repeat(inner) + "║" : "╓" + "─".repeat(inner) + "╖";
 }
 
 export function checkpointGlyphs(checkpoint, lit) {

@@ -1,20 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_ATTEMPTS, playableLevel, searchPath, validateLevel } from "../logic/validator.mjs";
-import { BASIC_KINDS, generateLevel, generateSafeLevel } from "../logic/generator.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, DEFAULT_KINDS, generateLevel, generateSafeLevel } from "../logic/generator.mjs";
 import { CHUNKS } from "../logic/chunks.mjs";
 import { parseLevel } from "../logic/level.mjs";
-import { createEnemy, stepEnemies } from "../logic/enemies.mjs";
+import { createEnemies, stepEnemies } from "../logic/enemies.mjs";
 import { computeEnvelope, createHero, RUN_SPEED } from "../logic/physics.mjs";
 import { CAMERA_FOLLOW_RATE, CAMERA_LEAD } from "../logic/world.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
-import { SCREEN_ROWS, SCREEN_WIDTH } from "../logic/screen.mjs";
+import { SCREEN_ROWS, SCREEN_WIDTH, TILE } from "../logic/screen.mjs";
 
 const SEED = 1;
 const LEVELS = [1, 2, 3, 4, 5];
 const SAMPLE = Array.from({ length: 200 }, (_, i) => Math.imul(i + 1, 0x2545f491) >>> 0);
 const PHASES = Array.from({ length: 16 }, (_, i) => i * 0.25);
 const CHUNK_MARGIN = 10;
+const START_CLEARANCE = 3 * TILE;
 
 function ground(width) {
   return "#".repeat(width);
@@ -82,13 +83,17 @@ function chunkAlone(level, chunk) {
   });
   let row = SCREEN_ROWS - 1;
   while (edgeTile(rows[row][0]) !== ".") row--;
-  return { level: parseLevel(rows), from: { col: 0, row } };
+  const alone = parseLevel(rows);
+  const inChunk = level.enemies.filter(enemy => enemy.col >= chunk.col && enemy.col < chunk.col + chunk.width);
+  alone.enemies = alone.enemies.map((enemy, i) => Object.assign({}, inChunk[i], { col: enemy.col }));
+  return { level: alone, from: { col: 0, row } };
 }
 
 function passesAtPhase(alone, phase) {
-  const enemies = alone.level.enemies.map(createEnemy);
+  const enemies = createEnemies(alone.level.enemies);
   const faraway = createHero(-1000, 0);
-  for (let i = 0; i < Math.round(phase / STEP_SECONDS); i++) stepEnemies(enemies, alone.level, faraway, STEP_SECONDS);
+  for (let i = 0; i < Math.round(phase / STEP_SECONDS); i++) stepEnemies(enemies, alone.level, faraway, STEP_SECONDS, 0);
+  for (const enemy of enemies) enemy.shots = enemy.shots.filter(x => x > START_CLEARANCE);
   return searchPath(alone.level, { from: alone.from, goalCol: alone.level.cols - 1, dynamic: true, enemies });
 }
 
@@ -247,9 +252,13 @@ test("every hazard chunk with every enemy it can hold has a safe passage at ever
   }
 
   for (const chunk of CHUNKS.filter(candidate => candidate.role === "body" && candidate.map.join("").includes("E"))) {
-    for (const kind of chunk.kinds || BASIC_KINDS) assert.ok(covered[chunk.name + " " + kind], chunk.name + " never held " + kind);
+    for (const kind of chunk.kinds || DEFAULT_KINDS) assert.ok(covered[chunk.name + " " + kind], chunk.name + " never held " + kind);
   }
-  for (const kind of BASIC_KINDS) assert.ok(covered["intro " + kind], "intro never held " + kind);
+  for (const kind of BASIC_KINDS.concat(ADVANCED_KINDS)) {
+    const own = CHUNKS.filter(chunk => chunk.role === "intro" && chunk.kinds && chunk.kinds.includes(kind));
+    const intro = own.length > 0 ? own[0].name : "intro";
+    assert.ok(covered[intro + " " + kind], intro + " never held " + kind);
+  }
 });
 
 test("a bug in a corridor too low to jump has no safe passage", () => {

@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BASIC_KINDS, DIFFICULTY, DRAFTED_BASIC, MAX_RISE, PACE_TILES_PER_SECOND, generateLevel, introductions, maxGapTiles } from "../logic/generator.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, DIFFICULTY, DRAFTED_ADVANCED, DRAFTED_BASIC, MAX_RISE, PACE_TILES_PER_SECOND, generateLevel, introductions, maxGapTiles } from "../logic/generator.mjs";
 import { computeEnvelope } from "../logic/physics.mjs";
+import { CHUNKS } from "../logic/chunks.mjs";
+import { CRON_HEIGHTS, CRON_PERIODS } from "../logic/enemies.mjs";
 import { SCREEN_COLS, SCREEN_ROWS, TILE } from "../logic/screen.mjs";
 
 const LEVELS = [1, 2, 3, 4, 5];
@@ -75,12 +77,17 @@ test("another attempt at the same level gives a different layout", () => {
   assert.notDeepEqual(generateLevel(0x7f3a91c2, 2, 1).rows, generateLevel(0x7f3a91c2, 2, 0).rows);
 });
 
-test("the draft holds four different basic enemies", () => {
+function tiers(intros) {
+  return intros.map(kinds => ({ basic: kinds.filter(kind => BASIC_KINDS.includes(kind)), advanced: kinds.filter(kind => ADVANCED_KINDS.includes(kind)) }));
+}
+
+test("the draft holds four different basic enemies and three different advanced ones", () => {
   for (const seed of SEEDS) {
     const drafted = [].concat(...introductions(seed));
 
-    assert.equal(new Set(drafted).size, DRAFTED_BASIC);
-    assert.ok(drafted.every(kind => BASIC_KINDS.includes(kind)));
+    assert.equal(new Set(drafted.filter(kind => BASIC_KINDS.includes(kind))).size, DRAFTED_BASIC);
+    assert.equal(new Set(drafted.filter(kind => ADVANCED_KINDS.includes(kind))).size, DRAFTED_ADVANCED);
+    assert.equal(drafted.length, DRAFTED_BASIC + DRAFTED_ADVANCED);
   }
 });
 
@@ -88,26 +95,40 @@ test("level 1 introduces two basic enemies, level 2 one or two, level 4 the rest
   const level2Counts = new Set();
 
   for (const seed of SEEDS) {
-    const intros = introductions(seed);
-    assert.equal(intros[0].length, 2);
-    assert.ok(intros[1].length === 1 || intros[1].length === 2);
-    assert.equal(intros[3].length, 2 - intros[1].length);
-    assert.deepEqual([intros[2], intros[4]], [[], []]);
-    level2Counts.add(intros[1].length);
+    const basic = tiers(introductions(seed)).map(level => level.basic);
+    assert.equal(basic[0].length, 2);
+    assert.ok(basic[1].length === 1 || basic[1].length === 2);
+    assert.equal(basic[3].length, 2 - basic[1].length);
+    assert.deepEqual([basic[2], basic[4]], [[], []]);
+    level2Counts.add(basic[1].length);
   }
 
   assert.deepEqual([...level2Counts].sort(), [1, 2]);
 });
 
-test("every basic enemy is sometimes left out of the draft", () => {
+test("advanced enemies join at level 3, one or two of them, and the rest at level 4", () => {
+  const level3Counts = new Set();
+
+  for (const seed of SEEDS) {
+    const advanced = tiers(introductions(seed)).map(level => level.advanced);
+    assert.deepEqual([advanced[0], advanced[1], advanced[4]], [[], [], []]);
+    assert.ok(advanced[2].length === 1 || advanced[2].length === 2);
+    assert.equal(advanced[3].length, DRAFTED_ADVANCED - advanced[2].length);
+    level3Counts.add(advanced[2].length);
+  }
+
+  assert.deepEqual([...level3Counts].sort(), [1, 2]);
+});
+
+test("every enemy is sometimes left out of the draft", () => {
   const leftOut = new Set();
 
   for (const seed of SEEDS) {
     const drafted = [].concat(...introductions(seed));
-    for (const kind of BASIC_KINDS) if (!drafted.includes(kind)) leftOut.add(kind);
+    for (const kind of BASIC_KINDS.concat(ADVANCED_KINDS)) if (!drafted.includes(kind)) leftOut.add(kind);
   }
 
-  assert.equal(leftOut.size, BASIC_KINDS.length);
+  assert.equal(leftOut.size, BASIC_KINDS.length + ADVANCED_KINDS.length);
 });
 
 test("a level holds only enemies introduced in it or before", () => {
@@ -220,8 +241,8 @@ test("the first part of a level holds only the easiest body chunks", () => {
   });
 });
 
-test("levels 1 and 2 hold about as many enemies per screen as the table says", () => {
-  for (const number of [1, 2]) {
+test("every level holds about as many enemies per screen as the table says", () => {
+  for (const number of LEVELS) {
     let enemies = 0;
     let cols = 0;
     for (const seed of SEEDS) {
@@ -231,4 +252,40 @@ test("levels 1 and 2 hold about as many enemies per screen as the table says", (
     }
     assert.ok(Math.abs((enemies / cols) * SCREEN_COLS - DIFFICULTY[number - 1].enemiesPerScreen) < 0.15);
   }
+});
+
+test("each cron vent and pipe gets its own rhythm from the seed", () => {
+  const timed = [];
+  eachLevel(level => {
+    for (const enemy of level.enemies) if (enemy.kind === "cron" || enemy.kind === "pipe") timed.push(enemy);
+  });
+  const crons = timed.filter(enemy => enemy.kind === "cron");
+  const pipes = timed.filter(enemy => enemy.kind === "pipe");
+
+  assert.ok(crons.every(cron => CRON_PERIODS.includes(cron.period) && CRON_HEIGHTS.includes(cron.height) && cron.phase >= 0 && cron.phase < cron.period));
+  assert.equal(new Set(crons.map(cron => cron.period)).size, CRON_PERIODS.length);
+  assert.equal(new Set(crons.map(cron => cron.height)).size, CRON_HEIGHTS.length);
+  assert.ok(new Set(pipes.map(pipe => pipe.jitter)).size > pipes.length / 2);
+  assert.ok(new Set(timed.map(enemy => enemy.phase)).size > timed.length / 2);
+});
+
+test("the same seed gives the same rhythms", () => {
+  const timings = level => level.enemies.map(enemy => [enemy.period, enemy.height, enemy.phase, enemy.jitter]);
+
+  for (const number of [3, 4, 5]) assert.deepEqual(timings(generateLevel(0x7f3a91c2, number, 0)), timings(generateLevel(0x7f3a91c2, number, 0)));
+});
+
+test("a chunk whose slots go together is filled whole with one kind or left empty", () => {
+  const counts = new Set();
+
+  eachLevel(level => {
+    for (const chunk of level.chunks.filter(placed => CHUNKS.filter(c => c.name === placed.name)[0].together)) {
+      const inside = level.enemies.filter(enemy => enemy.col >= chunk.col && enemy.col < chunk.col + chunk.width);
+      assert.ok(inside.length === 0 || inside.length === 3, chunk.name + " holds " + inside.length);
+      assert.ok(new Set(inside.map(enemy => enemy.kind)).size <= 1);
+      counts.add(inside.length);
+    }
+  });
+
+  assert.deepEqual([...counts].sort(), [0, 3]);
 });

@@ -1,10 +1,10 @@
 import { TILE, SCREEN_HEIGHT, SCREEN_ROWS, SCREEN_COLS } from "./screen.mjs";
 import { STEP_SECONDS } from "./clock.mjs";
 import { createHero, stepHero, heroHeight } from "./physics.mjs";
-import { createEnemy, stepEnemies, touchEnemies, PING_AIR_SECONDS, PING_GROUND_SECONDS } from "./enemies.mjs";
-import { keepInsideLevel, touchesBit } from "./world.mjs";
+import { createEnemies, leakCycleSeconds, stepEnemies, touchEnemies, PING_AIR_SECONDS, PING_GROUND_SECONDS } from "./enemies.mjs";
+import { keepInsideLevel, touchesBit, CAMERA_LEAD } from "./world.mjs";
 import { CHUNKS } from "./chunks.mjs";
-import { BASIC_KINDS, DIFFICULTY, MAX_RISE, generateLevel, generateSafeLevel, introductions, kindsUpTo, maxGapTiles } from "./generator.mjs";
+import { DEFAULT_KINDS, DIFFICULTY, MAX_RISE, generateLevel, generateSafeLevel, introductions, kindsUpTo, maxGapTiles } from "./generator.mjs";
 
 export const MAX_ATTEMPTS = 8;
 
@@ -59,9 +59,17 @@ function pingPhase(enemy) {
   return enemy.kind === "ping" ? Math.round(((enemy.time + enemy.phase) % cycle) / PHASE_BUCKET) : 0;
 }
 
+function timingKey(enemy) {
+  if (enemy.kind === "cron") return Math.round(((enemy.time + enemy.phase) % enemy.period) / PHASE_BUCKET);
+  if (enemy.kind === "pipe") return enemy.cycle + ":" + Math.round(enemy.timer / PHASE_BUCKET);
+  if (enemy.kind === "pointer") return Math.round(enemy.charge / PHASE_BUCKET) + ":" + enemy.shots.map(x => Math.round(x / ENEMY_BUCKET)).join("/");
+  if (enemy.kind === "leak") return Math.round((enemy.timer % leakCycleSeconds(enemy.extent)) / PHASE_BUCKET);
+  return Math.round(enemy.grace / PHASE_BUCKET);
+}
+
 function enemyKey(enemy) {
   const position = Math.round(enemy.x / ENEMY_BUCKET) + "," + Math.round(enemy.y / ENEMY_BUCKET);
-  return [enemy.alive ? 1 : 0, enemy.state, enemy.direction, position, pingPhase(enemy), Math.round(enemy.lying / PHASE_BUCKET)].join(",");
+  return [enemy.alive ? 1 : 0, enemy.state, enemy.direction, position, pingPhase(enemy), Math.round(enemy.lying / PHASE_BUCKET), timingKey(enemy)].join(",");
 }
 
 function heroKey(hero) {
@@ -92,7 +100,7 @@ function runMacro(search, node, macro) {
     stepHero(hero, inputAt(macro, step), level, STEP_SECONDS);
     keepInsideLevel(hero, level);
     time += STEP_SECONDS;
-    if (search.dynamic) stepEnemies(enemies, level, hero, STEP_SECONDS);
+    if (search.dynamic) stepEnemies(enemies, level, hero, STEP_SECONDS, hero.x - CAMERA_LEAD);
     if (touchEnemies(touchable, hero, previousBottom).some(event => event.type === "hit")) return null;
     if (hero.y - heroHeight(hero) > SCREEN_HEIGHT) return null;
     if (search.bit && touchesBit(hero, search.bit)) search.reached = true;
@@ -123,7 +131,7 @@ export function searchPath(level, options) {
     maxSeconds: options.dynamic ? MAX_DYNAMIC_SECONDS : Infinity,
     reached: false,
   };
-  const enemies = options.enemies || level.enemies.filter(enemy => enemy.kind === "spikes").map(createEnemy);
+  const enemies = options.enemies || createEnemies(level.enemies.filter(enemy => enemy.kind === "spikes"));
   const start = { hero, enemies, time: 0 };
   const visited = {};
   visited[nodeKey(start, search.dynamic)] = true;
@@ -190,7 +198,7 @@ function chunkAt(level, col) {
 function allowedKinds(chunk) {
   if (chunk.intro) return [chunk.intro];
   const definition = CHUNKS.filter(candidate => candidate.name === chunk.name)[0];
-  return definition.kinds || BASIC_KINDS;
+  return definition.kinds || DEFAULT_KINDS;
 }
 
 function restZonesOk(level, levelNumber) {

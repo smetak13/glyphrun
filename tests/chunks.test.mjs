@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CHUNKS } from "../logic/chunks.mjs";
-import { BASIC_KINDS, HANG_ROW } from "../logic/generator.mjs";
-import { SCREEN_ROWS } from "../logic/screen.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, HANG_ROW } from "../logic/generator.mjs";
+import { SCREEN_ROWS, TILE } from "../logic/screen.mjs";
+import { computeEnvelope } from "../logic/physics.mjs";
 
 const TILES = ".#B=PGE*+@CX";
 const GROUND_ROWS = 3;
@@ -49,8 +50,8 @@ test("chunks with lifted platforms say how far they may lift, and only they do",
   }
 });
 
-test("there is one start, checkpoint, exit and intro chunk, and rest chunks", () => {
-  const count = role => CHUNKS.filter(chunk => chunk.role === role).length;
+test("there is one start, checkpoint, exit and general intro chunk, and rest chunks", () => {
+  const count = role => CHUNKS.filter(chunk => chunk.role === role && !chunk.kinds).length;
 
   assert.deepEqual([count("start"), count("checkpoint"), count("exit"), count("intro")], [1, 1, 1, 1]);
   assert.ok(count("rest") > 0);
@@ -65,13 +66,14 @@ test("the hero, checkpoint and exit appear only in their own chunks", () => {
   }
 });
 
-test("the intro chunk has one enemy slot, flat ground and no gap", () => {
-  const intro = CHUNKS.filter(chunk => chunk.role === "intro")[0];
-  const slots = intro.map.join("|").match(/E+/g);
+test("every intro chunk has one enemy slot, flat ground and no gap", () => {
+  for (const intro of CHUNKS.filter(chunk => chunk.role === "intro")) {
+    const slots = intro.map.join("|").match(/E+/g);
 
-  assert.equal(slots.length, 1);
-  assert.ok(!intro.map.join("").includes("G"));
-  assert.ok(!intro.map.join("").includes("B"));
+    assert.equal(slots.length, 1, intro.name);
+    assert.ok(!intro.map.join("").includes("G"), intro.name);
+    assert.ok(!intro.map.join("").includes("B"), intro.name);
+  }
 });
 
 test("rest, start, checkpoint and exit chunks hold no enemies or gaps", () => {
@@ -81,8 +83,18 @@ test("rest, start, checkpoint and exit chunks hold no enemies or gaps", () => {
   }
 });
 
-test("chunk enemy kinds are basic kinds", () => {
+test("chunk enemy kinds are basic or advanced kinds", () => {
   for (const chunk of CHUNKS) {
-    for (const kind of chunk.kinds || []) assert.ok(BASIC_KINDS.includes(kind), chunk.name);
+    for (const kind of chunk.kinds || []) assert.ok(BASIC_KINDS.includes(kind) || ADVANCED_KINDS.includes(kind), chunk.name);
+  }
+});
+
+test("a lone full memory leak is wider than any jump, and smaller ones come only as a row of three placed together", () => {
+  const maxGap = computeEnvelope().maxGap;
+
+  for (const chunk of CHUNKS.filter(candidate => candidate.kinds && candidate.kinds.includes("leak"))) {
+    const runs = chunk.map.join("|").match(/E+/g);
+    const small = runs.filter(run => (run.length - 1) * TILE <= maxGap);
+    if (small.length > 0) assert.ok(chunk.together && runs.length >= 3, chunk.name);
   }
 });

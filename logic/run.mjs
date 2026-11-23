@@ -118,7 +118,7 @@ function handleEvent(run, event) {
   } else if (event.type === "hit") {
     hitHero(run, event.source);
   } else if (event.type === "kill") {
-    killEnemy(run, event.source, event.x, event.y, false);
+    killEnemy(run, event.source, event.x, event.y, event.small);
   }
 }
 

@@ -114,27 +114,27 @@ Ten in the MVP. Basic ones appear from level 1; advanced ones join from level 3.
 | 2 | `Z` | zombie process | Floats slowly back and forth over a short stretch, bobbing, labelled `<defunct>`. | Stomp from above. |
 | 3 | `^^^` | kernel spikes | Static spikes on the ground or on a platform. | No. |
 | 4 | `o` | ping | Hops in place at a fixed rhythm. Pass under it while it is up, or jump over it while it is down. | Stomp from above, on the ground or mid-hop. |
-| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen. Drops when the hero comes within about five tiles, timed to land on a hero running at full speed; braking when it starts to drop avoids it. Lies on the ground for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
+| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen. Drops when the hero comes within about five tiles, timed to land on a hero running at full speed; braking when it starts to drop avoids it. It falls through platforms and lands only on the ground or a solid block, so a platform is no shelter. Lies there for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
 
 ### 6.2 Advanced
 
 | # | Glyph | Name | Behaviour | Killable |
 |---|---|---|---|---|
-| 6 | `[*]` | cron job | A vent in the ground fires a column `#####` 3–4 tiles high at a fixed rhythm. 0.5 s before, the vent blinks and `* * * * *` appears above it. Each vent's rhythm and phase come from the seed. | No. |
-| 7 | `║ ║`, `}<` | pipe daemon | A pipe; a daemon rises out of its top now and then, stays up briefly and sinks back. The pipe is always visible; the timing has a small seeded jitter. | No. |
-| 8 | `*`, `-->` | dangling pointer | An emitter `*` fires `-->` horizontally across the screen, at one or two tiles above the ground. The emitter blinks before each shot. Fires only while on screen. | No. |
-| 9 | `&` | fork bomb | Walks like a bug. Stomped, it splits into two small `&` that run in opposite directions, faster, bouncing off obstacles. A small one dies to one stomp and does not split. | Stomp; small ones too. |
-| 10 | `%`, `~~~` | memory leak | A source `%` drips and a puddle `~~~` grows from it at a constant speed once it is on screen. Its maximum extent is always drawn as a dotted frame labelled `malloc(n)`, so the player sees how far it will reach. Touching the puddle is a hit. | Stomp the source: the puddle disappears. |
+| 6 | `[*]` | cron job | A vent on the ground fires a column `#####` 5–6 tiles high, higher than any jump, at a fixed rhythm, for 1 s. There is no warning: the player learns each vent's rhythm and passes while it is off. Each vent's rhythm (every 2.4, 3 or 3.6 s), phase and height come from the seed. The vent itself is harmless. | No. |
+| 7 | `║ ║`, `}<` | pipe daemon | A solid pipe two tiles wide and three tall; a daemon rises 1.5 tiles out of its top now and then, stays up for 1 s and sinks back. With the daemon out its top is higher than any jump, so the pipe can only be crossed while it is down. Standing on the pipe while the daemon is up is a hit. The pipe is always visible; the time down is 1.8 s plus a seeded jitter of up to 0.5 s per cycle. | No. |
+| 8 | `*`, `<--` | dangling pointer | An emitter `*`, on the ground or on a block, fires `<--` to the left, towards the arriving hero, across the screen until a wall stops it: in the lowest tile row above the ground (jump it) or in the second (the small hero passes under, the big one must jump). The emitter blinks 0.5 s before each shot and fires every 2.5 s, only while on screen. Touching the emitter is a hit. | No. |
+| 9 | `&` | fork bomb | Walks like a bug. Stomped, it splits into two small `&` that run in opposite directions, faster, bouncing off obstacles. For 0.3 s after the split the small ones dash apart faster than the hero runs. Until the hero has landed from the stomp's bounce and stands clear of them, they neither hurt nor die, so one stomp never kills them too. A small one dies to one stomp and does not split. | Stomp; small ones too. |
+| 10 | `%`, `~~~` | memory leak | A source `%` drips and a puddle `~~~` grows from it towards the arriving hero. From the moment it first comes on screen it repeats a cycle: grows at 3 tiles per second to its maximum extent, stays full for 0.8 s, dries back to the source at 4 tiles per second and stays dry for 0.6 s. Its maximum extent is always drawn as a dotted frame labelled `malloc(n)`, so the player sees how far it will reach. A lone leak is big: 7 tiles, or 10 from level 4, so a full puddle is wider than any jump and the player waits for it to dry back. Smaller leaks (3 tiles) come only as a row of three with 2-tile gaps between them. Touching the puddle is a hit. | Stomp the source: the puddle disappears. |
 
-A stomp bounces the hero up; holding jump makes the bounce higher, like a jump. Touching a killable enemy is a stomp when the hero was above it a moment before, even if the enemy is moving up into the hero; otherwise it is a hit. Spikes always hit. After the hero loses a life, the enemies still alive return to where they started; killed ones stay dead.
+"On screen" is judged against the camera. A stomp bounces the hero up; holding jump makes the bounce higher, like a jump. Touching a killable enemy is a stomp when the hero was above it a moment before, even if the enemy is moving up into the hero; otherwise it is a hit. Spikes always hit. After the hero loses a life, the enemies still alive return to where they started; killed ones stay dead.
 
-The memory leak's source sits at the far end of its frame, on a one-tile target, so stomping it is about as hard as jumping the whole puddle. Killing it is worth more than any other kill, so it is a real choice rather than always jumping over.
+The memory leak's source sits at the far end of its frame, on a one-tile target, so stomping it is about as hard as jumping the remaining puddle. Killing it is worth more than any other kill, so it is a real choice rather than always jumping over.
 
 ### 6.3 Draft and introduction
 
 - Each run drafts **4 of the 5 basic** and **3 of the 5 advanced**, from the seed. Some surprises are left for later runs.
 - Level 1: 2 basic. Level 2: plus 1–2 basic. Level 3: plus 1–2 advanced. Level 4: the rest of the draft. Level 5: a mix of everything drafted, then the boss.
-- The first time an enemy appears in a run, it appears in a chunk tagged as a safe introduction: visible from afar, with room to watch it, where a mistake does not kill (no pit beside it).
+- The first time an enemy appears in a run, it appears in a chunk tagged as a safe introduction: visible from afar, with room to watch it, where a mistake does not kill (no pit beside it). One introduction chunk serves every enemy except the memory leak, which has its own so that it is introduced at full size.
 
 ### 6.4 Messages
 
@@ -188,12 +188,15 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 - Chunks are text tile maps in the source (`logic/chunks.mjs`), one character per tile, bottom-aligned on the level's three ground rows: `#` ground, `B` block, `=` platform. Some cells are parameters the generator fills in:
   - `G`: a gap in the ground. Each run of gap columns becomes a pit as wide as the generator draws from the chunk's range, cut to the level's envelope fraction; a bit is placed over its middle.
   - `P`: a platform the generator may lift by up to the chunk's `lift` rows, together with everything above it, as long as it stays within the rise limit.
-  - `E`: an enemy slot. Filled with a drafted, already introduced kind (the chunk may restrict the kinds), or left empty, so the level holds about its number of enemies per screen. A run of slots becomes spikes as wide as the run; any other kind stands in its middle, and a hang hangs high above it.
+  - `E`: an enemy slot. Filled with a drafted, already introduced kind, or left empty, so the level holds about its number of enemies per screen. A chunk may restrict the kinds; an unrestricted slot holds a basic enemy or a fork bomb, and the other advanced enemies appear only in chunks made for them. A run of slots becomes spikes as wide as the run; a pipe stands on the first two slots of a run and rises three tiles; a memory leak fills the run with its frame and sits at its right end; any other kind stands in its middle, and a hang hangs high above it.
+  - A chunk may say that its slots go together: they are filled all with one kind or all left empty (a row of small leaks never appears as a single one).
+  - A chunk may name the first level it appears in, to keep levels 1–2 as they are while later levels get denser chunks.
+- After the layout, each cron vent and pipe draws its rhythm from the level's sub-stream.
   - `*` and `+`: bits on the intended path and in riskier spots.
 - The level follows a pacing curve: introduction, build-up, a rest zone, a harder stretch, and never two of the hardest chunks back to back.
 - Bits are placed along the intended path and in optional riskier spots. The sudo bit is one of them, chosen from the seed: a riskier one half of the time.
-- The first fifth of a level uses only the easiest body chunks, up to 55 % of it medium ones too, and the rest all of them. The hardest chunks combine hazards: an enemy at a gap's landing, a hang over it, spikes on an island between pits, a chain of pits. A rest chunk follows every few body chunks (the table below), and the new enemies of the level are introduced right after the start, one introduction chunk each.
-- Level width grows with the level number, tuned so a level takes 60–90 seconds: its target time (the table below) at an assumed pace of 4 tiles per second for a decent player, about half of the hero's top speed. Both are tuning values.
+- The first fifth of a level uses only the easiest body chunks, up to 55 % of it medium ones too, and the rest all of them. The hardest chunks combine hazards: an enemy at a gap's landing, a hang over it, spikes on an island between pits, a chain of pits, a run of five spikes, a row of three spike pairs with two tiles between them. A rest chunk follows every few body chunks (the table below), and the new enemies of the level are introduced right after the start, one introduction chunk each.
+- Level width grows with the level number, tuned so a level takes 60–90 seconds (a body chunk that could push the level over 90 seconds is not chosen): its target time (the table below) at an assumed pace of 4 tiles per second for a decent player, about half of the hero's top speed. Both are tuning values.
 
 ### 8.3 Physics limits
 
@@ -207,7 +210,7 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 | 2 | 65 % | 2 | 3 tiles | every 3 chunks | 66 s | 2.5–4 |
 | 3 | 72 % | 2.5 | 3 tiles | every 4 chunks | 72 s | 3–4.5 |
 | 4 | 80 % | 3 | 2 tiles | every 4 chunks | 78 s | 3.25–4.5 |
-| 5 | 88 % | 3.5 | 2 tiles | every 5 chunks | 84 s | 3.5–4.75 |
+| 5 | 88 % | 3.25 | 2 tiles | every 5 chunks | 84 s | 3.5–4.75 |
 
 The narrowest platform also limits ground islands between two pits. Hazards per screen is the validator's difficulty score (section 8.4).
 
@@ -219,7 +222,7 @@ Before a level is offered, the validator checks it:
 
 - **Reachability**: a search over hero states (position, velocity, facing) using the real physics module finds a path from start to checkpoint and from checkpoint to exit for the small hero (it respawns small), from start to exit for the big hero (it may carry sudo in from the last level, and it bumps its head where the small one does not), and to the sudo bit. The search steps the physics exactly, from the hero's standing state, through a fixed set of moves: walking, waiting, and jumps of three heights, steering forward, back or braking in the air. Similar states are merged, but each keeps the real state it was reached in, so every path found is one a player can play; the search may only miss paths, never invent them.
 - **Static hazards** (spikes, pits) are part of that search.
-- **Dynamic hazards** (enemies, cron, pipes, pointers, leaks) are safe by construction: each chunk that holds one is verified by its own tests to have a safe passage at every phase of the hazard, with every enemy it can hold. The tests run the same search with the enemies moving, from a standing start in front of the chunk, at phases a quarter second apart. The runtime validator checks only that such chunks are placed under the conditions they were verified for: every enemy stands in a chunk that may hold its kind, and every pit is within the level's limit.
+- **Dynamic hazards** (enemies, cron, pipes, pointers, leaks) are safe by construction: each chunk that holds one is verified by its own tests to have a safe passage at every phase of the hazard, with every enemy it can hold. The tests run the same search with the enemies moving, from a standing start in front of the chunk, at phases a quarter second apart. During the phase the chunk counts as on screen, so pointers have fired and leaks have grown; a shot already at the hero's start is dropped, since a player would have seen it coming. The runtime validator checks only that such chunks are placed under the conditions they were verified for: every enemy stands in a chunk that may hold its kind, and every pit is within the level's limit.
 - **Quality rules**: the difficulty score, hazards per screen (enemies and pits per 40 columns), is within the level's range (table in 8.3), rest zones are present, the first appearance of each enemy is in a safe introduction chunk and no enemy appears before its level.
 - **No blind jumps**: every landing is visible before the jump. This holds by the geometry rather than by a check: a level is one screen tall, and the camera shows about 25 tiles ahead of the hero even when lagging at full speed, while the longest jump is under 7 tiles.
 

@@ -1,19 +1,24 @@
 import { TILE, SCREEN_ROWS, SCREEN_COLS } from "./screen.mjs";
 import { computeEnvelope } from "./physics.mjs";
+import { CRON_HEIGHTS, CRON_PERIODS, PIPE_DOWN_SECONDS } from "./enemies.mjs";
 import { ENEMY_KINDS, parseLevel } from "./level.mjs";
 import { subStream, randomInt, pick, shuffle } from "./random.mjs";
 import { CHUNKS } from "./chunks.mjs";
 
 export const BASIC_KINDS = ["bug", "zombie", "spikes", "ping", "hang"];
+export const ADVANCED_KINDS = ["cron", "pipe", "pointer", "fork", "leak"];
+export const DEFAULT_KINDS = BASIC_KINDS.concat(["fork"]);
 export const DRAFTED_BASIC = 4;
+export const DRAFTED_ADVANCED = 3;
 export const PACE_TILES_PER_SECOND = 4;
+export const MAX_LEVEL_SECONDS = 90;
 export const HANG_ROW = 4;
 export const DIFFICULTY = [
   { gapFraction: 0.6, enemiesPerScreen: 1.5, narrowestPlatform: 4, restEvery: 3, seconds: 60, hazardsPerScreen: [2, 3.5] },
   { gapFraction: 0.65, enemiesPerScreen: 2, narrowestPlatform: 3, restEvery: 3, seconds: 66, hazardsPerScreen: [2.5, 4] },
   { gapFraction: 0.72, enemiesPerScreen: 2.5, narrowestPlatform: 3, restEvery: 4, seconds: 72, hazardsPerScreen: [3, 4.5] },
   { gapFraction: 0.8, enemiesPerScreen: 3, narrowestPlatform: 2, restEvery: 4, seconds: 78, hazardsPerScreen: [3.25, 4.5] },
-  { gapFraction: 0.88, enemiesPerScreen: 3.5, narrowestPlatform: 2, restEvery: 5, seconds: 84, hazardsPerScreen: [3.5, 4.75] },
+  { gapFraction: 0.88, enemiesPerScreen: 3.25, narrowestPlatform: 2, restEvery: 5, seconds: 84, hazardsPerScreen: [3.5, 4.75] },
 ];
 
 const ENVELOPE = computeEnvelope();
@@ -28,6 +33,9 @@ const PATH_BIT = "*";
 const RISKY_BIT = "+";
 const SPIKES = "^";
 const SUDO_BIT = "S";
+const PIPE = "H";
+const PIPE_HEIGHT = 3;
+const PUDDLE = "~";
 const GAP_BIT_HEIGHT = 2;
 const HARDEST = 3;
 const EASY_SHARE = 0.2;
@@ -42,7 +50,10 @@ export function introductions(seed) {
   const random = subStream(seed, "draft-basic");
   const drafted = shuffle(random, BASIC_KINDS).slice(0, DRAFTED_BASIC);
   const afterLevel2 = 2 + randomInt(random, 1, 2);
-  return [drafted.slice(0, 2), drafted.slice(2, afterLevel2), [], drafted.slice(afterLevel2), []];
+  const advancedRandom = subStream(seed, "draft-advanced");
+  const advanced = shuffle(advancedRandom, ADVANCED_KINDS).slice(0, DRAFTED_ADVANCED);
+  const atLevel3 = randomInt(advancedRandom, 1, 2);
+  return [drafted.slice(0, 2), drafted.slice(2, afterLevel2), advanced.slice(0, atLevel3), drafted.slice(afterLevel2).concat(advanced.slice(atLevel3)), []];
 }
 
 export function kindsUpTo(intros, levelNumber) {
@@ -105,6 +116,7 @@ function narrowestFooting(grid) {
 }
 
 function chunkFits(chunk, levelNumber, kinds) {
+  if (levelNumber < (chunk.minLevel || 1)) return false;
   const grid = paddedGrid(chunk.map);
   if (narrowestFooting(grid) < DIFFICULTY[levelNumber - 1].narrowestPlatform) return false;
   if (chunk.kinds && !chunk.kinds.some(kind => kinds.indexOf(kind) >= 0)) return false;
@@ -159,14 +171,26 @@ function chunkNamed(name) {
   return CHUNKS.filter(chunk => chunk.name === name)[0];
 }
 
+function introChunk(kind) {
+  const own = CHUNKS.filter(chunk => chunk.role === "intro" && chunk.kinds && chunk.kinds.indexOf(kind) >= 0);
+  return own.length > 0 ? own[0] : chunkNamed("intro");
+}
+
 function targetDifficulty(progress) {
   if (progress < EASY_SHARE) return 1;
   return progress < MEDIUM_SHARE ? 2 : HARDEST;
 }
 
-function chooseBody(random, body, previous, progress) {
+function widestBuild(chunk) {
+  const grid = paddedGrid(chunk.map);
+  let width = grid[0].length;
+  for (const run of gapRuns(grid)) width += chunk.gap[1] - (run.end - run.start + 1);
+  return width;
+}
+
+function chooseBody(random, body, previous, progress, room) {
   const target = targetDifficulty(progress);
-  const candidates = body.filter(chunk => chunk.difficulty <= target && chunk.name !== previous.name && !(chunk.difficulty === HARDEST && previous.difficulty === HARDEST));
+  const candidates = body.filter(chunk => chunk.difficulty <= target && chunk.name !== previous.name && !(chunk.difficulty === HARDEST && previous.difficulty === HARDEST) && widestBuild(chunk) <= room);
   const weighted = [];
   for (const chunk of candidates) {
     weighted.push(chunk);
@@ -197,27 +221,60 @@ function fillSlot(grid, slot, kind) {
   if (kind === null) return;
   const center = Math.floor((slot.start + slot.end) / 2);
   if (kind === "hang") grid[HANG_ROW][center] = tileOf(kind);
+  else if (kind === "pipe") placePipe(grid, slot);
+  else if (kind === "leak") placeLeak(grid, slot);
   else if (kind !== "spikes") grid[slot.row][center] = tileOf(kind);
 }
 
+function placePipe(grid, slot) {
+  for (let row = slot.row - PIPE_HEIGHT + 1; row <= slot.row; row++) {
+    grid[row][slot.start] = PIPE;
+    grid[row][slot.start + 1] = PIPE;
+  }
+  grid[slot.row - PIPE_HEIGHT][slot.start] = tileOf("pipe");
+}
+
+function placeLeak(grid, slot) {
+  for (let col = slot.start; col < slot.end; col++) grid[slot.row][col] = PUDDLE;
+  grid[slot.row][slot.end] = tileOf("leak");
+}
+
+function slotFits(slot, kind) {
+  const width = slot.end - slot.start + 1;
+  return kind === "pipe" || kind === "leak" ? width >= 2 : true;
+}
+
+function slotGroups(chunk, slots) {
+  if (chunkNamed(chunk.name).together) return slots.length > 0 ? [slots] : [];
+  return slots.map(slot => [slot]);
+}
+
 function placeEnemies(grid, placed, levelNumber, kinds, random) {
-  const bodySlots = [];
+  const units = [];
   let introduced = 0;
   for (const chunk of placed) {
-    for (const slot of slotsIn(grid, chunk)) {
-      if (chunk.intro) {
-        fillSlot(grid, slot, chunk.intro);
-        introduced++;
-      } else {
-        slot.kinds = (chunkNamed(chunk.name).kinds || BASIC_KINDS).filter(kind => kinds.indexOf(kind) >= 0);
-        bodySlots.push(slot);
-      }
+    const slots = slotsIn(grid, chunk);
+    if (chunk.intro) {
+      for (const slot of slots) fillSlot(grid, slot, chunk.intro);
+      introduced += slots.length;
+      continue;
+    }
+    const allowed = chunkNamed(chunk.name).kinds || DEFAULT_KINDS;
+    for (const group of slotGroups(chunk, slots)) {
+      units.push({ slots: group, kinds: allowed.filter(kind => kinds.indexOf(kind) >= 0 && group.every(slot => slotFits(slot, kind))) });
     }
   }
-  const wanted = Math.round((DIFFICULTY[levelNumber - 1].enemiesPerScreen * grid[0].length) / SCREEN_COLS) - introduced;
-  const usable = shuffle(random, bodySlots.filter(slot => slot.kinds.length > 0));
-  const chosen = usable.slice(0, Math.max(wanted, 0));
-  for (const slot of bodySlots) fillSlot(grid, slot, chosen.indexOf(slot) >= 0 ? pick(random, slot.kinds) : null);
+  let wanted = Math.round((DIFFICULTY[levelNumber - 1].enemiesPerScreen * grid[0].length) / SCREEN_COLS) - introduced;
+  const chosen = [];
+  for (const unit of shuffle(random, units.filter(candidate => candidate.kinds.length > 0))) {
+    if (wanted <= 0) break;
+    chosen.push(unit);
+    wanted -= unit.slots.length;
+  }
+  for (const unit of units) {
+    const kind = chosen.indexOf(unit) >= 0 ? pick(random, unit.kinds) : null;
+    for (const slot of unit.slots) fillSlot(grid, slot, kind);
+  }
 }
 
 function placeBits(grid, random) {
@@ -276,7 +333,7 @@ function assembleLevel(seed, levelNumber, label, body) {
   };
 
   let previous = place(chunkNamed("start"));
-  for (const kind of intros[levelNumber - 1]) previous = place(chunkNamed("intro"), kind);
+  for (const kind of intros[levelNumber - 1]) previous = place(introChunk(kind), kind);
   let sinceRest = 0;
   let checkpointPlaced = false;
   while (cols + exit.map[0].length < targetCols) {
@@ -287,7 +344,8 @@ function assembleLevel(seed, levelNumber, label, body) {
       previous = place(pick(random, rests));
       sinceRest = 0;
     } else {
-      previous = place(chooseBody(random, body, previous, cols / targetCols));
+      const room = MAX_LEVEL_SECONDS * PACE_TILES_PER_SECOND - cols - exit.map[0].length;
+      previous = place(chooseBody(random, body, previous, cols / targetCols, room));
       sinceRest++;
     }
   }
@@ -297,5 +355,19 @@ function assembleLevel(seed, levelNumber, label, body) {
   placeBits(grid, random);
   const level = parseLevel(grid.map(line => line.join("")));
   level.chunks = placed;
+  drawTimings(level, random);
   return level;
+}
+
+function drawTimings(level, random) {
+  for (const enemy of level.enemies) {
+    if (enemy.kind === "cron") {
+      enemy.period = pick(random, CRON_PERIODS);
+      enemy.height = pick(random, CRON_HEIGHTS);
+      enemy.phase = random.next() * enemy.period;
+    } else if (enemy.kind === "pipe") {
+      enemy.phase = random.next() * PIPE_DOWN_SECONDS;
+      enemy.jitter = Math.floor(random.next() * 0x100000000);
+    }
+  }
 }

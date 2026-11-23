@@ -1,6 +1,6 @@
 import { TILE, SCREEN_WIDTH, SCREEN_HEIGHT } from "./screen.mjs";
 import { createHero, stepHero, heroHeight, HERO_WIDTH } from "./physics.mjs";
-import { createEnemy, resetEnemy, stepEnemies, touchEnemies } from "./enemies.mjs";
+import { createEnemies, resetEnemy, stepEnemies, touchEnemies } from "./enemies.mjs";
 
 export const CAMERA_LEAD = 320;
 export const CAMERA_FOLLOW_RATE = 6;
@@ -12,7 +12,7 @@ export function createWorld(level) {
     cameraX: 0,
     hero: null,
     bits: level.bits.map(bit => ({ col: bit.col, row: bit.row, text: bit.text, sudo: bit.sudo, collected: false })),
-    enemies: level.enemies.map(createEnemy),
+    enemies: createEnemies(level.enemies),
     bitsCollected: 0,
     checkpointReached: false,
     finished: false,
@@ -75,7 +75,7 @@ export function stepWorld(world, input, seconds) {
   const previousBottom = hero.y;
   stepHero(hero, input, world.level, seconds);
   keepInsideLevel(hero, world.level);
-  stepEnemies(world.enemies, world.level, hero, seconds);
+  stepEnemies(world.enemies, world.level, hero, seconds, world.cameraX);
   for (const event of touchEnemies(world.enemies, hero, previousBottom)) events.push(event);
   collectBits(world, events);
   if (!world.checkpointReached && reached(world, world.level.checkpoint)) {

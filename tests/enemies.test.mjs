@@ -1,11 +1,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  createEnemies,
   createEnemy,
+  cronState,
   pingHeight,
+  pipeRaise,
+  pointerWarning,
   stepEnemies,
   touchEnemies,
   BUG_SPEED,
+  CRON_FIRE_SECONDS,
+  CRON_HEIGHTS,
+  LEAK_EMPTY_SECONDS,
+  LEAK_FULL_SECONDS,
+  LEAK_GROW_SPEED,
+  LEAK_SHRINK_SPEED,
+  PIPE_DOWN_SECONDS,
+  PIPE_JITTER_SECONDS,
+  PIPE_MOVE_SECONDS,
+  PIPE_RISE,
+  PIPE_UP_SECONDS,
+  POINTER_FIRST_SHOT_SECONDS,
+  POINTER_PERIOD,
+  POINTER_WARNING_SECONDS,
+  SHOT_LENGTH,
+  SHOT_SPEED,
+  SMALL_FORK_SPEED,
+  SPLIT_GRACE_SECONDS,
+  leakCycleSeconds,
   HANG_LIE_SECONDS,
   HANG_TRIGGER_DISTANCE,
   HANG_WINDUP_SPEED,
@@ -17,7 +40,7 @@ import {
 } from "../logic/enemies.mjs";
 import { createWorld, respawnHero, stepWorld } from "../logic/world.mjs";
 import { createRun, stepRun, LIVES } from "../logic/run.mjs";
-import { createHero, RUN_SPEED } from "../logic/physics.mjs";
+import { computeEnvelope, createHero, RUN_SPEED } from "../logic/physics.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { TILE } from "../logic/screen.mjs";
@@ -25,11 +48,12 @@ import { TILE } from "../logic/screen.mjs";
 const IDLE = { direction: 0, jumpHeld: false, jumpPressed: false };
 const FAR_AWAY = createHero(-1000, 0);
 
-function levelFrom(bottomRows, topRows) {
+function levelFrom(bottomRows, topRows, middleRows) {
   const cols = bottomRows[0].length;
   const rows = (topRows || []).map(row => row.padEnd(cols, "."));
-  while (rows.length < 22 - bottomRows.length) rows.push(".".repeat(cols));
-  return parseLevel(rows.concat(bottomRows));
+  const middle = middleRows || [];
+  while (rows.length < 22 - bottomRows.length - middle.length) rows.push(".".repeat(cols));
+  return parseLevel(rows.concat(middle, bottomRows));
 }
 
 function stepFor(enemies, level, hero, seconds) {
@@ -37,7 +61,11 @@ function stepFor(enemies, level, hero, seconds) {
 }
 
 function enemiesOf(level) {
-  return level.enemies.map(createEnemy);
+  return createEnemies(level.enemies);
+}
+
+function steps(world, count) {
+  for (let i = 0; i < count; i++) stepWorld(world, IDLE, STEP_SECONDS);
 }
 
 function worldEventsUntil(world, input, done) {
@@ -337,6 +365,26 @@ test("a running hero that brakes when the hang starts to drop is not hit", () =>
   assert.equal(runTowardHang(0.25), false);
 });
 
+test("a falling hang drops through a platform to the ground beneath", () => {
+  const level = levelFrom(["............", "....======..", "............", "............", "############"], ["", "", "", "......v....."]);
+  const [hang] = enemiesOf(level);
+  stepEnemies([hang], level, createHero(hang.x, 21 * TILE), STEP_SECONDS);
+
+  while (hang.state === "falling") stepEnemies([hang], level, FAR_AWAY, STEP_SECONDS);
+
+  assert.deepEqual([hang.state, hang.y], ["lying", 21 * TILE]);
+});
+
+test("a hang stops on a solid block", () => {
+  const level = levelFrom(["............", "....BBBBBB..", "............", "............", "############"], ["", "", "", "......v....."]);
+  const [hang] = enemiesOf(level);
+  stepEnemies([hang], level, createHero(hang.x, 21 * TILE), STEP_SECONDS);
+
+  while (hang.state === "falling") stepEnemies([hang], level, FAR_AWAY, STEP_SECONDS);
+
+  assert.equal(hang.y, 18 * TILE);
+});
+
 test("a hang lies on the ground for a moment, then slowly winds back up and hangs again", () => {
   const [hang] = enemiesOf(HANG_LEVEL);
   stepEnemies([hang], HANG_LEVEL, createHero(hang.x, 21 * TILE), STEP_SECONDS);
@@ -428,4 +476,438 @@ test("an enemy hit while small costs a life and names the enemy", () => {
   stepRun(run, IDLE, STEP_SECONDS);
 
   assert.deepEqual([run.lives, run.toast.text], [LIVES - 1, "request timed out"]);
+});
+
+function harmsHeroAt(enemy, x, y) {
+  return touchEnemies([enemy], createHero(x, y), y).some(event => event.type === "hit");
+}
+
+const GROUND_Y = 21 * TILE;
+
+test("level maps place each advanced enemy, a pipe with its width and a leak with its frame", () => {
+  const level = levelFrom(["@cdf..HH.~~~m", "#############"], [], ["......p......", "......HH....."]);
+
+  assert.deepEqual(
+    level.enemies.map(e => [e.kind, e.col, e.tiles || e.extent || 1]),
+    [["pipe", 6, 2], ["cron", 1, 1], ["pointer", 2, 1], ["fork", 3, 1], ["leak", 12, 3]],
+  );
+});
+
+const CRON_LEVEL = levelFrom(["@.....c.....", "############"]);
+
+test("a cron vent idles, then fires for a while in its rhythm, with no warning", () => {
+  const [cron] = enemiesOf(CRON_LEVEL);
+  const fireAt = cron.period - CRON_FIRE_SECONDS;
+  const stateAt = seconds => {
+    cron.time = seconds;
+    return cronState(cron);
+  };
+
+  assert.deepEqual(
+    [stateAt(0), stateAt(fireAt - 0.01), stateAt(fireAt + 0.01), stateAt(cron.period - 0.01), stateAt(cron.period + 0.01)],
+    ["idle", "idle", "firing", "firing", "idle"],
+  );
+});
+
+test("a cron column is higher than the hero can jump", () => {
+  const cron = createEnemy({ kind: "cron", col: 6, row: 20, height: Math.min.apply(null, CRON_HEIGHTS) });
+  cron.time = cron.period - CRON_FIRE_SECONDS + 0.1;
+
+  assert.equal(harmsHeroAt(cron, cron.x, GROUND_Y - computeEnvelope().maxJumpHeight), true);
+});
+
+test("a cron vent's phase shifts its rhythm", () => {
+  const [plain] = enemiesOf(CRON_LEVEL);
+  const shifted = createEnemy({ kind: "cron", col: 6, row: 20, phase: 1 });
+  shifted.time = 0;
+  plain.time = 1;
+
+  assert.equal(cronState(shifted), cronState(plain));
+});
+
+test("a cron column hurts up to its height only while it fires", () => {
+  const cron = createEnemy({ kind: "cron", col: 6, row: 20, height: 5 });
+  cron.time = cron.period - CRON_FIRE_SECONDS + 0.1;
+  const firingLow = harmsHeroAt(cron, cron.x, GROUND_Y);
+  const firingHigh = harmsHeroAt(cron, cron.x, GROUND_Y - 4.5 * TILE);
+  const firingAbove = harmsHeroAt(cron, cron.x, GROUND_Y - 6 * TILE);
+  cron.time = 0;
+
+  assert.deepEqual([firingLow, firingHigh, firingAbove, harmsHeroAt(cron, cron.x, GROUND_Y)], [true, true, false, false]);
+});
+
+test("a cron vent cannot be stomped", () => {
+  const world = createWorld(CRON_LEVEL);
+  const cron = world.enemies[0];
+  cron.time = cron.period - CRON_FIRE_SECONDS + 0.1;
+  world.hero.x = cron.x;
+  world.hero.y = GROUND_Y - 3 * TILE;
+  world.hero.vy = 300;
+  world.hero.grounded = false;
+
+  const events = worldEventsUntil(world, IDLE, e => e.length > 0);
+
+  assert.deepEqual(kinds(events), ["hit cron"]);
+});
+
+const PIPE_LEVEL = levelFrom(["@.....HH....", "############"], [], ["......p.....", "......HH....", "......HH...."]);
+const PIPE_TOP = 18 * TILE;
+
+function pipeOf(level, jitter) {
+  return createEnemies(level.enemies.map(slot => Object.assign({}, slot, { jitter })))[0];
+}
+
+function raisedTimes(pipe, seconds) {
+  const changes = [];
+  let up = false;
+  for (let i = 0; i < Math.round(seconds / STEP_SECONDS); i++) {
+    stepEnemies([pipe], PIPE_LEVEL, FAR_AWAY, STEP_SECONDS);
+    const nowUp = pipe.y < pipe.homeY + PIPE_RISE;
+    if (nowUp !== up) changes.push(Math.round(pipe.time * 100) / 100);
+    up = nowUp;
+  }
+  return changes;
+}
+
+test("a pipe daemon stays down, rises, stays up briefly and sinks back", () => {
+  assert.equal(pipeRaise(0), 0);
+  assert.ok(pipeRaise(PIPE_MOVE_SECONDS / 2) > 0 && pipeRaise(PIPE_MOVE_SECONDS / 2) < PIPE_RISE);
+  assert.equal(pipeRaise(PIPE_MOVE_SECONDS + PIPE_UP_SECONDS / 2), PIPE_RISE);
+  assert.equal(pipeRaise(2 * PIPE_MOVE_SECONDS + PIPE_UP_SECONDS + 0.01), 0);
+});
+
+test("a pipe daemon's time down varies a little from cycle to cycle, the same way for the same jitter seed", () => {
+  const first = raisedTimes(pipeOf(PIPE_LEVEL, 7), 20);
+  const again = raisedTimes(pipeOf(PIPE_LEVEL, 7), 20);
+  const other = raisedTimes(pipeOf(PIPE_LEVEL, 8), 20);
+  const downs = [first[0]];
+  for (let i = 2; i < first.length; i += 2) downs.push(first[i] - first[i - 1]);
+
+  assert.deepEqual(first, again);
+  assert.notDeepEqual(first, other);
+  assert.ok(downs.every(down => down >= PIPE_DOWN_SECONDS - 0.02 && down <= PIPE_DOWN_SECONDS + PIPE_JITTER_SECONDS + 0.02), downs.join(" "));
+  assert.ok(Math.max.apply(null, downs) - Math.min.apply(null, downs) > 0.05);
+});
+
+test("the pipe is solid: the hero stands on it and a walker turns at it", () => {
+  const world = createWorld(PIPE_LEVEL);
+  world.hero.x = 7 * TILE;
+  world.hero.y = PIPE_TOP - 30;
+  world.hero.grounded = false;
+  const bugLevel = levelFrom(["..........b.", "......HH....", "############"]);
+  const [bug] = enemiesOf(bugLevel);
+
+  steps(world, 30);
+  stepFor([bug], bugLevel, FAR_AWAY, 4);
+
+  assert.equal(world.hero.y, PIPE_TOP);
+  assert.ok(bug.x - bug.width / 2 >= 8 * TILE - 0.01);
+});
+
+test("with the daemon out, no jump clears the pipe", () => {
+  const pipe = pipeOf(PIPE_LEVEL, 0);
+  while (pipe.y > pipe.homeY) stepEnemies([pipe], PIPE_LEVEL, FAR_AWAY, STEP_SECONDS);
+
+  assert.equal(harmsHeroAt(pipe, pipe.x, GROUND_Y - computeEnvelope().maxJumpHeight), true);
+});
+
+test("a pipe daemon hurts a hero on the pipe while it is up, and not while it is down", () => {
+  const pipe = pipeOf(PIPE_LEVEL, 0);
+  const downHarm = harmsHeroAt(pipe, pipe.x, PIPE_TOP);
+  while (pipe.y > pipe.homeY) stepEnemies([pipe], PIPE_LEVEL, FAR_AWAY, STEP_SECONDS);
+
+  assert.deepEqual([downHarm, harmsHeroAt(pipe, pipe.x, PIPE_TOP)], [false, true]);
+});
+
+const POINTER_LEVEL = levelFrom(["@.....................d.", "########################"]);
+const WALLED_POINTER_LEVEL = levelFrom(["@.B..................d.", "#######################"]);
+const ON_SCREEN = 0;
+const OFF_SCREEN = 30 * TILE;
+
+function stepOnCamera(enemies, level, seconds, cameraX) {
+  for (let i = 0; i < Math.round(seconds / STEP_SECONDS); i++) stepEnemies(enemies, level, FAR_AWAY, STEP_SECONDS, cameraX);
+}
+
+test("a dangling pointer fires only while it is on screen", () => {
+  const [offScreen] = enemiesOf(POINTER_LEVEL);
+  const [onScreen] = enemiesOf(POINTER_LEVEL);
+
+  stepOnCamera([offScreen], POINTER_LEVEL, POINTER_PERIOD, OFF_SCREEN);
+  stepOnCamera([onScreen], POINTER_LEVEL, POINTER_FIRST_SHOT_SECONDS + 0.01, ON_SCREEN);
+
+  assert.deepEqual([offScreen.shots.length, onScreen.shots.length], [0, 1]);
+});
+
+test("a dangling pointer blinks before each shot, then fires in its rhythm", () => {
+  const [pointer] = enemiesOf(POINTER_LEVEL);
+  stepOnCamera([pointer], POINTER_LEVEL, POINTER_FIRST_SHOT_SECONDS - POINTER_WARNING_SECONDS - 0.02, ON_SCREEN);
+  const before = pointerWarning(pointer);
+  stepOnCamera([pointer], POINTER_LEVEL, 0.04, ON_SCREEN);
+  const warning = pointerWarning(pointer);
+  stepOnCamera([pointer], POINTER_LEVEL, POINTER_WARNING_SECONDS, ON_SCREEN);
+  const afterShot = [pointerWarning(pointer), pointer.shots.length];
+  stepOnCamera([pointer], POINTER_LEVEL, POINTER_PERIOD, ON_SCREEN);
+
+  assert.deepEqual([before, warning, afterShot, pointer.shots.length], [false, true, [false, 1], 2]);
+});
+
+test("a pointer's shot flies left at its speed and hurts the hero it meets", () => {
+  const [pointer] = enemiesOf(POINTER_LEVEL);
+  stepOnCamera([pointer], POINTER_LEVEL, POINTER_FIRST_SHOT_SECONDS + 0.01, ON_SCREEN);
+  const firedAt = pointer.shots[0];
+  stepOnCamera([pointer], POINTER_LEVEL, 0.5, OFF_SCREEN);
+  const shot = pointer.shots[0];
+
+  assert.ok(Math.abs(firedAt - shot - SHOT_SPEED * 0.5) < 1);
+  assert.equal(harmsHeroAt(pointer, shot + SHOT_LENGTH / 2, GROUND_Y), true);
+  assert.equal(harmsHeroAt(pointer, shot + SHOT_LENGTH / 2, GROUND_Y - 2 * TILE), false);
+});
+
+test("a pointer's shot stops at a wall", () => {
+  const [pointer] = enemiesOf(WALLED_POINTER_LEVEL);
+
+  stepOnCamera([pointer], WALLED_POINTER_LEVEL, POINTER_FIRST_SHOT_SECONDS + 0.01, ON_SCREEN);
+  stepOnCamera([pointer], WALLED_POINTER_LEVEL, 3, OFF_SCREEN);
+
+  assert.deepEqual(pointer.shots, []);
+});
+
+test("a pointer two tiles up fires over a small hero and into a big one", () => {
+  const level = levelFrom(["@....................d.", "@....................B.", "#######################"]);
+  const [pointer] = enemiesOf(level);
+  stepOnCamera([pointer], level, POINTER_FIRST_SHOT_SECONDS + 0.5, ON_SCREEN);
+  const x = pointer.shots[0] + SHOT_LENGTH / 2;
+  const big = createHero(x, GROUND_Y);
+  big.big = true;
+
+  assert.equal(harmsHeroAt(pointer, x, GROUND_Y), false);
+  assert.equal(touchEnemies([pointer], big, big.y).some(event => event.type === "hit"), true);
+});
+
+test("a dangling pointer cannot be stomped", () => {
+  const world = createWorld(POINTER_LEVEL);
+  dropHeroOnto(world, world.enemies[0]);
+
+  const events = worldEventsUntil(world, IDLE, e => e.length > 0);
+
+  assert.deepEqual(kinds(events), ["hit pointer"]);
+});
+
+const FORK_LEVEL = levelFrom(["@B.......f.......B..", "####################"]);
+
+test("a fork bomb walks like a bug", () => {
+  const level = levelFrom(["..........f.........", "####################"]);
+  const [fork] = enemiesOf(level);
+
+  stepFor([fork], level, FAR_AWAY, 1);
+
+  assert.ok(Math.abs(fork.x - (10.5 * TILE - BUG_SPEED)) < 0.01);
+});
+
+test("a stomped fork bomb splits into two small ones running apart, faster", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left, right] = world.enemies;
+  dropHeroOnto(world, fork);
+
+  const events = worldEventsUntil(world, IDLE, e => e.length > 0);
+  steps(world, 60);
+
+  assert.deepEqual(kinds(events), ["kill fork"]);
+  assert.deepEqual([fork.alive, left.alive, right.alive, left.small, right.small], [false, true, true, true, true]);
+  assert.ok(left.x < fork.x - SMALL_FORK_SPEED * 0.4 && right.x > fork.x + SMALL_FORK_SPEED * 0.4);
+  assert.ok(SMALL_FORK_SPEED > BUG_SPEED);
+});
+
+test("the small fork bombs do not die to the stomp that split them", () => {
+  const world = createWorld(FORK_LEVEL);
+  dropHeroOnto(world, world.enemies[0]);
+
+  const events = worldEventsUntil(world, IDLE, e => e.length > 0);
+  for (let i = 0; i < 60; i++) for (const event of stepWorld(world, IDLE, STEP_SECONDS)) events.push(event);
+
+  assert.deepEqual(kinds(events), ["kill fork"]);
+});
+
+test("a fast stomp straight down kills only the big fork bomb", () => {
+  const world = createWorld(FORK_LEVEL);
+  const fork = world.enemies[0];
+  world.hero.x = fork.x;
+  world.hero.y = fork.y - fork.height - 1;
+  world.hero.vy = 700;
+  world.hero.grounded = false;
+
+  const events = worldEventsUntil(world, IDLE, e => e.length > 0);
+
+  assert.deepEqual(kinds(events), ["kill fork"]);
+});
+
+test("a high bounce off a fork bomb on a platform does not come down on the small ones", () => {
+  const world = createWorld(levelFrom(["@.........", ".....f....", "...======.", "..........", "##########"]));
+  const fork = world.enemies[0];
+  const holding = { direction: 0, jumpHeld: true, jumpPressed: false };
+  dropHeroOnto(world, fork);
+
+  const events = worldEventsUntil(world, holding, e => e.length > 0);
+  for (let i = 0; i < 120; i++) for (const event of stepWorld(world, holding, STEP_SECONDS)) events.push(event);
+
+  assert.deepEqual(kinds(events).filter(kind => kind === "kill fork"), ["kill fork"]);
+});
+
+test("a running stomp without holding jump does not land the hero on the small fork bombs", () => {
+  const world = createWorld(FORK_LEVEL);
+  const running = { direction: 1, jumpHeld: false, jumpPressed: false };
+  const fork = world.enemies[0];
+  dropHeroOnto(world, fork);
+  world.hero.x = fork.x - 4;
+  world.hero.y = fork.y - fork.height - 1;
+  world.hero.vx = RUN_SPEED;
+
+  const events = worldEventsUntil(world, running, e => e.length > 0);
+  for (let i = 0; i < 30; i++) for (const event of stepWorld(world, running, STEP_SECONDS)) events.push(event);
+
+  assert.deepEqual(kinds(events), ["kill fork"]);
+});
+
+test("a small fork bomb cannot be stomped before the hero has landed from the split", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left] = world.enemies;
+  dropHeroOnto(world, fork);
+  worldEventsUntil(world, IDLE, e => e.length > 0);
+  steps(world, 6);
+  world.hero.x = left.x;
+  world.hero.y = left.y - left.height - 1;
+  world.hero.vy = 200;
+
+  const events = [];
+  for (let i = 0; i < 6; i++) for (const event of stepWorld(world, IDLE, STEP_SECONDS)) events.push(event);
+
+  assert.deepEqual([kinds(events), left.alive], [[], true]);
+});
+
+test("right after the split the small fork bombs do not hurt", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left] = world.enemies;
+  dropHeroOnto(world, fork);
+  worldEventsUntil(world, IDLE, e => e.length > 0);
+  heroTouchingFromSide(world, left);
+  world.hero.vy = 0;
+
+  const events = [];
+  for (let i = 0; i < Math.round((SPLIT_GRACE_SECONDS - 0.05) / STEP_SECONDS); i++) for (const event of stepWorld(world, IDLE, STEP_SECONDS)) events.push(event);
+
+  assert.deepEqual(kinds(events), []);
+});
+
+test("small fork bombs bounce off walls", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left, right] = world.enemies;
+  dropHeroOnto(world, fork);
+  worldEventsUntil(world, IDLE, e => e.length > 0);
+  world.hero.x = 100 * TILE;
+
+  for (let i = 0; i < 600; i++) stepEnemies(world.enemies, world.level, FAR_AWAY, STEP_SECONDS);
+
+  assert.ok(left.x - left.width / 2 >= 2 * TILE - 0.01 && right.x + right.width / 2 <= 17 * TILE + 0.01);
+});
+
+test("a small fork bomb dies to one stomp and does not split", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left] = world.enemies;
+  dropHeroOnto(world, fork);
+  worldEventsUntil(world, IDLE, e => e.length > 0);
+  steps(world, 60);
+  dropHeroOnto(world, left);
+  world.hero.vy = 120;
+
+  const events = worldEventsUntil(world, IDLE, e => e.some(event => event.source === "fork"));
+
+  assert.deepEqual(events.filter(e => e.type === "kill").map(e => e.small), [true]);
+  assert.equal(world.enemies.filter(enemy => enemy.alive).length, 1);
+});
+
+test("a big fork bomb scores forked and a small one scores wait() with fewer points", () => {
+  const run = createRun(1, FORK_LEVEL);
+  const [fork, left] = run.world.enemies;
+  dropHeroOnto(run.world, fork);
+  while (fork.alive) stepRun(run, IDLE, STEP_SECONDS);
+  for (let i = 0; i < 60; i++) stepRun(run, IDLE, STEP_SECONDS);
+  dropHeroOnto(run.world, left);
+  run.world.hero.vy = 120;
+  for (let i = 0; i < 60 && left.alive; i++) stepRun(run, IDLE, STEP_SECONDS);
+
+  assert.equal(run.score, 150);
+  assert.deepEqual(run.popups.map(p => p.note), ["forked", "wait()"]);
+});
+
+test("after a respawn the small fork bombs return to where they split and the big one stays dead", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left] = world.enemies;
+  dropHeroOnto(world, fork);
+  worldEventsUntil(world, IDLE, e => e.length > 0);
+  const splitAt = fork.x;
+  steps(world, 60);
+
+  respawnHero(world);
+
+  assert.deepEqual([fork.alive, left.alive, left.x], [false, true, splitAt]);
+});
+
+const LEAK_LEVEL = levelFrom(["@.....~~~~~~~m...", "#################"]);
+const LEAK_FULL = 7 * TILE;
+
+function grownAfter(leak, seconds) {
+  stepOnCamera([leak], LEAK_LEVEL, seconds, OFF_SCREEN);
+  return leak.grown;
+}
+
+test("a memory leak's puddle starts growing only once it has been on screen", () => {
+  const [offScreen] = enemiesOf(LEAK_LEVEL);
+  const [leak] = enemiesOf(LEAK_LEVEL);
+
+  stepOnCamera([offScreen], LEAK_LEVEL, 2, OFF_SCREEN);
+  stepOnCamera([leak], LEAK_LEVEL, STEP_SECONDS, ON_SCREEN);
+
+  assert.equal(offScreen.grown, 0);
+  assert.ok(grownAfter(leak, 1) > 0);
+});
+
+test("a memory leak's puddle grows to its frame, stays, dries back to the source and grows again", () => {
+  const [leak] = enemiesOf(LEAK_LEVEL);
+  stepOnCamera([leak], LEAK_LEVEL, STEP_SECONDS, ON_SCREEN);
+  const growSeconds = LEAK_FULL / LEAK_GROW_SPEED;
+  const shrinkSeconds = LEAK_FULL / LEAK_SHRINK_SPEED;
+
+  const growing = grownAfter(leak, 0.5);
+  const full = grownAfter(leak, growSeconds - 0.5 + LEAK_FULL_SECONDS / 2);
+  const shrinking = grownAfter(leak, LEAK_FULL_SECONDS / 2 + shrinkSeconds / 2);
+  const empty = grownAfter(leak, shrinkSeconds / 2 + LEAK_EMPTY_SECONDS / 2);
+  const again = grownAfter(leak, LEAK_EMPTY_SECONDS / 2 + 0.5);
+
+  assert.ok(Math.abs(growing - LEAK_GROW_SPEED * 0.5) < 2);
+  assert.equal(full, LEAK_FULL);
+  assert.ok(Math.abs(shrinking - LEAK_FULL / 2) < 2);
+  assert.equal(empty, 0);
+  assert.ok(Math.abs(again - growing) < 2);
+  assert.ok(Math.abs(leakCycleSeconds(7) - (growSeconds + LEAK_FULL_SECONDS + shrinkSeconds + LEAK_EMPTY_SECONDS)) < 1e-9);
+});
+
+test("touching the puddle is a hit, beyond its edge is not", () => {
+  const [leak] = enemiesOf(LEAK_LEVEL);
+  stepOnCamera([leak], LEAK_LEVEL, 1, ON_SCREEN);
+
+  assert.equal(harmsHeroAt(leak, 12.5 * TILE, GROUND_Y), true);
+  assert.equal(harmsHeroAt(leak, 8 * TILE, GROUND_Y), false);
+});
+
+test("stomping the leak's source frees it: the puddle goes and it scores free()", () => {
+  const run = createRun(1, LEAK_LEVEL);
+  const leak = run.world.enemies[0];
+  stepOnCamera([leak], LEAK_LEVEL, 3, ON_SCREEN);
+  dropHeroOnto(run.world, leak);
+
+  for (let i = 0; i < 60; i++) stepRun(run, IDLE, STEP_SECONDS);
+
+  assert.equal(leak.alive, false);
+  assert.equal(harmsHeroAt(leak, 12.5 * TILE, GROUND_Y), false);
+  assert.deepEqual([run.score, run.popups.map(p => p.note)], [200, ["free()"]]);
 });
