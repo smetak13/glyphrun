@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canContinue, mainMenuItems, moveIndex } from "../logic/menu.mjs";
+import { canContinue, mainMenuItems, moveIndex, percent, stepVolume } from "../logic/menu.mjs";
 
 const IN_PROGRESS = { over: false, won: false };
 
@@ -19,4 +19,15 @@ test("the main menu starts with Continue when a run can be continued", () => {
 test("menu selection wraps around at both ends", () => {
   assert.equal(moveIndex(0, -1, 4), 3);
   assert.equal(moveIndex(3, 1, 4), 0);
+});
+
+test("volume moves in tenths and stays between silent and full", () => {
+  assert.equal(stepVolume(0.3, 1), 0.4);
+  assert.equal(stepVolume(0.7, -1), 0.6);
+  assert.equal(stepVolume(1, 1), 1);
+  assert.equal(stepVolume(0, -1), 0);
+});
+
+test("volume shows as a whole percentage", () => {
+  assert.equal(percent(stepVolume(0.2, 1)), "30%");
 });

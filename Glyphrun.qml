@@ -3,11 +3,15 @@ import QtCore
 import Quickshell
 import Quickshell.Io
 import "ui"
+import "logic/audio.mjs" as AudioLogic
 import "logic/clock.mjs" as Clock
+import "logic/effects.mjs" as Effects
+import "logic/frameRate.mjs" as FrameRate
 import "logic/highScores.mjs" as HighScores
 import "logic/menu.mjs" as Menu
 import "logic/messages.mjs" as Messages
 import "logic/run.mjs" as Run
+import "logic/screen.mjs" as Screen
 import "logic/seed.mjs" as Seed
 import "logic/story.mjs" as Story
 import "logic/boss.mjs" as Boss
@@ -24,6 +28,10 @@ Item {
   property var run: null
   property var world: null
   property var clock: Clock.createClock()
+  property var effects: Effects.createEffects()
+  property var frameWatcher: FrameRate.createFrameWatcher()
+  property bool autoReduced: false
+  property bool stageEnded: false
   property bool leftHeld: false
   property bool rightHeld: false
   property bool jumpHeld: false
@@ -46,7 +54,13 @@ Item {
   property int rank: 0
   property var recordedRun: null
   readonly property var scores: HighScores.parseScores(storage.highScores)
-  readonly property var settingsItems: ["Effects: " + storage.effects]
+  readonly property bool fullEffects: storage.effects === "full"
+  readonly property var settingsItems: [
+    "Effects: " + storage.effects,
+    "Music volume: " + Menu.percent(storage.musicVolume),
+    "Sound volume: " + Menu.percent(storage.soundVolume),
+    "Mute: " + (storage.muted ? "on" : "off"),
+  ]
   readonly property var devKills: Messages.KILLABLE_SOURCES.map(function(source) { return { source: source, small: false } })
     .concat([{ source: "fork", small: true }])
   property int devHitIndex: 0
@@ -103,6 +117,9 @@ Item {
     levelNumber = run.levelNumber
     clock = Clock.createClock()
     summaryTime = 0
+    stageEnded = false
+    Effects.clearEffects(effects)
+    audio.startTrack(AudioLogic.trackFor(run.seed, run.levelNumber))
     if (gameLoader.item) gameLoader.item.sync()
   }
 
@@ -144,11 +161,31 @@ Item {
     menuIndex = 0
   }
 
+  function showNotice(text, milliseconds) {
+    notice.text = text
+    noticeTimer.interval = milliseconds
+    noticeTimer.restart()
+  }
+
   function copySeed(seed) {
     Quickshell.execDetached(["wl-copy", "--", Seed.formatSeed(seed)])
     clipboardSeed = seed
-    notice.text = Messages.EVENTS.seedCopied
-    noticeTimer.restart()
+    showNotice(Messages.EVENTS.seedCopied, 1600)
+  }
+
+  function watchFrameRate(frameTime) {
+    if (!fullEffects || autoReduced) return
+    if (!FrameRate.watchFrame(frameWatcher, frameTime)) return
+    autoReduced = true
+    storage.effects = "reduced"
+    showNotice(Messages.EVENTS.effectsReduced, 4000)
+  }
+
+  function playCues() {
+    for (const cue of Run.takeCues(run)) {
+      Effects.applyCue(effects, cue)
+      audio.play(cue.name)
+    }
   }
 
   function openMenu() {
@@ -164,9 +201,13 @@ Item {
   }
 
   function listKey(key, items, activate) {
-    if (key === Qt.Key_Up) menuIndex = Menu.moveIndex(menuIndex, -1, items.length)
-    else if (key === Qt.Key_Down) menuIndex = Menu.moveIndex(menuIndex, 1, items.length)
-    else if (isConfirm(key)) activate(items[menuIndex])
+    if (key === Qt.Key_Up || key === Qt.Key_Down) {
+      menuIndex = Menu.moveIndex(menuIndex, key === Qt.Key_Up ? -1 : 1, items.length)
+      audio.play("menu-move")
+    } else if (isConfirm(key)) {
+      audio.play("menu-select")
+      activate(items[menuIndex])
+    }
   }
 
   function activateMain(item) {
@@ -237,21 +278,32 @@ Item {
   function scoresKey(key) {
     if (key === Qt.Key_Escape) showMainMenu()
     else if (scores.length === 0) return
-    else if (key === Qt.Key_Up) scoreRow = Menu.moveIndex(scoreRow, -1, scores.length)
-    else if (key === Qt.Key_Down) scoreRow = Menu.moveIndex(scoreRow, 1, scores.length)
-    else if (key === Qt.Key_Left || key === Qt.Key_Right) scoreAction = 1 - scoreAction
-    else if (isConfirm(key)) {
+    else if (key === Qt.Key_Up || key === Qt.Key_Down) {
+      scoreRow = Menu.moveIndex(scoreRow, key === Qt.Key_Up ? -1 : 1, scores.length)
+      audio.play("menu-move")
+    } else if (key === Qt.Key_Left || key === Qt.Key_Right) {
+      scoreAction = 1 - scoreAction
+      audio.play("menu-move")
+    } else if (isConfirm(key)) {
+      audio.play("menu-select")
       const seed = scores[scoreRow].seed
       if (Menu.SCORE_ACTIONS[scoreAction] === "play") startRun(seed, true)
       else copySeed(seed)
     }
   }
 
+  function changeSetting(setting, direction) {
+    if (setting === "effects") storage.effects = storage.effects === "full" ? "reduced" : "full"
+    else if (setting === "music") storage.musicVolume = Menu.stepVolume(storage.musicVolume, direction)
+    else if (setting === "sound") storage.soundVolume = Menu.stepVolume(storage.soundVolume, direction)
+    else if (setting === "mute") storage.muted = !storage.muted
+    audio.play(setting === "sound" ? "bit" : "menu-select")
+  }
+
   function settingsKey(key) {
     if (key === Qt.Key_Escape) showMainMenu()
-    else if (isConfirm(key) || key === Qt.Key_Left || key === Qt.Key_Right) {
-      storage.effects = storage.effects === "full" ? "reduced" : "full"
-    }
+    else if (key === Qt.Key_Left || key === Qt.Key_Right) changeSetting(Menu.SETTINGS[menuIndex], key === Qt.Key_Left ? -1 : 1)
+    else listKey(key, Menu.SETTINGS, function(setting) { changeSetting(setting, 1) })
   }
 
   function victoryKey(key) {
@@ -272,13 +324,17 @@ Item {
       return true
     }
     if (key === Qt.Key_Escape) {
-      if (!event.isAutoRepeat) openMenu()
+      if (!event.isAutoRepeat) {
+        openMenu()
+        audio.play("pause")
+      }
       return true
     }
     if (event.isAutoRepeat) return false
     if (devTools && devKey(key)) return true
     if (key === Qt.Key_P) {
       paused = !paused
+      audio.play("pause")
       return true
     }
     if (world.finished && isConfirm(key)) {
@@ -330,12 +386,17 @@ Item {
 
   function frame(frameTime) {
     if (screen !== "play") {
+      FrameRate.resetFrameWatcher(frameWatcher)
       screenTime += frameTime
       if (screen === "intro" && Story.introDone(screenTime)) showScreen("title")
       else if (screen === "title" && screenTime >= Story.TITLE_SECONDS) showScreen("play")
       return
     }
-    if (paused || menuOpen) return
+    if (paused || menuOpen) {
+      FrameRate.resetFrameWatcher(frameWatcher)
+      return
+    }
+    watchFrameRate(frameTime)
     const waiting = run.over || world.finished
     const steps = Clock.stepsFor(clock, frameTime)
     for (let i = 0; i < steps; i++) {
@@ -344,6 +405,9 @@ Item {
       if (!waiting) jumpPressed = false
     }
     jumpPressed = false
+    playCues()
+    Effects.stepEffects(effects, frameTime)
+    stageEnded = run.over || world.finished
     if (run.won) {
       recordScore()
       showScreen("victory")
@@ -360,6 +424,17 @@ Item {
     category: "glyphrun"
     property string highScores: "[]"
     property string effects: "full"
+    property real musicVolume: 0.6
+    property real soundVolume: 0.8
+    property bool muted: false
+  }
+
+  AudioController {
+    id: audio
+    musicVolume: storage.musicVolume
+    soundVolume: storage.soundVolume
+    muted: storage.muted
+    musicRunning: root.opened && root.screen === "play" && !root.paused && !root.menuOpen && !root.stageEnded
   }
 
   Process {
@@ -373,7 +448,6 @@ Item {
 
   Timer {
     id: noticeTimer
-    interval: 1600
   }
 
   Theme {
@@ -425,6 +499,8 @@ Item {
           summaryReady: root.summaryTime >= root.summaryReadySeconds
           rank: root.rank
           colors: theme.colors
+          effects: root.effects
+          fullEffects: root.fullEffects
           pixelRatio: window.devicePixelRatio
         }
       }
@@ -464,6 +540,7 @@ Item {
           anchors.fill: parent
           visible: root.screen === "settings"
           items: root.settingsItems
+          index: root.menuIndex
           colors: theme.colors
         }
 
@@ -502,6 +579,14 @@ Item {
             colors: theme.colors
           }
         }
+      }
+
+      CrtOverlay {
+        readonly property real gameScale: Math.min(parent.width / Screen.SCREEN_WIDTH, parent.height / Screen.SCREEN_HEIGHT)
+        anchors.centerIn: parent
+        width: Screen.SCREEN_WIDTH * gameScale
+        height: Screen.SCREEN_HEIGHT * gameScale
+        visible: root.fullEffects
       }
 
       ScaledStage {

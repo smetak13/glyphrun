@@ -5,9 +5,9 @@ Item {
   id: bossItem
 
   property var colors
-  readonly property int dropPoolSize: 10
-  readonly property int tracePoolSize: 8
-  readonly property int bugPoolSize: 6
+  readonly property int dropPoolSize: BossLogic.MAX_DROPS
+  readonly property int tracePoolSize: BossLogic.MAX_TRACES
+  readonly property int bugPoolSize: BossLogic.MAX_BUGS
   readonly property real blinkRate: 8
   readonly property real walkHop: 2
   readonly property real walkHopRate: 8

@@ -3,6 +3,9 @@ import "../logic/screen.mjs" as Screen
 import "../logic/level.mjs" as Level
 import "../logic/run.mjs" as Run
 import "../logic/seed.mjs" as Seed
+import "../logic/backdrop.mjs" as BackdropLogic
+import "../logic/effects.mjs" as Effects
+import "../logic/physics.mjs" as Physics
 
 Item {
   id: view
@@ -18,9 +21,13 @@ Item {
   property bool summaryReady: false
   property int rank: 0
   property var colors
+  property var effects
+  property bool fullEffects: true
   property real pixelRatio: 1
   readonly property real gameScale: Math.min(width / Screen.SCREEN_WIDTH, height / Screen.SCREEN_HEIGHT)
   readonly property real texelScale: gameScale * pixelRatio
+  readonly property size screenTexture: Qt.size(Screen.SCREEN_WIDTH * texelScale, Screen.SCREEN_HEIGHT * texelScale)
+  readonly property var backdrop: BackdropLogic.backdropLayers()
   readonly property var sections: Level.levelSections(world.level)
   property bool checkpointLit: false
   property bool finished: false
@@ -32,6 +39,9 @@ Item {
   readonly property real bigHeroOffset: 20
   readonly property int popupPoolSize: 8
   readonly property real popupRise: 40
+  readonly property real trailGap: 22
+  readonly property real trailSpeed: Physics.RUN_SPEED * 0.9
+  readonly property real flashOpacity: 0.9
 
   function stageName() {
     return run.levelNumber > Run.LEVEL_COUNT ? "KERNEL PANIC" : "level " + run.levelNumber + "/" + Run.LEVEL_COUNT
@@ -52,6 +62,30 @@ Item {
     heroTop.x = hero.x
     heroTop.y = hero.y - bigHeroOffset
     heroTop.visible = hero.visible && world.hero.big
+    const direction = world.hero.vx > 0 ? 1 : -1
+    trail.visible = hero.visible && world.hero.grounded && Math.abs(world.hero.vx) >= trailSpeed
+    trail.text = direction > 0 ? "»" : "«"
+    trail.x = Math.round(world.hero.x - direction * trailGap - trail.width / 2)
+    trail.y = Math.round(world.hero.y - trail.height + heroBaselineDrop)
+  }
+
+  function syncEffects() {
+    shaken.x = Math.round(effects.shakeX)
+    shaken.y = Math.round(effects.shakeY)
+    for (let i = 0; i < particles.count; i++) {
+      const particle = effects.particles[i]
+      const item = particles.itemAt(i)
+      item.visible = particle !== undefined
+      if (!particle) continue
+      item.text = particle.text
+      item.color = colors[particle.role]
+      item.x = Math.round(particle.x - item.width / 2)
+      item.y = Math.round(particle.y - item.height / 2)
+      item.opacity = Math.min(1, particle.life * 2)
+    }
+    flash.opacity = effects.flash * flashOpacity
+    glitch.strength = fullEffects ? effects.glitch : 0
+    glitch.sync(effects.slices)
   }
 
   function syncMessages() {
@@ -83,7 +117,11 @@ Item {
   }
 
   function sync() {
-    worldLayer.x = -Math.round(world.cameraX)
+    const cameraX = Math.round(world.cameraX)
+    levelLayer.x = -cameraX
+    dynamicLayer.x = -cameraX
+    farStrip.cameraX = cameraX
+    nearStrip.cameraX = cameraX
     syncHero()
     for (let i = 0; i < bits.count; i++) {
       const item = bits.itemAt(i)
@@ -98,6 +136,7 @@ Item {
     overCause = run.over ? run.cause + " · " + stageName() : ""
     syncHud()
     syncMessages()
+    syncEffects()
   }
 
   Item {
@@ -116,119 +155,220 @@ Item {
     }
 
     Item {
-      id: worldLayer
+      id: scene
+      anchors.fill: parent
 
-      Repeater {
-        model: view.sections
+      HexStrip {
+        id: farStrip
+        glyphs: view.backdrop.far
+        parallax: BackdropLogic.FAR_PARALLAX
+        size: 11
+        color: view.colors.hexdump
+        opacity: 0.12
+        texelScale: view.texelScale
+      }
+
+      HexStrip {
+        id: nearStrip
+        glyphs: view.backdrop.near
+        parallax: BackdropLogic.NEAR_PARALLAX
+        size: 12
+        color: view.colors.hexdump
+        opacity: 0.2
+        texelScale: view.texelScale
+      }
+
+      Item {
+        id: shaken
+        width: Screen.SCREEN_WIDTH
+        height: Screen.SCREEN_HEIGHT
 
         Item {
-          required property var modelData
-          x: modelData.x
-          width: Level.SECTION_WIDTH + Level.SECTION_OVERHANG
-          height: Screen.SCREEN_HEIGHT
-          layer.enabled: true
-          layer.textureSize: Qt.size(width * view.texelScale, height * view.texelScale)
+          id: levelLayer
 
           Repeater {
-            model: parent.modelData.glyphs
+            model: view.sections
+
+            Item {
+              id: section
+              required property var modelData
+              readonly property size textureSize: Qt.size(width * view.texelScale, height * view.texelScale)
+              x: modelData.x
+              width: Level.SECTION_WIDTH + Level.SECTION_OVERHANG
+              height: Screen.SCREEN_HEIGHT
+              layer.enabled: true
+              layer.textureSize: textureSize
+
+              GlowLayer {
+                width: section.width
+                height: section.height
+                glowing: view.fullEffects
+                glow: 0.4
+                glowOpacity: 0.2
+                textureSize: section.textureSize
+
+                Repeater {
+                  model: section.modelData.glyphs.filter(glyph => glyph.role !== "muted")
+
+                  Glyph {
+                    required property var modelData
+                    x: modelData.x
+                    y: modelData.y
+                    text: modelData.text
+                    size: modelData.size
+                    color: view.colors[modelData.role]
+                  }
+                }
+              }
+
+              Repeater {
+                model: section.modelData.glyphs.filter(glyph => glyph.role === "muted")
+
+                Glyph {
+                  required property var modelData
+                  x: modelData.x
+                  y: modelData.y
+                  text: modelData.text
+                  size: modelData.size
+                  color: view.colors.muted
+                }
+              }
+            }
+          }
+        }
+
+        GlowLayer {
+          width: Screen.SCREEN_WIDTH
+          height: Screen.SCREEN_HEIGHT
+          glowing: view.fullEffects
+          glow: 0.4
+          glowOpacity: 0.35
+          textureSize: view.screenTexture
+
+          Item {
+            id: dynamicLayer
+
+            Repeater {
+              id: bits
+              model: view.world.bits
+
+              Glyph {
+                required property var modelData
+                readonly property real restY: (modelData.row + 0.5) * Screen.TILE - height / 2
+                x: (modelData.col + 0.5) * Screen.TILE - width / 2
+                y: restY
+                text: modelData.text
+                size: 20
+                color: view.colors.bit
+              }
+            }
+
+            Repeater {
+              model: view.world.level.checkpoint ? Level.checkpointGlyphs(view.world.level.checkpoint, view.checkpointLit) : []
+
+              Glyph {
+                required property var modelData
+                x: modelData.x
+                y: modelData.y
+                text: modelData.text
+                size: modelData.size
+                color: view.colors[modelData.role]
+              }
+            }
+
+            Repeater {
+              id: enemies
+              model: view.world.enemies
+
+              Enemy {
+                required property var modelData
+                enemy: modelData
+                colors: view.colors
+              }
+            }
+
+            Boss {
+              id: boss
+              colors: view.colors
+            }
 
             Glyph {
-              required property var modelData
-              x: modelData.x
-              y: modelData.y
-              text: modelData.text
-              size: modelData.size
-              color: view.colors[modelData.role]
+              id: trail
+              size: 14
+              opacity: 0.7
+              color: view.colors.muted
+            }
+
+            Glyph {
+              id: heroTop
+              text: "@"
+              size: 28
+              color: view.colors.hero
+            }
+
+            Glyph {
+              id: hero
+              text: "@"
+              size: 28
+              color: view.colors.hero
+            }
+
+            Repeater {
+              id: popups
+              model: view.popupPoolSize
+
+              Column {
+                property alias text: score.text
+                property alias note: note.text
+                property string role: "bit"
+                visible: false
+
+                Glyph {
+                  id: score
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  size: 14
+                  color: view.colors[parent.role]
+                }
+
+                Glyph {
+                  id: note
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  visible: text !== ""
+                  size: 11
+                  opacity: 0.75
+                  color: view.colors[parent.role]
+                }
+              }
+            }
+
+            Repeater {
+              id: particles
+              model: Effects.PARTICLE_LIMIT
+
+              Glyph {
+                visible: false
+                size: 14
+              }
             }
           }
         }
       }
+    }
 
-      Repeater {
-        id: bits
-        model: view.world.bits
+    Glitch {
+      id: glitch
+      anchors.fill: parent
+      source: scene
+      textureSize: view.screenTexture
+      sliceCount: Effects.GLITCH_SLICES
+    }
 
-        Glyph {
-          required property var modelData
-          readonly property real restY: (modelData.row + 0.5) * Screen.TILE - height / 2
-          x: (modelData.col + 0.5) * Screen.TILE - width / 2
-          y: restY
-          text: modelData.text
-          size: 20
-          color: view.colors.bit
-        }
-      }
-
-      Repeater {
-        model: view.world.level.checkpoint ? Level.checkpointGlyphs(view.world.level.checkpoint, view.checkpointLit) : []
-
-        Glyph {
-          required property var modelData
-          x: modelData.x
-          y: modelData.y
-          text: modelData.text
-          size: modelData.size
-          color: view.colors[modelData.role]
-        }
-      }
-
-      Repeater {
-        id: enemies
-        model: view.world.enemies
-
-        Enemy {
-          required property var modelData
-          enemy: modelData
-          colors: view.colors
-        }
-      }
-
-      Boss {
-        id: boss
-        colors: view.colors
-      }
-
-      Glyph {
-        id: heroTop
-        text: "@"
-        size: 28
-        color: view.colors.hero
-      }
-
-      Glyph {
-        id: hero
-        text: "@"
-        size: 28
-        color: view.colors.hero
-      }
-
-      Repeater {
-        id: popups
-        model: view.popupPoolSize
-
-        Column {
-          property alias text: score.text
-          property alias note: note.text
-          property string role: "bit"
-          visible: false
-
-          Glyph {
-            id: score
-            anchors.horizontalCenter: parent.horizontalCenter
-            size: 14
-            color: view.colors[parent.role]
-          }
-
-          Glyph {
-            id: note
-            anchors.horizontalCenter: parent.horizontalCenter
-            visible: text !== ""
-            size: 11
-            opacity: 0.75
-            color: view.colors[parent.role]
-          }
-        }
-      }
+    Rectangle {
+      id: flash
+      anchors.fill: parent
+      color: view.colors.text
+      opacity: 0
+      visible: opacity > 0
     }
 
     Rectangle {

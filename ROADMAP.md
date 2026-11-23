@@ -2,10 +2,12 @@
 
 Everything agreed but kept out of the MVP (`docs/SPEC.md`). Roughly in priority order within each group.
 
-## Sound (first after the MVP)
+## Sound
 
-- Synthesized sound effects, as Omatris does: jump, land, bit, sudo, stomp, hit, death, checkpoint, exit, boss hits.
-- Music later.
+Music and sound effects moved into the MVP (`docs/IMPLEMENTATION.md`, task 10). Later:
+
+- More tracks when task 11 adds levels beyond ten, so a run never repeats a level track.
+- A track per future boss (see Content).
 
 ## Modes
 

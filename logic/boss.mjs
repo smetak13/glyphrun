@@ -25,6 +25,8 @@ export const TRACE_LENGTH = 3 * TILE;
 export const TRACE_HEIGHT = 8;
 export const TRACE_TEXTS = ["panic+0x5c", "do_exit+0x2a", "oops_end+0x9", "die+0x41", "schedule+0x3e", "page_fault+0x1e"];
 export const SPAWN_INTERVAL = 2;
+export const MAX_DROPS = 10;
+export const MAX_TRACES = 8;
 export const CORE_COLS = [5, 19, 33];
 export const CORE_WIDTH = 2 * TILE;
 export const CORE_HEIGHT = 16;
@@ -33,6 +35,8 @@ const START_COL = 2;
 const GROUND_ROWS = 3;
 const DROP_MARGIN_COLS = 1;
 const BUG_MARGIN_COLS = 3;
+
+export const MAX_BUGS = Math.ceil(PHASE_SECONDS[PHASE_SECONDS.length - 1] * BOSS_SPEEDS[BOSS_SPEEDS.length - 1] / SPAWN_INTERVAL) + 1;
 
 const EMITTED = { spikes: "spike", trace: "trace", spawn: "bug" };
 const INTERVALS = { spike: SPIKE_INTERVAL, trace: TRACE_INTERVAL, bug: SPAWN_INTERVAL };
@@ -71,12 +75,22 @@ export function createBoss(seed, arena) {
     timer: INTRO_SECONDS,
     hits: 0,
     attacks: 0,
+    cleared: false,
     attack: null,
     drops: [],
     traces: [],
     bugs: [],
     core: null,
   };
+}
+
+export function resumeBoss(boss) {
+  if (boss.state !== "intro" && !boss.cleared) boss.attacks--;
+  boss.attack = null;
+  boss.core = null;
+  clearHazards(boss);
+  boss.state = "intro";
+  boss.timer = INTRO_SECONDS;
 }
 
 export function bossSpeed(boss) {
@@ -87,9 +101,10 @@ function attackLength(boss) {
   return PHASE_SECONDS[Math.min(boss.hits, PHASE_SECONDS.length - 1)] * bossSpeed(boss);
 }
 
-function startAttack(boss) {
+function startAttack(boss, events) {
   const phase = phaseOrder(boss.seed, boss.attacks + 1)[boss.attacks];
   boss.attacks++;
+  boss.cleared = false;
   boss.state = "attack";
   boss.attack = {
     phase,
@@ -98,6 +113,7 @@ function startAttack(boss) {
     aimed: false,
     emitters: phase.split("+").map(pattern => ({ what: EMITTED[pattern], interval: INTERVALS[EMITTED[pattern]], next: 0 })),
   };
+  events.push({ type: "bossPhase", phase });
 }
 
 function randomCol(boss, margin) {
@@ -128,7 +144,7 @@ function emit(boss, what, hero) {
   boss.drops.push({ kind: what, x: boss.left + (col + 0.5) * TILE, y: DROP_TOP_ROW * TILE, warning: DROP_WARNING_SECONDS });
 }
 
-function runAttack(boss, hero, fast) {
+function runAttack(boss, hero, fast, events) {
   const attack = boss.attack;
   const length = attackLength(boss);
   for (const emitter of attack.emitters) {
@@ -143,6 +159,7 @@ function runAttack(boss, hero, fast) {
     boss.attack = null;
     const col = pick(boss.random, CORE_COLS);
     boss.core = { x: boss.left + col * TILE + CORE_WIDTH / 2, timer: CORE_SECONDS };
+    events.push({ type: "coreDump", x: boss.core.x, y: boss.ground - CORE_HEIGHT });
   }
 }
 
@@ -240,6 +257,7 @@ function hitCore(boss, hero, events) {
   hero.jumping = true;
   hero.grounded = false;
   boss.hits++;
+  boss.cleared = true;
   events.push({ type: "bossHit", hits: boss.hits, x: boss.core.x, y: boss.ground - CORE_HEIGHT });
   if (boss.hits < BOSS_HITS) {
     pause(boss);
@@ -254,7 +272,7 @@ function hitCore(boss, hero, events) {
 function runTimers(boss, seconds, events) {
   boss.timer = Math.max(boss.timer - seconds, 0);
   if (boss.timer > 0) return;
-  if (boss.state === "intro" || boss.state === "pause") startAttack(boss);
+  if (boss.state === "intro" || boss.state === "pause") startAttack(boss, events);
   else if (boss.state === "crash") {
     boss.state = "reboot";
     boss.timer = REBOOT_SECONDS;
@@ -268,7 +286,7 @@ function runTimers(boss, seconds, events) {
 export function stepBoss(boss, level, hero, previousBottom, seconds) {
   const events = [];
   const fast = seconds * bossSpeed(boss);
-  if (boss.state === "attack") runAttack(boss, hero, fast);
+  if (boss.state === "attack") runAttack(boss, hero, fast, events);
   else if (boss.state === "core") {
     boss.core.timer = Math.max(boss.core.timer - seconds, 0);
     if (stompsCore(boss, hero, previousBottom)) hitCore(boss, hero, events);

@@ -9,6 +9,7 @@ import {
   runBits,
   runSeconds,
   stepRun,
+  takeCues,
   DEATH_SECONDS,
   INVULNERABLE_SECONDS,
   LEVEL_COUNT,
@@ -19,7 +20,7 @@ import {
 import { parseLevel } from "../logic/level.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { TILE } from "../logic/screen.mjs";
-import { BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, PAR_SECONDS, TIME_BONUS_PER_SECOND } from "../logic/score.mjs";
+import { BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, LIFE_BONUS_POINTS, PAR_SECONDS, TIME_BONUS_PER_SECOND } from "../logic/score.mjs";
 import { arenaLevel, coreBox } from "../logic/boss.mjs";
 
 const IDLE = { direction: 0, jumpHeld: false, jumpPressed: false };
@@ -302,7 +303,7 @@ test("the third hit defeats the boss, says the kernel is rebooting and finishes 
   stepUntil(run, IDLE, r => r.world.finished);
 
   assert.equal(toast, "kernel: rebooting…");
-  assert.equal(run.score, 3 * BOSS_HIT_POINTS + BOSS_DEFEATED_POINTS);
+  assert.equal(run.score, 3 * BOSS_HIT_POINTS + BOSS_DEFEATED_POINTS + LIVES * LIFE_BONUS_POINTS);
   assert.equal(run.world.finished, true);
 });
 
@@ -376,4 +377,124 @@ test("the level summary starts afresh on the next level", () => {
   nextLevel(run, FLAT);
 
   assert.deepEqual(levelSummary(run)[1], { label: "kills", detail: "0", points: 0 });
+});
+
+function cueNames(run) {
+  return takeCues(run).map(cue => cue.name);
+}
+
+test("jumping and landing are cued at the hero's feet", () => {
+  const run = createRun(1, FLAT);
+
+  stepRun(run, { direction: 0, jumpHeld: true, jumpPressed: true }, STEP_SECONDS);
+  const jump = takeCues(run);
+  const feet = run.world.hero.y;
+  stepUntil(run, { direction: 0, jumpHeld: true, jumpPressed: false }, r => r.world.hero.grounded);
+  const land = takeCues(run);
+
+  assert.deepEqual(jump, [{ name: "jump", x: 1.5 * TILE, y: feet }]);
+  assert.deepEqual(land, [{ name: "land", x: 1.5 * TILE, y: 21 * TILE }]);
+});
+
+test("collecting bits and sudo is cued where they were", () => {
+  const bits = createRun(1, BITS);
+  const sudo = createRun(1, SUDO);
+  const root = bigRun(SUDO);
+
+  stepUntil(bits, RIGHT, r => r.world.bits[0].collected);
+  stepUntil(sudo, RIGHT, r => r.world.bits[0].collected);
+  stepUntil(root, RIGHT, r => r.world.bits[0].collected);
+
+  assert.deepEqual(takeCues(bits).filter(cue => cue.name === "bit"), [{ name: "bit", x: 3.5 * TILE, y: 20.5 * TILE }]);
+  assert.ok(cueNames(sudo).includes("sudo"));
+  assert.ok(cueNames(root).includes("already-root"));
+});
+
+test("a shrinking hit, a lost life and the end of the run are cued", () => {
+  const run = bigRun(FLAT);
+  run.lives = 1;
+  takeCues(run);
+
+  hitHero(run, "bug");
+  const shrink = cueNames(run);
+  steps(run, IDLE, INVULNERABLE_SECONDS + 0.1);
+  hitHero(run, "bug");
+  const death = cueNames(run);
+  steps(run, IDLE, DEATH_SECONDS + 0.1);
+
+  assert.deepEqual([shrink, death, cueNames(run)], [["hit"], ["death"], ["game-over"]]);
+});
+
+test("a hit ignored while invulnerable is not cued", () => {
+  const run = bigRun(FLAT);
+  hitHero(run, "bug");
+  takeCues(run);
+
+  hitHero(run, "bug");
+
+  assert.deepEqual(cueNames(run), []);
+});
+
+test("kills, the checkpoint and the exit are cued", () => {
+  const run = createRun(1, PIT_AFTER_CHECKPOINT);
+  const exit = createRun(1, EXIT);
+  killEnemy(run, "bug", 100, 200, false);
+
+  stepUntil(run, RIGHT, r => r.world.checkpointReached);
+  stepUntil(exit, RIGHT, r => r.world.finished);
+
+  const cues = takeCues(run);
+  assert.deepEqual(cues[0], { name: "stomp", x: 100, y: 200 });
+  assert.ok(cues.some(cue => cue.name === "checkpoint"));
+  assert.ok(cueNames(exit).includes("level-clear"));
+});
+
+test("the boss fight cues each phase, each core dump, each hit, its defeat and the victory", () => {
+  const run = bossRun();
+  takeCues(run);
+  stompCore(run);
+  stompCore(run);
+  stompCore(run);
+
+  stepUntil(run, IDLE, r => r.world.finished);
+
+  const names = cueNames(run).filter(name => name !== "land" && name !== "jump");
+  assert.deepEqual(names, [
+    "boss-warning", "core-dump", "boss-hit",
+    "boss-warning", "core-dump", "boss-hit",
+    "boss-warning", "core-dump", "boss-hit",
+    "boss-defeat", "victory",
+  ]);
+});
+
+test("taking the cues empties them", () => {
+  const run = createRun(1, FLAT);
+  killEnemy(run, "bug", 0, 0, false);
+
+  takeCues(run);
+
+  assert.deepEqual(takeCues(run), []);
+});
+
+test("beating the boss adds a bonus for every life left", () => {
+  const run = bossRun();
+  run.lives = 2;
+  stompCore(run);
+  stompCore(run);
+  stompCore(run);
+  const before = run.score;
+
+  stepUntil(run, IDLE, r => r.won);
+
+  assert.deepEqual([run.lifeBonus, run.score - before], [2 * LIFE_BONUS_POINTS, BOSS_DEFEATED_POINTS + 2 * LIFE_BONUS_POINTS]);
+});
+
+test("a run that ends in game over gets no life bonus", () => {
+  const run = createRun(1, FLAT);
+  run.lives = 1;
+  hitHero(run, "bug");
+
+  steps(run, IDLE, DEATH_SECONDS + 0.1);
+
+  assert.deepEqual([run.over, run.lifeBonus, run.score], [true, 0, 0]);
 });

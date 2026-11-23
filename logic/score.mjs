@@ -8,11 +8,16 @@ export const BOSS_HIT_POINTS = 1000;
 export const BOSS_DEFEATED_POINTS = 5000;
 export const PAR_SECONDS = 60;
 export const TIME_BONUS_PER_SECOND = 20;
+export const LIFE_BONUS_POINTS = 2000;
 
 export function killPoints(source, small) {
   if (source === "leak") return LEAK_POINTS;
   if (source === "fork" && small) return SMALL_FORK_POINTS;
   return KILL_POINTS;
+}
+
+export function lifeBonus(lives) {
+  return lives * LIFE_BONUS_POINTS;
 }
 
 export function timeBonus(seconds) {

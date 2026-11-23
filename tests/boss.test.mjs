@@ -5,12 +5,16 @@ import {
   createBoss,
   coreBox,
   phaseOrder,
+  resumeBoss,
   stepBoss,
   BOSS_HITS,
   CORE_HEIGHT,
   CORE_SECONDS,
   DROP_TOP_ROW,
   INTRO_SECONDS,
+  MAX_BUGS,
+  MAX_DROPS,
+  MAX_TRACES,
   PHASES,
   PAUSE_SECONDS,
   PHASE_SECONDS,
@@ -300,4 +304,112 @@ test("spawned bugs drop in, walk and can be stomped, and are gone after the core
   assert.ok(walked);
   assert.deepEqual(kills.map(event => event.source), ["bug"]);
   assert.deepEqual(f.boss.bugs, []);
+});
+
+function mostHazardsInLastPhase(seed) {
+  const f = fight(seed);
+  reachCore(f);
+  stompCore(f);
+  reachCore(f);
+  stompCore(f);
+  const most = { drops: 0, traces: 0, bugs: 0 };
+  for (let i = 0; i < 100000 && f.boss.state !== "core"; i++) {
+    f.hero.y = GROUND - 10 * TILE;
+    f.hero.vy = 0;
+    step(f);
+    for (const kind of Object.keys(most)) most[kind] = Math.max(most[kind], f.boss[kind].length);
+  }
+  return most;
+}
+
+test("the longest, fastest phases never hold more hazards than the arena can draw", () => {
+  for (const seed of SEEDS.slice(0, 30)) {
+    const most = mostHazardsInLastPhase(seed);
+
+    assert.ok(most.drops <= MAX_DROPS, "drops " + most.drops);
+    assert.ok(most.traces <= MAX_TRACES, "traces " + most.traces);
+    assert.ok(most.bugs <= MAX_BUGS, "bugs " + most.bugs);
+  }
+});
+
+function phaseStarted(f) {
+  return stepUntil(f, boss => boss.state === "attack").events;
+}
+
+test("after a death in a phase, the boss keeps its hits and runs that phase again from its start", () => {
+  const f = fight();
+  reachCore(f);
+  stompCore(f);
+  reachCore(f);
+  stompCore(f);
+  phaseStarted(f);
+  stepUntil(f, boss => boss.attack.time > 3);
+  const phase = f.boss.attack.phase;
+
+  resumeBoss(f.boss);
+  const intro = [f.boss.state, f.boss.drops.length, f.boss.traces.length, f.boss.bugs.length];
+  const { seconds } = stepUntil(f, boss => boss.state === "attack");
+
+  assert.deepEqual(intro, ["intro", 0, 0, 0]);
+  assert.ok(Math.abs(seconds - INTRO_SECONDS) < 0.02);
+  assert.deepEqual([f.boss.hits, f.boss.attacks, f.boss.attack.phase, f.boss.attack.time], [2, 3, phase, 0]);
+});
+
+test("after a death during a core window, the boss runs the same phase again", () => {
+  const f = fight();
+  reachCore(f);
+
+  resumeBoss(f.boss);
+  stepUntil(f, boss => boss.state === "attack");
+
+  assert.deepEqual([f.boss.core, f.boss.hits, f.boss.attacks, f.boss.attack.phase], [null, 0, 1, phaseOrder(SEED, 1)[0]]);
+});
+
+test("after a death in the pause following a missed core, the boss runs the missed phase again", () => {
+  const f = fight();
+  reachCore(f);
+  stepUntil(f, boss => boss.state === "pause");
+
+  resumeBoss(f.boss);
+  stepUntil(f, boss => boss.state === "attack");
+
+  assert.deepEqual([f.boss.hits, f.boss.attacks], [0, 1]);
+});
+
+test("after a death in the pause following a hit, the boss goes on with the next phase", () => {
+  const f = fight();
+  reachCore(f);
+  stompCore(f);
+
+  resumeBoss(f.boss);
+  stepUntil(f, boss => boss.state === "attack");
+
+  assert.deepEqual([f.boss.hits, f.boss.attacks, f.boss.attack.phase], [1, 2, phaseOrder(SEED, 2)[1]]);
+});
+
+test("dying again before the resumed phase starts does not go back further", () => {
+  const f = fight();
+  reachCore(f);
+  stompCore(f);
+  reachCore(f);
+  resumeBoss(f.boss);
+
+  resumeBoss(f.boss);
+  stepUntil(f, boss => boss.state === "attack");
+
+  assert.deepEqual([f.boss.hits, f.boss.attacks], [1, 2]);
+});
+
+test("a resumed fight keeps the seed's phase order", () => {
+  const f = fight();
+  const order = phaseOrder(SEED, 2);
+  const phases = [];
+  for (let i = 0; i < 4; i++) {
+    phaseStarted(f);
+    phases.push(f.boss.attack.phase);
+    if (i % 2 === 0) resumeBoss(f.boss);
+    else reachCore(f);
+  }
+
+  assert.deepEqual(phases, [order[0], order[0], order[1], order[1]]);
 });

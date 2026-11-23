@@ -95,6 +95,8 @@ function moveY(hero, dy, level) {
 }
 
 export function stepHero(hero, input, level, seconds) {
+  const wasGrounded = hero.grounded;
+  let jumped = false;
   const acceleration = hero.grounded ? ACCELERATION : AIR_ACCELERATION;
   hero.vx = approach(hero.vx, input.direction * RUN_SPEED, acceleration * seconds);
 
@@ -105,6 +107,7 @@ export function stepHero(hero, input, level, seconds) {
     hero.jumping = true;
     hero.buffer = 0;
     hero.coyote = 0;
+    jumped = true;
   }
   if (hero.jumping && !input.jumpHeld && hero.vy < -JUMP_CUT_VELOCITY) hero.vy = -JUMP_CUT_VELOCITY;
   if (hero.vy >= 0) hero.jumping = false;
@@ -114,6 +117,8 @@ export function stepHero(hero, input, level, seconds) {
 
   moveX(hero, hero.vx * seconds, level);
   moveY(hero, hero.vy * seconds, level);
+  if (jumped) return "jump";
+  return hero.grounded && !wasGrounded ? "land" : null;
 }
 
 export function computeEnvelope() {

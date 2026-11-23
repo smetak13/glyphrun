@@ -193,14 +193,12 @@ test("the boss arena starts its fight with the world", () => {
   assert.deepEqual([world.boss.state, world.cameraX], ["intro", 0]);
 });
 
-test("respawning in the arena puts the hero back at its start against a fresh boss", () => {
+test("respawning in the arena puts the hero back at its start and the boss before its current phase", () => {
   const world = createWorld(arenaLevel(1));
   const start = world.hero.x;
   stepUntil(world, RIGHT, w => w.boss.state === "attack");
-  const fought = world.boss;
 
   respawnHero(world);
 
-  assert.notEqual(world.boss, fought);
-  assert.deepEqual([world.boss.state, world.boss.hits, world.hero.x], ["intro", 0, start]);
+  assert.deepEqual([world.boss.state, world.boss.attacks, world.boss.drops, world.boss.traces, world.boss.bugs, world.hero.x], ["intro", 0, [], [], [], start]);
 });

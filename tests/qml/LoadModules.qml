@@ -1,8 +1,12 @@
 import QtQuick
+import "../../logic/audio.mjs" as AudioLogic
+import "../../logic/backdrop.mjs" as Backdrop
 import "../../logic/boss.mjs" as Boss
 import "../../logic/chunks.mjs" as Chunks
 import "../../logic/clock.mjs" as Clock
+import "../../logic/effects.mjs" as Effects
 import "../../logic/enemies.mjs" as Enemies
+import "../../logic/frameRate.mjs" as FrameRate
 import "../../logic/generator.mjs" as Generator
 import "../../logic/highScores.mjs" as HighScores
 import "../../logic/level.mjs" as Level
@@ -55,6 +59,13 @@ QtObject {
       Story.shippedShown(3)
       Story.commitHash(run.seed, 1)
       Random.shuffle(Random.subStream(1, "check"), Chunks.CHUNKS)
+      AudioLogic.trackFor(run.seed, 6)
+      Backdrop.backdropOffset(Backdrop.backdropLayers().near[0].x, Backdrop.NEAR_PARALLAX)
+      const effects = Effects.createEffects()
+      for (const cue of Run.takeCues(run)) Effects.applyCue(effects, cue)
+      Effects.stepEffects(effects, 1 / 60)
+      FrameRate.watchFrame(FrameRate.createFrameWatcher(), 1 / 60)
+      Menu.stepVolume(0.5, 1)
       console.log("GLYPHRUN_MODULES_OK " + Seed.formatSeed(run.seed) + " " + run.score + " " + Screen.SCREEN_WIDTH + " " + world.hero.y + " " + envelope.maxGap + " " + generated.cols)
       Qt.exit(0)
     } catch (error) {

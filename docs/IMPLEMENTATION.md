@@ -113,26 +113,45 @@ Tests: seed entry parsing and rejection, high score insertion and ordering, boot
 
 Done when: a full run from the main menu through victory or game over works, and the texts read well to the user.
 
-## 10. Effects
+## 10. Effects and sound
 
-- Status: todo
+- Status: done
 
 The full visual layer of the prototype in the game: glow, particles, score popups, screen shake, glitch on damage and death, parallax hexdump, CRT and vignette. Effects setting (full / reduced) and the automatic switch to reduced under 50 fps with a one-time notice.
 
-Tests: the frame-rate watcher's switching rule.
+Sound, played with Qt Multimedia as Omatris does (`MediaPlayer` with an `AudioOutput` for music, `SoundEffect` for effects):
 
-Done when: the game looks like `docs/prototype/demo.html` with full effects and stays smooth with reduced effects on weaker hardware.
+- The assets already exist and are generated, not hand-made: `node scripts/generate-audio.mjs` (synth and composer in `scripts/audio/`, no npm dependencies, needs `ffmpeg`) writes `assets/audio/music/*.ogg` and `assets/audio/sfx/*.wav`. The output is deterministic. Generator and assets are in the working tree but not committed yet: they go into this task's commit, not into earlier ones.
+- Music: retro synthwave loops of 32 bars that loop seamlessly. Ten level tracks `level-01`–`level-10` (96–126 BPM, about 60–80 s) and five faster, harder boss tracks `boss-01`–`boss-05` (150–168 BPM, about 45–50 s). Track list and titles: `scripts/audio/tracks.mjs`.
+- Track choice from the seed, on its own sub-stream so it never shifts level generation: the ten level tracks are shuffled per seed and level n plays the n-th one, so a run's five levels always have five different tracks and the same seed always has the same music. The boss stage plays one of the five boss tracks, also chosen by the seed. Music starts with each level, pauses with the game and when the window is hidden, and stops on game over and victory, where their jingles play.
+- Effects (`assets/audio/sfx/`): `jump`, `land`, `bit`, `sudo`, `already-root`, `stomp`, `hit`, `death`, `checkpoint`, `level-clear`, `boss-warning`, `boss-hit`, `boss-defeat`, `core-dump`, `game-over`, `victory`, `menu-move`, `menu-select`, `pause`. The logic exposes events (as Omatris's `effectSerial` does) and an `AudioController.qml` plays them, so the logic stays free of QML.
+- Settings: music volume, effects volume and mute, stored with the other settings.
+- SPEC gets a sound section (the rules above) and section 17 no longer lists sound as out of scope.
+
+Tests: the frame-rate watcher's switching rule; track choice is deterministic per seed, gives five different level tracks per run and does not change any generated level.
+
+Done when: the game looks like `docs/prototype/demo.html` with full effects and stays smooth with reduced effects on weaker hardware, and music and effects play at the right moments, follow the volume settings and fit the game to the user.
+
+Notes: the logic reports what happened as cues on the run (`takeCues`), which drive both the particles, shake, flash and glitch (`logic/effects.mjs`, with its own fixed-seed generator so cosmetics never touch the run's streams) and `ui/AudioController.qml`. The glow needed `MultiEffect` auto-padding off: with a layer texture at physical size, auto-padding drew the glow a few pixels off its glyph. The automatic switch to reduced effects could not be triggered on the development machine, which holds the refresh rate with full effects; its rule is covered by tests only.
+
+After the first round of play: the CRT overlay is about 15 % of its first strength; each effect got its own gain (they were 10–13 dB louder than the music at equal settings, the jump the worst); and unexplained deaths in the boss stage were invisible bugs. The arena drew at most 6 spawned bugs, but a 20 s phase at ×1.2 speed spawns up to 13 and they stay until stomped or the core window ends. The glyph pools now come from `MAX_DROPS`, `MAX_TRACES` and `MAX_BUGS` in `logic/boss.mjs`, and a test checks the longest phases stay within them.
+
+Second round: a death in the boss stage no longer restarts the fight from the first phase. The boss keeps its hits and runs the current phase again (`resumeBoss`); a phase counts as cleared only once its core is stomped. SPEC 7 is updated.
+
+Third round: gameplay looked blurred with full effects while menus were sharp. The glow layers themselves render at full resolution; the haze came from a glow that was too wide and bright over every glyph. The glow is now tight (`blurMax` 8) and faint (opacity 0.35 on moving glyphs, 0.2 on the level).
+
+Fourth round: beating the boss adds 2,000 points for every life left, so lost lives count in the final score. SPEC 9 is updated.
 
 ## 11. Terrain, difficulty and run length
 
 - Status: todo
 
-The levels are too easy and the terrain too bland: even level 5 is easy to finish, and a whole run takes about three minutes. Make the generated levels varied and hard, so that reaching the boss is a real challenge, closer to the difficulty of a classic platformer. To be shaped by a grilling session before it starts; the starting points:
+The levels are too easy and the terrain too bland: even level 5 is easy to finish, and a whole run takes about three minutes. Make the generated levels varied and harder, so that even reaching the boss is a challenge, closer to the difficulty of a classic platformer. To be shaped by a grilling session before it starts; the starting points:
 
 - New terrain obstacles and chunks, so each level looks and plays differently every time: more gaps in a row, varied heights, and other terrain features to be decided.
 - A higher concentration of hazards and enemies, with the difficulty table and the validator's hazard ranges retuned.
 - Combination chunks that put several enemies together on one screen: for example several dangling pointers firing at different heights, or memory leaks in a row with only a small gap between them. Difficulty comes from terrain and enemy combinations together, not from enemies alone.
-- More levels and longer later levels, with the story, title cards and difficulty table extended to match.
+- To weigh the difficulty a bit when the levels get harder, we will add one sudo powerup somewhere during the boss fight during phase One. The exact form of powerup will be some object (we will discuss it so that it fits to the story) and the object will be moving on the floor until it gets out of screen. After that it disappears. The player has to pick it up in order to apply. It will work as a standard sudo powerup during the game so it will add another @ over the first one. The horizontal moving bars will need to account for the power up option so that it is possible to jump over every obstacle even in the sudo form. Because without the sudo form it is possible to "crawl" under a high bar so with sudo we need to be able to jump over it to make sense.
 
 Tests: to be decided with the scope; at least the validator over a large seed sample, per-chunk safe passage for every new hazard chunk and the pass-rate report.
 

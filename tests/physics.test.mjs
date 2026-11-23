@@ -241,3 +241,26 @@ test("the hero falls once its edge is past the ledge", () => {
 
   assert.ok(hero.y > 20 * TILE);
 });
+
+test("a step reports a jump when the jump fires and a landing when the hero touches down", () => {
+  const level = levelFrom(["....", "####"]);
+  const hero = standingHero(1, 21);
+
+  const jump = stepHero(hero, JUMP, level, STEP);
+  const airborne = [];
+  while (!hero.grounded) airborne.push(stepHero(hero, HOLD, level, STEP));
+
+  assert.equal(jump, "jump");
+  assert.deepEqual(airborne.slice(0, -1).filter(Boolean), []);
+  assert.equal(airborne[airborne.length - 1], "land");
+});
+
+test("standing and running on the ground report nothing", () => {
+  const level = levelFrom(["........", "########"]);
+  const hero = standingHero(1, 21);
+
+  const reports = [];
+  for (let i = 0; i < 60; i++) reports.push(stepHero(hero, RUN, level, STEP));
+
+  assert.deepEqual(reports.filter(Boolean), []);
+});

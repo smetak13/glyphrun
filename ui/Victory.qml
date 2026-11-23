@@ -1,5 +1,6 @@
 import QtQuick
 import "../logic/run.mjs" as Run
+import "../logic/score.mjs" as Score
 import "../logic/seed.mjs" as Seed
 import "../logic/story.mjs" as Story
 
@@ -147,6 +148,12 @@ Rectangle {
           text: "score " + String(screen.run.score).padStart(5, "0") + (screen.rank > 0 ? "   new high score #" + screen.rank : "")
           size: 15
           color: screen.colors.bit
+        }
+
+        Glyph {
+          text: "lives left " + screen.run.lives + " × " + Score.LIFE_BONUS_POINTS + "   +" + screen.run.lifeBonus
+          size: 13
+          color: screen.colors.muted
         }
 
         Glyph {

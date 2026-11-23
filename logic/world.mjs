@@ -1,7 +1,7 @@
 import { TILE, SCREEN_WIDTH, SCREEN_HEIGHT } from "./screen.mjs";
 import { createHero, stepHero, heroHeight, HERO_WIDTH } from "./physics.mjs";
 import { createEnemies, resetEnemy, stepEnemies, touchEnemies } from "./enemies.mjs";
-import { createBoss, stepBoss } from "./boss.mjs";
+import { createBoss, resumeBoss, stepBoss } from "./boss.mjs";
 
 export const CAMERA_LEAD = 320;
 export const CAMERA_FOLLOW_RATE = 6;
@@ -45,7 +45,7 @@ export function keepInsideLevel(hero, level) {
 
 export function respawnHero(world) {
   for (const enemy of world.enemies) resetEnemy(enemy);
-  if (world.boss) world.boss = createBoss(world.level.seed, world.level.arena);
+  if (world.boss) resumeBoss(world.boss);
   placeHero(world, world.checkpointReached ? world.level.checkpoint : world.level.start);
 }
 
@@ -83,7 +83,8 @@ export function stepWorld(world, input, seconds) {
   world.time += seconds;
   const hero = world.hero;
   const previousBottom = hero.y;
-  stepHero(hero, input, world.level, seconds);
+  const movement = stepHero(hero, input, world.level, seconds);
+  if (movement) events.push({ type: movement });
   keepInsideLevel(hero, world.level);
   stepEnemies(world.enemies, world.level, hero, seconds, world.cameraX);
   for (const event of touchEnemies(world.enemies, hero, previousBottom)) events.push(event);

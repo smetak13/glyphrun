@@ -12,7 +12,7 @@ Rectangle {
   Panel {
     anchors.centerIn: parent
     width: 440
-    height: 240
+    height: 380
     colors: screen.colors
 
     Glyph {
@@ -24,6 +24,7 @@ Rectangle {
     }
 
     MenuList {
+      id: list
       x: 24
       y: 76
       width: parent.width - 48
@@ -34,7 +35,7 @@ Rectangle {
 
     Glyph {
       x: 32
-      y: 140
+      y: list.y + list.height + 20
       text: "reduced turns off glow, glitch and CRT"
       size: 12
       color: screen.colors.muted
@@ -42,8 +43,8 @@ Rectangle {
 
     Glyph {
       x: 32
-      y: 200
-      text: "Enter · change   Esc · back"
+      y: 340
+      text: "←→ · change   Esc · back"
       size: 12
       color: screen.colors.muted
     }

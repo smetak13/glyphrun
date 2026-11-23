@@ -22,6 +22,7 @@ export const EVENTS = {
   nothingToPaste: "no seed in the clipboard",
   seedRejected: "not a seed: 8 hex digits, like 7f3a-91c2",
   bossDefeated: "kernel: rebooting…",
+  effectsReduced: "under 50 fps · effects set to reduced",
 };
 
 export const ENEMY_SOURCES = Object.keys(SOURCES).filter(source => NOT_ENEMIES.indexOf(source) < 0);
