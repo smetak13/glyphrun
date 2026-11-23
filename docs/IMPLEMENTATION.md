@@ -142,22 +142,38 @@ Third round: gameplay looked blurred with full effects while menus were sharp. T
 
 Fourth round: beating the boss adds 2,000 points for every life left, so lost lives count in the final score. SPEC 9 is updated.
 
-## 11. Terrain, difficulty and run length
+## 11. Spinlock
+
+- Status: done
+
+A new advanced enemy, the spinlock (SPEC 6.2), in the spirit of a rotating fire bar: a pivot `(o)` on the ground or on a block with an arm of 3–5 glyphs (`·` along it, `*` at its tip) turning a full 360°, passing behind ground and blocks. Arm length, direction and starting angle come from the seed; one turn takes about 3 s. It cannot be killed; only the arm hurts, and the pivot is solid to stand on. Hit message `spinlock: deadlock detected`. It is the sixth advanced enemy and the draft takes 4 of the 6 advanced. Chunks for it and first combinations: two spinlocks out of phase on consecutive pillars, a spinlock guarding a landing, a spinlock over a pit.
+
+Tests: arm geometry and rotation over time, direction and phase from the seed, collision only with the arm, standing on the pivot, draft of 4 of 6, per-chunk safe passage for every spinlock chunk, full-run generation over many seeds and the pass-rate report.
+
+Done when: the spinlock reads clearly, is fair and fun to the user, and every level offered is still completable.
+
+Notes: the pivot is a solid tile (`s` in level maps). The spinlocks of one chunk share arm and direction, and a chunk may set them a fixed part of a turn apart (`spinOffset`) and limit the arm lengths (`arms`). After the first round of play the spinlock got variants: arms of up to 7 links and a double arm (a second arm pointing the opposite way). No level rules: each chunk lists the arm lengths it allows (`arms`) and those that may be double (`doubles`), and the seed picks among them. A double arm of 6 or 7 on a ground pivot was passable only through a tiny window (the search needed minutes to find it), so on the ground only arms up to 5 may be double; the floating one allows double arms of every length. Chunks: `spinlock-ground` (arms 3–7), `spinlock-high` (a floating pivot to pass under, arms 4–7), `spinlock-pair` (two half a turn apart, from level 3) and `spinlock-landing` (behind a pit's landing). A spinlock right over a pit is left for task 12, since chunks keep gap columns empty above the ground. The safe-passage test runs every spinlock chunk with every arm length and both directions. With one-slot spinlock chunks in the draft, level 5 holds about 3.1 enemies per screen, so its table value is 3.1 until task 12 retunes it. `node scripts/pass-rate.mjs 1000` gives a first-attempt pass rate of 91.8 % (level 1: 96.5 %, 2: 97.3 %, 3: 88.4 %, 4: 87.4 %, 5: 89.3 %), every failure on the difficulty rule, no fallback needed.
+
+## 12. Terrain, difficulty and run length
 
 - Status: todo
 
-The levels are too easy and the terrain too bland: even level 5 is easy to finish, and a whole run takes about three minutes. Make the generated levels varied and harder, so that even reaching the boss is a challenge, closer to the difficulty of a classic platformer. To be shaped by a grilling session before it starts; the starting points:
+The levels are too easy and the terrain too bland: even level 5 is easy to finish, and a whole run takes about three minutes. Make the generated levels varied and harder, closer to the difficulty of a classic platformer, so that reaching the boss feels earned. Shaped in a grilling session:
 
-- New terrain obstacles and chunks, so each level looks and plays differently every time: more gaps in a row, varied heights, and other terrain features to be decided.
-- A higher concentration of hazards and enemies, with the difficulty table and the validator's hazard ranges retuned.
-- Combination chunks that put several enemies together on one screen: for example several dangling pointers firing at different heights, or memory leaks in a row with only a small gap between them. Difficulty comes from terrain and enemy combinations together, not from enemies alone.
-- To weigh the difficulty a bit when the levels get harder, we will add one sudo powerup somewhere during the boss fight during phase One. The exact form of powerup will be some object (we will discuss it so that it fits to the story) and the object will be moving on the floor until it gets out of screen. After that it disappears. The player has to pick it up in order to apply. It will work as a standard sudo powerup during the game so it will add another @ over the first one. The horizontal moving bars will need to account for the power up option so that it is possible to jump over every obstacle even in the sudo form. Because without the sudo form it is possible to "crawl" under a high bar so with sudo we need to be able to jump over it to make sense.
+- Difficulty curve: level 1 a bit harder than now but doable while losing at most one life; level 3 is where it gets challenging; levels 4 and 5 get progressively harder.
+- Run length: a clean run without the boss takes about five minutes. The assumed pace goes from 4 to about 7 tiles per second so the 60–84 s level targets hold for a decent player.
+- Terrain from existing tiles only (no new tile types): chains of pits, long jumps to 1–2 tile platforms, high and low routes, tunnels whose ceiling blocks the big hero, staircases over pits, drops with a ledge. Moving or crumbling platforms and springs go into `ROADMAP.md`.
+- About half the difficulty from terrain and half from enemies. One difficulty score as now, retuned; the chunk library for levels 3–5 gets about as many terrain-hard chunks as enemy-hard ones, plus many combination chunks: dangling pointers at different heights, a row of memory leaks with small gaps, a pointer across a gap, a cron vent on an island between pits, a pipe followed by a leak, a ping on a narrow pillar, spinlock combinations and more. Basic and advanced enemies mix freely from level 3. Every new hazard chunk passes the safe-passage test.
+- Difficulty table, to be tuned by playing: max gap 65 / 72 / 80 / 88 / 92 %, narrowest platform 3 / 2 / 2 / 1 / 1 tiles, about 0.5 more enemies per screen from level 2, rest zones a bit less often, hazard ranges retuned. One checkpoint per level as now.
+- 1-up: every 100 bits collected over the run (sudo not counted) gives a life, with the toast `fork(): +1 life`, a new generated `one-up` effect and a flash of the HUD lives. At most 9 lives; at the cap it gives 1,000 points instead. `scripts/pass-rate.mjs` also reports bits per level, so the 100 can be tuned. SPEC 5 is updated.
+- Boss `[patch]`: a sudo pickup in the first phase only, again each time that phase repeats after a death. It enters at a seeded time 3–6 s into the phase from the arena edge away from the hero, moves along the floor at about half the hero's speed and is gone when it leaves the screen. Collected it works as sudo (`kernel: hotfix applied`, or `already root` while big). Drawn in the bit colour with a glow and a trail of `+` sparkles so it reads as a good thing, with a faint `hotfix` label the first time. The big hero must be able to jump every stack trace bar.
+- Boss core arrow: a `▼` above every core that bobs while the window is open and blinks with the core in its last second.
 
-Tests: to be decided with the scope; at least the validator over a large seed sample, per-chunk safe passage for every new hazard chunk and the pass-rate report.
+Tests: the validator over a large seed sample, per-chunk safe passage for every new hazard chunk, the pass-rate report, the 1-up rules, the patch's timing, determinism and its phase rule, and the big hero clearing every stack trace bar.
 
 Done when: generated runs are varied, a full run is challenging to the user, and every level offered is still completable.
 
-## 12. Release preparation
+## 13. Release preparation
 
 - Status: todo
 

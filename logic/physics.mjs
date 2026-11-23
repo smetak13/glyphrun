@@ -24,7 +24,7 @@ export function createHero(x, y) {
 }
 
 export function isSolid(tile) {
-  return tile === "#" || tile === "B" || tile === "H";
+  return tile === "#" || tile === "B" || tile === "H" || tile === "s";
 }
 
 export function heroHeight(hero) {

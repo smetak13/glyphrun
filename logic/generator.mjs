@@ -1,15 +1,15 @@
 import { TILE, SCREEN_ROWS, SCREEN_COLS } from "./screen.mjs";
 import { computeEnvelope } from "./physics.mjs";
-import { CRON_HEIGHTS, CRON_PERIODS, PIPE_DOWN_SECONDS } from "./enemies.mjs";
+import { CRON_HEIGHTS, CRON_PERIODS, PIPE_DOWN_SECONDS, SPINLOCK_ARMS, SPINLOCK_PERIOD } from "./enemies.mjs";
 import { ENEMY_KINDS, parseLevel } from "./level.mjs";
 import { subStream, randomInt, pick, shuffle } from "./random.mjs";
 import { CHUNKS } from "./chunks.mjs";
 
 export const BASIC_KINDS = ["bug", "zombie", "spikes", "ping", "hang"];
-export const ADVANCED_KINDS = ["cron", "pipe", "pointer", "fork", "leak"];
+export const ADVANCED_KINDS = ["cron", "pipe", "pointer", "fork", "leak", "spinlock"];
 export const DEFAULT_KINDS = BASIC_KINDS.concat(["fork"]);
 export const DRAFTED_BASIC = 4;
-export const DRAFTED_ADVANCED = 3;
+export const DRAFTED_ADVANCED = 4;
 export const PACE_TILES_PER_SECOND = 4;
 export const MAX_LEVEL_SECONDS = 90;
 export const HANG_ROW = 4;
@@ -18,7 +18,7 @@ export const DIFFICULTY = [
   { gapFraction: 0.65, enemiesPerScreen: 2, narrowestPlatform: 3, restEvery: 3, seconds: 66, hazardsPerScreen: [2.5, 4] },
   { gapFraction: 0.72, enemiesPerScreen: 2.5, narrowestPlatform: 3, restEvery: 4, seconds: 72, hazardsPerScreen: [3, 4.5] },
   { gapFraction: 0.8, enemiesPerScreen: 3, narrowestPlatform: 2, restEvery: 4, seconds: 78, hazardsPerScreen: [3.25, 4.5] },
-  { gapFraction: 0.88, enemiesPerScreen: 3.25, narrowestPlatform: 2, restEvery: 5, seconds: 84, hazardsPerScreen: [3.5, 4.75] },
+  { gapFraction: 0.88, enemiesPerScreen: 3.1, narrowestPlatform: 2, restEvery: 5, seconds: 84, hazardsPerScreen: [3.5, 4.75] },
 ];
 
 const ENVELOPE = computeEnvelope();
@@ -359,9 +359,37 @@ function assembleLevel(seed, levelNumber, label, body) {
   return level;
 }
 
+export function spinlockArms(chunkName) {
+  return chunkNamed(chunkName).arms || SPINLOCK_ARMS;
+}
+
+export function spinlockDoubles(chunkName, arm) {
+  return (chunkNamed(chunkName).doubles || []).indexOf(arm) >= 0 ? [false, true] : [false];
+}
+
+function drawSpinlock(enemy, level, random, groups) {
+  const chunk = level.chunks.filter(placed => enemy.col >= placed.col && enemy.col < placed.col + placed.width)[0];
+  const first = groups[chunk.col];
+  if (first) {
+    enemy.arm = first.arm;
+    enemy.spin = first.spin;
+    enemy.double = first.double;
+    enemy.phase = (first.phase + (chunkNamed(chunk.name).spinOffset || 0) * SPINLOCK_PERIOD) % SPINLOCK_PERIOD;
+    return;
+  }
+  enemy.arm = pick(random, spinlockArms(chunk.name));
+  enemy.spin = pick(random, [-1, 1]);
+  enemy.double = pick(random, spinlockDoubles(chunk.name, enemy.arm));
+  enemy.phase = random.next() * SPINLOCK_PERIOD;
+  groups[chunk.col] = enemy;
+}
+
 function drawTimings(level, random) {
+  const spinlockGroups = {};
   for (const enemy of level.enemies) {
-    if (enemy.kind === "cron") {
+    if (enemy.kind === "spinlock") {
+      drawSpinlock(enemy, level, random, spinlockGroups);
+    } else if (enemy.kind === "cron") {
       enemy.period = pick(random, CRON_PERIODS);
       enemy.height = pick(random, CRON_HEIGHTS);
       enemy.phase = random.next() * enemy.period;

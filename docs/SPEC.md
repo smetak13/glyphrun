@@ -1,6 +1,6 @@
 # Glyphrun — Specification (MVP)
 
-Glyphrun is a retro side-scrolling platformer made of ASCII, living in your Omarchy theme. It runs as an Omarchy shell (Quickshell) plugin in its own window, like Omatris. Every run is procedurally generated from a seed: five levels, ten kinds of enemies and traps, and a final boss as a bonus stage.
+Glyphrun is a retro side-scrolling platformer made of ASCII, living in your Omarchy theme. It runs as an Omarchy shell (Quickshell) plugin in its own window, like Omatris. Every run is procedurally generated from a seed: five levels, eleven kinds of enemies and traps, and a final boss as a bonus stage.
 
 The hero is `@`, a programmer trying to ship perfect software. Bugs, zombie processes and worse stand in the way. The game is in English.
 
@@ -34,7 +34,7 @@ Plugin id: `smetak13.glyphrun`.
 - **sudo**: the power-up. One bit per level secretly holds it.
 - **Big / small**: the hero is small as `@` and big as `@@` (two stacked) while it holds sudo.
 - **Basic / advanced**: enemy tiers (section 6).
-- **Draft**: the enemies chosen for a run: 4 of the 5 basic and 3 of the 5 advanced.
+- **Draft**: the enemies chosen for a run: 4 of the 5 basic and 4 of the 6 advanced.
 - **Envelope**: the set of jumps the hero can physically make, computed from the physics constants. The generator never asks for more than a fraction of it.
 - **Validator**: the check that a generated level is completable and meets the quality rules before it is offered.
 
@@ -131,7 +131,7 @@ All texts here are defaults and may be tuned during implementation.
 
 ## 6. Enemies and traps
 
-Ten in the MVP. Basic ones appear from level 1; advanced ones join from level 3. Walking enemies turn around at walls, other enemies and ledge edges: they never fall into pits.
+Eleven in the MVP. Basic ones appear from level 1; advanced ones join from level 3. Walking enemies turn around at walls, other enemies and ledge edges: they never fall into pits.
 
 ### 6.1 Basic
 
@@ -152,6 +152,7 @@ Ten in the MVP. Basic ones appear from level 1; advanced ones join from level 3.
 | 8 | `*`, `<--` | dangling pointer | An emitter `*`, on the ground or on a block, fires `<--` to the left, towards the arriving hero, across the screen until a wall stops it: in the lowest tile row above the ground (jump it) or in the second (the small hero passes under, the big one must jump). The emitter blinks 0.5 s before each shot and fires every 2.5 s, only while on screen. Touching the emitter is a hit. | No. |
 | 9 | `&` | fork bomb | Walks like a bug. Stomped, it splits into two small `&` that run in opposite directions, faster, bouncing off obstacles. For 0.3 s after the split the small ones dash apart faster than the hero runs. Until the hero has landed from the stomp's bounce and stands clear of them, they neither hurt nor die, so one stomp never kills them too. A small one dies to one stomp and does not split. | Stomp; small ones too. |
 | 10 | `%`, `~~~` | memory leak | A source `%` drips and a puddle `~~~` grows from it towards the arriving hero. From the moment it first comes on screen it repeats a cycle: grows at 3 tiles per second to its maximum extent, stays full for 0.8 s, dries back to the source at 4 tiles per second and stays dry for 0.6 s. Its maximum extent is always drawn as a dotted frame labelled `malloc(n)`, so the player sees how far it will reach. A lone leak is big: 7 tiles, or 10 from level 4, so a full puddle is wider than any jump and the player waits for it to dry back. Smaller leaks (3 tiles) come only as a row of three with 2-tile gaps between them. Touching the puddle is a hit. | Stomp the source: the puddle disappears. |
+| 11 | `(o)`, `·*` | spinlock | A pivot `(o)` on the ground, on a block or floating, with an arm of 3–7 links (`·`, `*` at the tip) turning a full circle every 3 s, passing behind ground and blocks. Some have a double arm, a second one pointing the opposite way. Arm length, direction, double arm and starting angle come from the seed, within what the spinlock's chunk allows: long and double arms only where the chunk leaves room to pass, never tied to a level. Only the arm hurts; the pivot is solid and can be stood on, though the arm sweeps through it. | No. |
 
 "On screen" is judged against the camera. A stomp bounces the hero up; holding jump makes the bounce higher, like a jump. Touching a killable enemy is a stomp when the hero was above it a moment before, even if the enemy is moving up into the hero; otherwise it is a hit. Spikes always hit. After the hero loses a life, the enemies still alive return to where they started; killed ones stay dead.
 
@@ -159,7 +160,7 @@ The memory leak's source sits at the far end of its frame, on a one-tile target,
 
 ### 6.3 Draft and introduction
 
-- Each run drafts **4 of the 5 basic** and **3 of the 5 advanced**, from the seed. Some surprises are left for later runs.
+- Each run drafts **4 of the 5 basic** and **4 of the 6 advanced**, from the seed. Some surprises are left for later runs.
 - Level 1: 2 basic. Level 2: plus 1–2 basic. Level 3: plus 1–2 advanced. Level 4: the rest of the draft. Level 5: a mix of everything drafted.
 - The first time an enemy appears in a run, it appears in a chunk tagged as a safe introduction: visible from afar, with room to watch it, where a mistake does not kill (no pit beside it). One introduction chunk serves every enemy except the memory leak, which has its own so that it is introduced at full size.
 
@@ -179,6 +180,7 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 | dangling pointer | `use after free` | — |
 | fork bomb | `fork: resource unavailable` | `forked` (big), `wait()` (small) |
 | memory leak | `out of memory` | `free()` |
+| spinlock | `spinlock: deadlock detected` | — |
 | pit | `/dev/null: write successful` | — |
 | boss: falling spike | `kernel: stack overflow` | — |
 | boss: stack trace | `Call Trace: you+0x0/0x1` | — |
@@ -224,7 +226,7 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
   - `E`: an enemy slot. Filled with a drafted, already introduced kind, or left empty, so the level holds about its number of enemies per screen. A chunk may restrict the kinds; an unrestricted slot holds a basic enemy or a fork bomb, and the other advanced enemies appear only in chunks made for them. A run of slots becomes spikes as wide as the run; a pipe stands on the first two slots of a run and rises three tiles; a memory leak fills the run with its frame and sits at its right end; any other kind stands in its middle, and a hang hangs high above it.
   - A chunk may say that its slots go together: they are filled all with one kind or all left empty (a row of small leaks never appears as a single one).
   - A chunk may name the first level it appears in, to keep levels 1–2 as they are while later levels get denser chunks.
-- After the layout, each cron vent and pipe draws its rhythm from the level's sub-stream.
+- After the layout, each cron vent and pipe draws its rhythm from the level's sub-stream, and each spinlock its arm length and whether it is double (from those its chunk allows), direction and starting angle. The spinlocks of one chunk share arm, double arm and direction, and the chunk may set them a fixed part of a turn apart.
   - `*` and `+`: bits on the intended path and in riskier spots.
 - The level follows a pacing curve: introduction, build-up, a rest zone, a harder stretch, and never two of the hardest chunks back to back.
 - Bits are placed along the intended path and in optional riskier spots. The sudo bit is one of them, chosen from the seed: a riskier one half of the time.
@@ -243,7 +245,7 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 | 2 | 65 % | 2 | 3 tiles | every 3 chunks | 66 s | 2.5–4 |
 | 3 | 72 % | 2.5 | 3 tiles | every 4 chunks | 72 s | 3–4.5 |
 | 4 | 80 % | 3 | 2 tiles | every 4 chunks | 78 s | 3.25–4.5 |
-| 5 | 88 % | 3.25 | 2 tiles | every 5 chunks | 84 s | 3.5–4.75 |
+| 5 | 88 % | 3.1 | 2 tiles | every 5 chunks | 84 s | 3.5–4.75 |
 
 The narrowest platform also limits ground islands between two pits. Hazards per screen is the validator's difficulty score (section 8.4).
 

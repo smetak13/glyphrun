@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_ATTEMPTS, playableLevel, searchPath, validateLevel } from "../logic/validator.mjs";
-import { ADVANCED_KINDS, BASIC_KINDS, DEFAULT_KINDS, generateLevel, generateSafeLevel } from "../logic/generator.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, DEFAULT_KINDS, generateLevel, generateSafeLevel, spinlockArms, spinlockDoubles } from "../logic/generator.mjs";
 import { CHUNKS } from "../logic/chunks.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { createEnemies, stepEnemies } from "../logic/enemies.mjs";
@@ -97,6 +97,21 @@ function passesAtPhase(alone, phase) {
   return searchPath(alone.level, { from: alone.from, goalCol: alone.level.cols - 1, dynamic: true, enemies });
 }
 
+function spinlockVariants(name, alone) {
+  if (!alone.level.enemies.some(enemy => enemy.kind === "spinlock")) return [{ label: "", alone }];
+  const variants = [];
+  for (const arm of spinlockArms(name)) {
+    for (const spin of [-1, 1]) {
+      for (const double of spinlockDoubles(name, arm)) {
+        const enemies = alone.level.enemies.map(enemy => (enemy.kind === "spinlock" ? Object.assign({}, enemy, { arm, spin, double }) : enemy));
+        const level = Object.assign({}, alone.level, { enemies });
+        variants.push({ label: " (arm " + arm + ", spin " + spin + (double ? ", double" : "") + ")", alone: { level, from: alone.from } });
+      }
+    }
+  }
+  return variants;
+}
+
 function hazardChunks() {
   const found = {};
   for (const seed of SAMPLE) {
@@ -106,7 +121,9 @@ function hazardChunks() {
         const alone = chunkAlone(level, chunk);
         if (alone.level.enemies.length === 0) continue;
         const kinds = alone.level.enemies.map(enemy => enemy.kind).sort();
-        found[chunk.name + ": " + kinds.join(", ")] = { name: chunk.name, kinds, alone };
+        for (const variant of spinlockVariants(chunk.name, alone)) {
+          found[chunk.name + ": " + kinds.join(", ") + variant.label] = { name: chunk.name, kinds, alone: variant.alone };
+        }
       }
     }
   }

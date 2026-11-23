@@ -5,13 +5,14 @@ import { ENEMY_SOURCES, KILLABLE_SOURCES, bossHitMessage, hitMessage, killMessag
 test("every enemy and trap has its own hit message", () => {
   const messages = ENEMY_SOURCES.map(hitMessage);
 
-  assert.equal(ENEMY_SOURCES.length, 10);
-  assert.equal(new Set(messages).size, 10);
+  assert.equal(ENEMY_SOURCES.length, 11);
+  assert.equal(new Set(messages).size, 11);
 });
 
 test("hit messages name what the source does to software", () => {
   assert.equal(hitMessage("spikes"), "kernel: stack overflow");
   assert.equal(hitMessage("cron"), "cron: job executed (you)");
+  assert.equal(hitMessage("spinlock"), "spinlock: deadlock detected");
   assert.equal(hitMessage("pit"), "/dev/null: write successful");
 });
 

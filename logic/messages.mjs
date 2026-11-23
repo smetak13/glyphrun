@@ -9,6 +9,7 @@ const SOURCES = {
   pointer: { hit: "use after free", kill: null },
   fork: { hit: "fork: resource unavailable", kill: "forked", smallKill: "wait()" },
   leak: { hit: "out of memory", kill: "free()" },
+  spinlock: { hit: "spinlock: deadlock detected", kill: null },
   pit: { hit: "/dev/null: write successful", kill: null },
   trace: { hit: "Call Trace: you+0x0/0x1", kill: null },
 };

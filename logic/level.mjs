@@ -16,7 +16,7 @@ const BOTTOM_ROW = SCREEN_ROWS - 1;
 const SPIKES = "^";
 const PIPE = "H";
 const PUDDLE = "~";
-export const ENEMY_KINDS = { b: "bug", z: "zombie", o: "ping", v: "hang", c: "cron", p: "pipe", d: "pointer", f: "fork", m: "leak" };
+export const ENEMY_KINDS = { b: "bug", z: "zombie", o: "ping", v: "hang", c: "cron", p: "pipe", d: "pointer", f: "fork", m: "leak", s: "spinlock" };
 
 export function parseLevel(rows) {
   if (rows.length !== SCREEN_ROWS) throw new Error("a level has " + SCREEN_ROWS + " rows, got " + rows.length);

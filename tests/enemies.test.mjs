@@ -28,6 +28,8 @@ import {
   SHOT_SPEED,
   SMALL_FORK_SPEED,
   SPLIT_GRACE_SECONDS,
+  SPINLOCK_PERIOD,
+  SPINLOCK_SPACING,
   leakCycleSeconds,
   HANG_LIE_SECONDS,
   HANG_TRIGGER_DISTANCE,
@@ -910,4 +912,93 @@ test("stomping the leak's source frees it: the puddle goes and it scores free()"
   assert.equal(leak.alive, false);
   assert.equal(harmsHeroAt(leak, 12.5 * TILE, GROUND_Y), false);
   assert.deepEqual([run.score, run.popups.map(p => p.note)], [200, ["free()"]]);
+});
+
+const SPINLOCK_LEVEL = levelFrom(["@.........s.........", "####################", "####################", "####################"]);
+const SPINLOCK_GROUND = 19 * TILE;
+const PIVOT_Y = SPINLOCK_GROUND - TILE / 2;
+
+function spinlockAt(level, slot, seconds) {
+  const [spinlock] = createEnemies(level.enemies.map(enemy => Object.assign({}, enemy, slot)));
+  stepFor([spinlock], level, FAR_AWAY, seconds);
+  return spinlock;
+}
+
+function tip(spinlock) {
+  const link = spinlock.links[spinlock.links.length - 1];
+  return [Math.round(link.x - spinlock.x), Math.round(link.y - PIVOT_Y)];
+}
+
+test("a spinlock's arm has one link per length, evenly spaced out from the pivot", () => {
+  const spinlock = spinlockAt(SPINLOCK_LEVEL, { arm: 4, spin: 1, phase: 0 }, STEP_SECONDS);
+
+  assert.equal(spinlock.links.length, 4);
+  assert.deepEqual(tip(spinlock), [4 * SPINLOCK_SPACING, -1]);
+});
+
+test("a spinlock turns a full circle every period, its direction set by its spin", () => {
+  const quarter = SPINLOCK_PERIOD / 4;
+
+  assert.deepEqual(tip(spinlockAt(SPINLOCK_LEVEL, { arm: 3, spin: 1, phase: 0 }, quarter)), [0, -3 * SPINLOCK_SPACING]);
+  assert.deepEqual(tip(spinlockAt(SPINLOCK_LEVEL, { arm: 3, spin: -1, phase: 0 }, quarter)), [0, 3 * SPINLOCK_SPACING]);
+  assert.deepEqual(tip(spinlockAt(SPINLOCK_LEVEL, { arm: 3, spin: 1, phase: 0 }, SPINLOCK_PERIOD)), [3 * SPINLOCK_SPACING, 0]);
+});
+
+test("a double spinlock has a second arm pointing the opposite way", () => {
+  const spinlock = spinlockAt(SPINLOCK_LEVEL, { arm: 3, spin: 1, phase: 0, double: true }, STEP_SECONDS);
+  const ends = [spinlock.links[2], spinlock.links[5]].map(link => [Math.round(link.x - spinlock.x), Math.round(link.y - PIVOT_Y)]);
+
+  assert.equal(spinlock.links.length, 6);
+  assert.deepEqual(ends, [[3 * SPINLOCK_SPACING, -1], [-3 * SPINLOCK_SPACING, 1]]);
+});
+
+test("a spinlock's phase sets its starting angle", () => {
+  const spinlock = spinlockAt(SPINLOCK_LEVEL, { arm: 3, spin: 1, phase: SPINLOCK_PERIOD / 2 }, STEP_SECONDS);
+
+  assert.deepEqual(tip(spinlock), [-3 * SPINLOCK_SPACING, 1]);
+});
+
+test("links inside the ground are buried and the others are not", () => {
+  const down = spinlockAt(SPINLOCK_LEVEL, { arm: 5, spin: -1, phase: 0 }, SPINLOCK_PERIOD / 4);
+  const up = spinlockAt(SPINLOCK_LEVEL, { arm: 5, spin: 1, phase: 0 }, SPINLOCK_PERIOD / 4);
+
+  assert.ok(down.links.every(link => link.buried));
+  assert.ok(up.links.every(link => !link.buried));
+});
+
+test("a spinlock's arm hurts the hero it touches, away from the arm it does not", () => {
+  const spinlock = spinlockAt(SPINLOCK_LEVEL, { arm: 5, spin: 1, phase: 0 }, STEP_SECONDS);
+  const tipX = spinlock.links[4].x;
+
+  assert.equal(harmsHeroAt(spinlock, tipX, SPINLOCK_GROUND), true);
+  assert.equal(harmsHeroAt(spinlock, spinlock.x - 3 * TILE, SPINLOCK_GROUND), false);
+});
+
+test("the hero can stand on a spinlock's pivot while its arm is buried", () => {
+  const world = createWorld(SPINLOCK_LEVEL);
+  Object.assign(world.enemies[0], { arm: 3, spin: -1, phase: SPINLOCK_PERIOD / 4 });
+  world.hero.x = world.enemies[0].x;
+  world.hero.y = SPINLOCK_GROUND - 2 * TILE;
+  world.hero.grounded = false;
+
+  const events = worldEventsUntil(world, IDLE, () => world.hero.grounded);
+
+  assert.deepEqual([world.hero.y, kinds(events)], [SPINLOCK_GROUND - TILE, []]);
+});
+
+test("a spinlock cannot be stomped", () => {
+  const world = createWorld(SPINLOCK_LEVEL);
+  Object.assign(world.enemies[0], { arm: 5, spin: 1, phase: SPINLOCK_PERIOD / 4 });
+  world.hero.x = world.enemies[0].x;
+  world.hero.y = SPINLOCK_GROUND - 6 * TILE;
+  world.hero.vy = 120;
+  world.hero.grounded = false;
+
+  const events = worldEventsUntil(world, IDLE, e => e.length > 0);
+
+  assert.deepEqual(kinds(events), ["hit spinlock"]);
+});
+
+test("a level map places a spinlock on its tile", () => {
+  assert.deepEqual(SPINLOCK_LEVEL.enemies.map(e => [e.kind, e.col]), [["spinlock", 10]]);
 });

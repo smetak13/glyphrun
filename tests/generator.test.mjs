@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ADVANCED_KINDS, BASIC_KINDS, DIFFICULTY, DRAFTED_ADVANCED, DRAFTED_BASIC, MAX_RISE, PACE_TILES_PER_SECOND, generateLevel, introductions, maxGapTiles } from "../logic/generator.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, DIFFICULTY, DRAFTED_ADVANCED, DRAFTED_BASIC, MAX_RISE, PACE_TILES_PER_SECOND, generateLevel, introductions, maxGapTiles, spinlockArms, spinlockDoubles } from "../logic/generator.mjs";
 import { computeEnvelope } from "../logic/physics.mjs";
 import { CHUNKS } from "../logic/chunks.mjs";
-import { CRON_HEIGHTS, CRON_PERIODS } from "../logic/enemies.mjs";
+import { CRON_HEIGHTS, CRON_PERIODS, SPINLOCK_ARMS, SPINLOCK_PERIOD } from "../logic/enemies.mjs";
 import { SCREEN_COLS, SCREEN_ROWS, TILE } from "../logic/screen.mjs";
 
 const LEVELS = [1, 2, 3, 4, 5];
@@ -81,7 +81,7 @@ function tiers(intros) {
   return intros.map(kinds => ({ basic: kinds.filter(kind => BASIC_KINDS.includes(kind)), advanced: kinds.filter(kind => ADVANCED_KINDS.includes(kind)) }));
 }
 
-test("the draft holds four different basic enemies and three different advanced ones", () => {
+test("the draft holds four different basic enemies and four different advanced ones", () => {
   for (const seed of SEEDS) {
     const drafted = [].concat(...introductions(seed));
 
@@ -269,8 +269,42 @@ test("each cron vent and pipe gets its own rhythm from the seed", () => {
   assert.ok(new Set(timed.map(enemy => enemy.phase)).size > timed.length / 2);
 });
 
+test("each spinlock gets its arm, direction, double arm and starting angle from the seed, as its chunk allows", () => {
+  const spinlocks = [];
+  eachLevel(level => {
+    for (const enemy of level.enemies) {
+      if (enemy.kind !== "spinlock") continue;
+      const chunk = level.chunks.filter(placed => enemy.col >= placed.col && enemy.col < placed.col + placed.width)[0];
+      spinlocks.push({ enemy, arms: spinlockArms(chunk.name), doubles: spinlockDoubles(chunk.name, enemy.arm) });
+    }
+  });
+  const allArms = new Set(CHUNKS.filter(chunk => chunk.kinds && chunk.kinds.includes("spinlock")).flatMap(chunk => chunk.arms).concat(SPINLOCK_ARMS));
+
+  assert.ok(spinlocks.every(({ enemy, arms, doubles }) => arms.includes(enemy.arm) && doubles.includes(enemy.double) && Math.abs(enemy.spin) === 1 && enemy.phase >= 0 && enemy.phase < SPINLOCK_PERIOD));
+  assert.deepEqual(new Set(spinlocks.map(({ enemy }) => enemy.arm)), allArms);
+  assert.deepEqual(new Set(spinlocks.map(({ enemy }) => enemy.spin)), new Set([-1, 1]));
+  assert.deepEqual(new Set(spinlocks.map(({ enemy }) => enemy.double)), new Set([false, true]));
+});
+
+test("a pair of spinlocks in one chunk shares its arm and direction and turns half a turn apart", () => {
+  const pairs = [];
+  eachLevel(level => {
+    for (const chunk of level.chunks.filter(placed => placed.name === "spinlock-pair")) {
+      const pair = level.enemies.filter(enemy => enemy.col >= chunk.col && enemy.col < chunk.col + chunk.width);
+      if (pair.length > 0) pairs.push(pair);
+    }
+  });
+
+  assert.ok(pairs.length > 0);
+  for (const [first, second] of pairs) {
+    const offset = (second.phase - first.phase + SPINLOCK_PERIOD) % SPINLOCK_PERIOD;
+    assert.deepEqual([second.arm, second.spin], [first.arm, first.spin]);
+    assert.ok(Math.abs(offset - SPINLOCK_PERIOD / 2) < 1e-9);
+  }
+});
+
 test("the same seed gives the same rhythms", () => {
-  const timings = level => level.enemies.map(enemy => [enemy.period, enemy.height, enemy.phase, enemy.jitter]);
+  const timings = level => level.enemies.map(enemy => [enemy.period, enemy.height, enemy.phase, enemy.jitter, enemy.arm, enemy.spin, enemy.double]);
 
   for (const number of [3, 4, 5]) assert.deepEqual(timings(generateLevel(0x7f3a91c2, number, 0)), timings(generateLevel(0x7f3a91c2, number, 0)));
 });
@@ -281,11 +315,12 @@ test("a chunk whose slots go together is filled whole with one kind or left empt
   eachLevel(level => {
     for (const chunk of level.chunks.filter(placed => CHUNKS.filter(c => c.name === placed.name)[0].together)) {
       const inside = level.enemies.filter(enemy => enemy.col >= chunk.col && enemy.col < chunk.col + chunk.width);
-      assert.ok(inside.length === 0 || inside.length === 3, chunk.name + " holds " + inside.length);
+      const slots = CHUNKS.filter(c => c.name === chunk.name)[0].map.join("|").match(/E+/g).length;
+      assert.ok(inside.length === 0 || inside.length === slots, chunk.name + " holds " + inside.length);
       assert.ok(new Set(inside.map(enemy => enemy.kind)).size <= 1);
       counts.add(inside.length);
     }
   });
 
-  assert.deepEqual([...counts].sort(), [0, 3]);
+  assert.deepEqual([...counts].sort(), [0, 2, 3]);
 });

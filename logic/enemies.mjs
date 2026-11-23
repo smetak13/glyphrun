@@ -39,6 +39,10 @@ export const LEAK_FULL_SECONDS = 0.8;
 export const LEAK_SHRINK_SPEED = 4 * TILE;
 export const LEAK_EMPTY_SECONDS = 0.6;
 export const PUDDLE_HEIGHT = 6;
+export const SPINLOCK_PERIOD = 3;
+export const SPINLOCK_ARMS = [3, 4, 5];
+export const SPINLOCK_SPACING = 14;
+export const SPINLOCK_LINK_SIZE = 10;
 export const STOMP_BOUNCE_VELOCITY = 420;
 export const STOMP_TOLERANCE = 6;
 const HIT_INSET = 2;
@@ -55,6 +59,7 @@ const SIZES = {
   pointer: { width: 14, height: 14 },
   fork: { width: 16, height: 16 },
   leak: { width: 16, height: 14 },
+  spinlock: { width: TILE, height: TILE },
 };
 const SMALL_FORK_SIZE = 12;
 const KILLABLE = ["bug", "zombie", "ping", "hang", "fork", "leak"];
@@ -74,6 +79,9 @@ export function createEnemy(slot) {
     columnTiles: slot.height || CRON_HEIGHTS[0],
     jitter: slot.jitter || 0,
     extent: slot.extent || 0,
+    arm: slot.arm || SPINLOCK_ARMS[0],
+    spin: slot.spin || 1,
+    double: slot.double || false,
     small: false,
     startDirection: -1,
     alive: true,
@@ -131,6 +139,7 @@ export function resetEnemy(enemy) {
   enemy.shots = [];
   enemy.seen = false;
   enemy.grown = 0;
+  enemy.links = [];
 }
 
 function box(enemy, x) {
@@ -306,6 +315,25 @@ function leak(enemy, seconds, cameraX) {
   enemy.grown = puddleLength(enemy.timer, enemy.extent);
 }
 
+export function spinlockAngle(enemy) {
+  return (enemy.spin * 2 * Math.PI * (enemy.time + enemy.phase)) / SPINLOCK_PERIOD;
+}
+
+function spinlock(enemy, level) {
+  const angle = spinlockAngle(enemy);
+  const centerY = enemy.homeY - TILE / 2;
+  const angles = enemy.double ? [angle, angle + Math.PI] : [angle];
+  const links = [];
+  for (const armAngle of angles) {
+    for (let i = 1; i <= enemy.arm; i++) {
+      const x = enemy.homeX + Math.cos(armAngle) * i * SPINLOCK_SPACING;
+      const y = centerY - Math.sin(armAngle) * i * SPINLOCK_SPACING;
+      links.push({ x, y, buried: isSolid(tileAt(level, Math.floor(x / TILE), Math.floor(y / TILE))) });
+    }
+  }
+  enemy.links = links;
+}
+
 function forkSpeed(enemy) {
   if (!enemy.small) return BUG_SPEED;
   return enemy.grace > 0 ? SPLIT_DASH_SPEED : SMALL_FORK_SPEED;
@@ -325,6 +353,7 @@ export function stepEnemies(enemies, level, hero, seconds, cameraX) {
     else if (enemy.kind === "pipe") pipe(enemy, seconds);
     else if (enemy.kind === "pointer") pointer(enemy, level, seconds, cameraX);
     else if (enemy.kind === "leak") leak(enemy, seconds, cameraX);
+    else if (enemy.kind === "spinlock") spinlock(enemy, level);
   }
 }
 
@@ -355,7 +384,13 @@ function puddleBox(enemy) {
   return { left: right - enemy.grown, right, top: enemy.homeY - PUDDLE_HEIGHT, bottom: enemy.homeY };
 }
 
+function linkBox(link) {
+  const half = SPINLOCK_LINK_SIZE / 2;
+  return { left: link.x - half, right: link.x + half, top: link.y - half, bottom: link.y + half };
+}
+
 export function harmfulAreas(enemy) {
+  if (enemy.kind === "spinlock") return enemy.links.map(linkBox);
   if (enemy.kind === "cron") return cronState(enemy) === "firing" ? [cronColumn(enemy)] : [];
   if (enemy.kind === "pointer") return [hitBox(enemy)].concat(enemy.shots.map(x => shotBox(enemy, x)));
   if (enemy.kind === "leak" && enemy.grown > 0) return [hitBox(enemy), puddleBox(enemy)];

@@ -38,5 +38,5 @@ Music and sound effects moved into the MVP (`docs/IMPLEMENTATION.md`, task 10). 
 
 ## Publishing
 
-- Plugin description and tags. Working wording: *Retro platformer made in ASCII, living in your Omarchy theme. Procedurally generated runs, 10 enemies, one final boss.*
+- Plugin description and tags. Working wording: *Retro platformer made in ASCII, living in your Omarchy theme. Procedurally generated runs, 11 enemies, one final boss.*
 - Discoverability without trademarks: no "Mario" in the name, description or tags. Use generic terms such as `platformer`, `retro-game`, `ascii-game`, `omarchy` as GitHub topics.

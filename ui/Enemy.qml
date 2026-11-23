@@ -19,6 +19,7 @@ Item {
     pointer: { text: "*", size: 26, role: "hostileAlt", drop: 8 },
     fork: { text: "&", size: enemy.small ? 18 : 26, role: "hostileAlt2", drop: 2 },
     leak: { text: "%", size: 22, role: "hostileAlt2", drop: 2 },
+    spinlock: { text: "(o)", size: 18, role: "hostileAlt", drop: 4 },
   })
   readonly property var look: looks[enemy.kind]
   readonly property real walkHop: 2
@@ -62,6 +63,16 @@ Item {
     puddle.x = Math.round(sourceLeft - live.grown)
   }
 
+  function syncSpinlock(live) {
+    for (let i = 0; i < live.links.length; i++) {
+      const item = links.itemAt(i)
+      const link = live.links[i]
+      item.visible = !link.buried
+      item.x = Math.round(link.x - item.width / 2)
+      item.y = Math.round(link.y - item.height / 2)
+    }
+  }
+
   function sync(live, time) {
     visible = live.alive
     if (!live.alive) return
@@ -76,6 +87,7 @@ Item {
     else if (live.kind === "pointer") syncPointer(live, time)
     else if (live.kind === "pipe") syncPipe(live)
     else if (live.kind === "leak") syncLeak(live)
+    else if (live.kind === "spinlock") syncSpinlock(live)
   }
 
   Rectangle {
@@ -154,6 +166,20 @@ Item {
       visible: false
       text: "<--"
       size: 16
+      color: enemyItem.colors.hostile
+    }
+  }
+
+  Repeater {
+    id: links
+    model: enemyItem.enemy.kind === "spinlock" ? enemyItem.enemy.arm * (enemyItem.enemy.double ? 2 : 1) : 0
+
+    Glyph {
+      required property int index
+      readonly property bool isTip: index % enemyItem.enemy.arm === enemyItem.enemy.arm - 1
+      visible: false
+      text: isTip ? "*" : "·"
+      size: isTip ? 22 : 20
       color: enemyItem.colors.hostile
     }
   }

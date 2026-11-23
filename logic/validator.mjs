@@ -1,7 +1,7 @@
 import { TILE, SCREEN_HEIGHT, SCREEN_ROWS, SCREEN_COLS } from "./screen.mjs";
 import { STEP_SECONDS } from "./clock.mjs";
 import { createHero, stepHero, heroHeight } from "./physics.mjs";
-import { createEnemies, leakCycleSeconds, stepEnemies, touchEnemies, PING_AIR_SECONDS, PING_GROUND_SECONDS } from "./enemies.mjs";
+import { createEnemies, leakCycleSeconds, stepEnemies, touchEnemies, PING_AIR_SECONDS, PING_GROUND_SECONDS, SPINLOCK_PERIOD } from "./enemies.mjs";
 import { keepInsideLevel, touchesBit, CAMERA_LEAD } from "./world.mjs";
 import { CHUNKS } from "./chunks.mjs";
 import { DEFAULT_KINDS, DIFFICULTY, MAX_RISE, generateLevel, generateSafeLevel, introductions, kindsUpTo, maxGapTiles } from "./generator.mjs";
@@ -64,6 +64,7 @@ function timingKey(enemy) {
   if (enemy.kind === "pipe") return enemy.cycle + ":" + Math.round(enemy.timer / PHASE_BUCKET);
   if (enemy.kind === "pointer") return Math.round(enemy.charge / PHASE_BUCKET) + ":" + enemy.shots.map(x => Math.round(x / ENEMY_BUCKET)).join("/");
   if (enemy.kind === "leak") return Math.round((enemy.timer % leakCycleSeconds(enemy.extent)) / PHASE_BUCKET);
+  if (enemy.kind === "spinlock") return Math.round(((enemy.time + enemy.phase) % SPINLOCK_PERIOD) / PHASE_BUCKET);
   return Math.round(enemy.grace / PHASE_BUCKET);
 }
 
