@@ -114,7 +114,7 @@ Ten in the MVP. Basic ones appear from level 1; advanced ones join from level 3.
 | 2 | `Z` | zombie process | Floats slowly back and forth over a short stretch, bobbing, labelled `<defunct>`. | Stomp from above. |
 | 3 | `^^^` | kernel spikes | Static spikes on the ground or on a platform. | No. |
 | 4 | `o` | ping | Hops in place at a fixed rhythm. Pass under it while it is up, or jump over it while it is down. | Stomp from above, on the ground or mid-hop. |
-| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen. Drops when the hero passes beneath, lies on the ground for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
+| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen. Drops when the hero comes within about five tiles, timed to land on a hero running at full speed; braking when it starts to drop avoids it. Lies on the ground for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
 
 ### 6.2 Advanced
 
@@ -179,31 +179,39 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 
 ### 8.1 Determinism
 
-- One seeded pseudo-random generator per run; each level, each generation attempt and the boss get their own sub-streams derived from the run seed, so changing one level's generation never shifts another's.
+- One seeded pseudo-random generator per run; each level, each generation attempt and the boss get their own sub-streams derived from the run seed, so changing one level's generation never shifts another's. The draft has its own sub-stream too.
 - No `Math.random()` in game logic. Tests can inject their own generator.
 
 ### 8.2 Assembly
 
 - A level is assembled from chunks: a start chunk, a sequence of body chunks, the checkpoint chunk in the middle, more body chunks and the exit chunk. Level 5 ends in the boss arena instead of an exit.
-- Chunks are text tile maps in the source, one character per tile (e.g. `#` ground, `=` platform, `^` spikes, `E` enemy slot). Some cells are parameters the generator fills in: gap widths, platform heights, enemy kinds from the draft.
+- Chunks are text tile maps in the source (`logic/chunks.mjs`), one character per tile, bottom-aligned on the level's three ground rows: `#` ground, `B` block, `=` platform. Some cells are parameters the generator fills in:
+  - `G`: a gap in the ground. Each run of gap columns becomes a pit as wide as the generator draws from the chunk's range, cut to the level's envelope fraction; a bit is placed over its middle.
+  - `P`: a platform the generator may lift by up to the chunk's `lift` rows, together with everything above it, as long as it stays within the rise limit.
+  - `E`: an enemy slot. Filled with a drafted, already introduced kind (the chunk may restrict the kinds), or left empty, so the level holds about its number of enemies per screen. A run of slots becomes spikes as wide as the run; any other kind stands in its middle, and a hang hangs high above it.
+  - `*` and `+`: bits on the intended path and in riskier spots.
 - The level follows a pacing curve: introduction, build-up, a rest zone, a harder stretch, and never two of the hardest chunks back to back.
-- Bits are placed along the intended path and in optional riskier spots. The sudo bit is one of them, chosen from the seed.
-- Level width grows with the level number, tuned so a level takes 60–90 seconds.
+- Bits are placed along the intended path and in optional riskier spots. The sudo bit is one of them, chosen from the seed: a riskier one half of the time.
+- The first fifth of a level uses only the easiest body chunks, up to 55 % of it medium ones too, and the rest all of them. The hardest chunks combine hazards: an enemy at a gap's landing, a hang over it, spikes on an island between pits, a chain of pits. A rest chunk follows every few body chunks (the table below), and the new enemies of the level are introduced right after the start, one introduction chunk each.
+- Level width grows with the level number, tuned so a level takes 60–90 seconds: its target time (the table below) at an assumed pace of 4 tiles per second for a decent player, about half of the hero's top speed. Both are tuning values.
 
 ### 8.3 Physics limits
 
-- Every gap, height and jump the generator places stays within a fraction of the envelope. The fraction is a difficulty parameter.
+- Every gap, height and jump the generator places stays within a fraction of the envelope. The fraction is a difficulty parameter: a pit is at most that fraction of the widest gap the hero can clear at the pit's rise (`maxGapByRise`).
+- Heights have a fixed limit instead: no step up the ground and no platform is more than one tile below the maximum jump height above what the hero stands on (3 tiles with the current physics).
 - Initial difficulty table, to be tuned by playing:
 
-| Level | Max gap (of envelope) | Enemies per screen | Narrowest platform | Rest zones |
-|---|---|---|---|---|
-| 1 | 45 % | 1 | 4 tiles | every 2 chunks |
-| 2 | 55 % | 1.5 | 4 tiles | every 3 chunks |
-| 3 | 65 % | 2 | 3 tiles | every 3 chunks |
-| 4 | 75 % | 2.5 | 3 tiles | every 4 chunks |
-| 5 | 85 % | 3 | 2 tiles | every 4 chunks |
+| Level | Max gap (of envelope) | Enemies per screen | Narrowest platform | Rest zones | Target time |
+|---|---|---|---|---|---|
+| 1 | 60 % | 1.5 | 4 tiles | every 3 chunks | 60 s |
+| 2 | 65 % | 2 | 3 tiles | every 3 chunks | 66 s |
+| 3 | 72 % | 2.5 | 3 tiles | every 4 chunks | 72 s |
+| 4 | 80 % | 3 | 2 tiles | every 4 chunks | 78 s |
+| 5 | 88 % | 3.5 | 2 tiles | every 5 chunks | 84 s |
 
-Level 1 should feel like the first level of a classic platformer: easy, readable, teaching. Level 5 must be challenging but always completable.
+The narrowest platform also limits ground islands between two pits.
+
+Level 1 should feel like the first level of a classic platformer: readable and teaching, but not a walk. Level 5 must be challenging but always completable.
 
 ### 8.4 Validator and quality gate
 

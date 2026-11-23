@@ -59,13 +59,15 @@ Done when: all five behave as the SPEC says on the test level and the user is ha
 
 ## 5. Level generator
 
-- Status: todo
+- Status: done
 
 Seeded generator (SPEC 8.1–8.3): seed format and parsing, seeded PRNG with sub-streams, chunk format and the first chunk library (enough variety for levels 1–2 with the basic enemies, including safe introduction and rest chunks), assembly with the pacing curve, checkpoint and exit chunks, bit and sudo placement, the draft of basic enemies and their introduction order, the difficulty table. The game plays generated levels 1–2 instead of the test level.
 
 Tests: same seed gives the same level; different levels and attempts use independent sub-streams; draft and introduction rules; every gap and height stays within the envelope fraction; level widths fit the target duration.
 
 Done when: new seeds give varied, sensible levels 1–2 that the user enjoys playing.
+
+Notes: levels 3–5 are generated too, with basic enemies only. With the current chunks they reach about 2.4–2.5 enemies per screen instead of the table's 2.5–3.5: task 7 adds chunks with more slots. The time bonus still uses the 60 s par from SPEC 9 while level 1 targets 60 s.
 
 ## 6. Validator and quality gate
 

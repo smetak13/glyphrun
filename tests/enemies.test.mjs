@@ -7,6 +7,7 @@ import {
   touchEnemies,
   BUG_SPEED,
   HANG_LIE_SECONDS,
+  HANG_TRIGGER_DISTANCE,
   HANG_WINDUP_SPEED,
   PING_AIR_SECONDS,
   PING_GROUND_SECONDS,
@@ -16,7 +17,7 @@ import {
 } from "../logic/enemies.mjs";
 import { createWorld, respawnHero, stepWorld } from "../logic/world.mjs";
 import { createRun, stepRun, LIVES } from "../logic/run.mjs";
-import { createHero } from "../logic/physics.mjs";
+import { createHero, RUN_SPEED } from "../logic/physics.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { TILE } from "../logic/screen.mjs";
@@ -294,10 +295,10 @@ test("a ping in the air at the hero's height hurts from the side", () => {
 
 const HANG_LEVEL = levelFrom(["@...........", "############"], ["", "", "", "......v....."]);
 
-test("a hang stays up while the hero is not beneath it", () => {
+test("a hang stays up while the hero is farther away than its trigger distance", () => {
   const [hang] = enemiesOf(HANG_LEVEL);
 
-  stepFor([hang], HANG_LEVEL, createHero(2 * TILE, 21 * TILE), 2);
+  stepFor([hang], HANG_LEVEL, createHero(hang.x - HANG_TRIGGER_DISTANCE - TILE, 21 * TILE), 2);
 
   assert.deepEqual([hang.state, hang.y], ["hanging", 4 * TILE]);
 });
@@ -310,6 +311,30 @@ test("a hang drops when the hero passes beneath and lands on the ground", () => 
   stepFor([hang], HANG_LEVEL, FAR_AWAY, 1);
 
   assert.deepEqual([state, hang.state, hang.y], ["falling", "lying", 21 * TILE]);
+});
+
+const RUNWAY = levelFrom(["@.......................................", "########################################"], ["", "", "", "", "..............................v"]);
+
+function runTowardHang(reactionSeconds) {
+  const world = createWorld(RUNWAY);
+  const hang = world.enemies[0];
+  world.hero.vx = RUN_SPEED;
+  let fellAt = null;
+  for (let i = 0; i < 1200; i++) {
+    if (fellAt === null && hang.state === "falling") fellAt = world.time;
+    const braking = reactionSeconds !== null && fellAt !== null && world.time - fellAt > reactionSeconds;
+    const events = stepWorld(world, { direction: braking ? 0 : 1, jumpHeld: false, jumpPressed: false }, STEP_SECONDS);
+    if (events.some(event => event.type === "hit")) return true;
+  }
+  return false;
+}
+
+test("a hang drops onto a hero running beneath it at full speed", () => {
+  assert.equal(runTowardHang(null), true);
+});
+
+test("a running hero that brakes when the hang starts to drop is not hit", () => {
+  assert.equal(runTowardHang(0.25), false);
 });
 
 test("a hang lies on the ground for a moment, then slowly winds back up and hangs again", () => {

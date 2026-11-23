@@ -2,11 +2,10 @@ import QtQuick
 import Quickshell
 import "ui"
 import "logic/clock.mjs" as Clock
-import "logic/level.mjs" as Level
+import "logic/generator.mjs" as Generator
 import "logic/messages.mjs" as Messages
 import "logic/run.mjs" as Run
 import "logic/seed.mjs" as Seed
-import "logic/testLevel.mjs" as TestLevel
 
 Item {
   id: root
@@ -16,8 +15,7 @@ Item {
   readonly property bool opened: window.visible
   property bool closingFromHost: false
   property bool devTools: false
-  readonly property var level: Level.parseLevel(TestLevel.TEST_LEVEL)
-  property var run: Run.createRun(newSeed(), level)
+  property var run: startingRun(newSeed())
   property var world: run.world
   property var clock: Clock.createClock()
   property bool leftHeld: false
@@ -65,6 +63,15 @@ Item {
     return Math.floor(Math.random() * 0x100000000)
   }
 
+  function startingRun(seed) {
+    return Run.createRun(seed, Generator.generateLevel(seed, 1, 0))
+  }
+
+  function advanceLevel() {
+    Run.nextLevel(run, Generator.generateLevel(run.seed, run.levelNumber + 1, 0))
+    showWorld()
+  }
+
   function showWorld() {
     world = run.world
     clock = Clock.createClock()
@@ -72,17 +79,14 @@ Item {
   }
 
   function startRun(seed) {
-    run = Run.createRun(seed, level)
+    run = startingRun(seed)
     showWorld()
   }
 
   function finishWaiting() {
     if (run.over) startRun(run.seed)
     else if (run.levelNumber === Run.LEVEL_COUNT) startRun(newSeed())
-    else {
-      Run.nextLevel(run, level)
-      showWorld()
-    }
+    else advanceLevel()
   }
 
   function openMenu() {
@@ -122,6 +126,8 @@ Item {
     } else if (key === Qt.Key_K) {
       const kill = devKills[devKillIndex++ % devKills.length]
       Run.killEnemy(run, kill.source, world.hero.x, world.hero.y - 60, kill.small)
+    } else if (key === Qt.Key_L) {
+      if (run.levelNumber < Run.LEVEL_COUNT) advanceLevel()
     } else return false
     return true
   }

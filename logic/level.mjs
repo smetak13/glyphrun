@@ -14,7 +14,7 @@ const SUDO_BIT = "S";
 const SUDO_BIT_TEXT = "1";
 const BOTTOM_ROW = SCREEN_ROWS - 1;
 const SPIKES = "^";
-const ENEMY_KINDS = { b: "bug", z: "zombie", o: "ping", v: "hang" };
+export const ENEMY_KINDS = { b: "bug", z: "zombie", o: "ping", v: "hang" };
 
 export function parseLevel(rows) {
   if (rows.length !== SCREEN_ROWS) throw new Error("a level has " + SCREEN_ROWS + " rows, got " + rows.length);

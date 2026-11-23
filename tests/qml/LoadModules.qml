@@ -1,9 +1,12 @@
 import QtQuick
+import "../../logic/chunks.mjs" as Chunks
 import "../../logic/clock.mjs" as Clock
 import "../../logic/enemies.mjs" as Enemies
+import "../../logic/generator.mjs" as Generator
 import "../../logic/level.mjs" as Level
 import "../../logic/messages.mjs" as Messages
 import "../../logic/physics.mjs" as Physics
+import "../../logic/random.mjs" as Random
 import "../../logic/run.mjs" as Run
 import "../../logic/score.mjs" as Score
 import "../../logic/screen.mjs" as Screen
@@ -31,7 +34,10 @@ QtObject {
       Enemies.pingHeight(1)
       Level.checkpointGlyphs(level.checkpoint, world.checkpointReached)
       const envelope = Physics.computeEnvelope()
-      console.log("GLYPHRUN_MODULES_OK " + Seed.formatSeed(run.seed) + " " + run.score + " " + Screen.SCREEN_WIDTH + " " + world.hero.y + " " + envelope.maxGap)
+      const generated = Generator.generateLevel(Seed.parseSeed("7f3a-91c2"), 2, 0)
+      Level.levelSections(generated)
+      Random.shuffle(Random.subStream(1, "check"), Chunks.CHUNKS)
+      console.log("GLYPHRUN_MODULES_OK " + Seed.formatSeed(run.seed) + " " + run.score + " " + Screen.SCREEN_WIDTH + " " + world.hero.y + " " + envelope.maxGap + " " + generated.cols)
       Qt.exit(0)
     } catch (error) {
       console.log("GLYPHRUN_MODULES_FAILED " + error)
