@@ -105,7 +105,7 @@ Done when: the boss is beatable, fair and fun to the user.
 
 ## 9. Run flow, story and screens
 
-- Status: todo
+- Status: done
 
 Main menu (Continue, New run, Enter seed, High scores, Settings), the intro, level title cards, the commit-style level summary, game over with tips and its four actions, the victory sequence with the boot log from real statistics, the high score table (top 10 with seed, level, date, copy and play) and settings storage.
 

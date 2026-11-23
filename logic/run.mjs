@@ -22,7 +22,10 @@ export function createRun(seed, level) {
     invulnerable: 0,
     dying: 0,
     over: false,
+    won: false,
     cause: null,
+    stats: { kills: 0, zombies: 0, hits: 0, deaths: 0, seconds: 0 },
+    levelPoints: null,
     timeBonus: 0,
     toast: null,
     popups: [],
@@ -37,18 +40,40 @@ function startLevel(run, level, big) {
   run.invulnerable = 0;
   run.dying = 0;
   run.timeBonus = 0;
+  run.levelPoints = { kills: 0, killPoints: 0, sudoPoints: 0 };
   run.toast = null;
   run.popups = [];
 }
 
 export function nextLevel(run, level) {
   run.bitsBeforeLevel += run.world.bitsCollected;
+  run.stats.seconds += run.world.time;
   run.levelNumber++;
   startLevel(run, level, run.world.hero.big);
 }
 
 export function runBits(run) {
   return run.bitsBeforeLevel + run.world.bitsCollected;
+}
+
+export function runSeconds(run) {
+  return run.stats.seconds + run.world.time;
+}
+
+function sudoDetail(points) {
+  if (points === ALREADY_ROOT_POINTS) return EVENTS.alreadyRoot;
+  return points > 0 ? "granted" : "—";
+}
+
+export function levelSummary(run) {
+  const points = run.levelPoints;
+  const bits = run.world.bitsCollected;
+  return [
+    { label: "bits", detail: bits + " × " + BIT_POINTS, points: bits * BIT_POINTS },
+    { label: "kills", detail: String(points.kills), points: points.killPoints },
+    { label: "sudo", detail: sudoDetail(points.sudoPoints), points: points.sudoPoints },
+    { label: "time", detail: run.world.time.toFixed(1) + " s", points: run.timeBonus },
+  ];
 }
 
 export function showToast(run, text, role) {
@@ -65,6 +90,8 @@ function inPlay(run) {
 }
 
 function loseLife(run, source) {
+  run.stats.hits++;
+  run.stats.deaths++;
   run.lives--;
   run.dying = DEATH_SECONDS;
   run.invulnerable = 0;
@@ -80,6 +107,7 @@ export function hitHero(run, source) {
   if (!inPlay(run) || run.invulnerable > 0) return;
   const hero = run.world.hero;
   if (hero.big) {
+    run.stats.hits++;
     hero.big = false;
     run.invulnerable = INVULNERABLE_SECONDS;
     showToast(run, hitMessage(source), "hostile");
@@ -89,7 +117,12 @@ export function hitHero(run, source) {
 }
 
 export function killEnemy(run, source, x, y, small) {
-  addPopup(run, x, y, killPoints(source, small), killMessage(source, small), "hostile");
+  const points = killPoints(source, small);
+  run.stats.kills++;
+  if (source === "zombie") run.stats.zombies++;
+  run.levelPoints.kills++;
+  run.levelPoints.killPoints += points;
+  addPopup(run, x, y, points, killMessage(source, small), "hostile");
 }
 
 function collectBit(run, bit) {
@@ -99,10 +132,12 @@ function collectBit(run, bit) {
   if (!bit.sudo) {
     addPopup(run, x, y, BIT_POINTS, "", "bit");
   } else if (hero.big) {
+    run.levelPoints.sudoPoints += ALREADY_ROOT_POINTS;
     addPopup(run, x, y, ALREADY_ROOT_POINTS, "", "hero");
     showToast(run, EVENTS.alreadyRoot, "hero");
   } else {
     hero.big = true;
+    run.levelPoints.sudoPoints += SUDO_POINTS;
     addPopup(run, x, y, SUDO_POINTS, "", "hero");
     showToast(run, EVENTS.sudo, "hero");
   }
@@ -127,6 +162,8 @@ function handleEvent(run, event) {
     const boss = run.world.boss;
     addPopup(run, (boss.left + boss.right) / 2, boss.ground - 4 * TILE, BOSS_DEFEATED_POINTS, "", "hostile");
     showToast(run, EVENTS.bossDefeated, "cyan");
+  } else if (event.type === "rebooted") {
+    run.won = true;
   }
 }
 

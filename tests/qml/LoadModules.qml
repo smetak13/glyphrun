@@ -4,7 +4,9 @@ import "../../logic/chunks.mjs" as Chunks
 import "../../logic/clock.mjs" as Clock
 import "../../logic/enemies.mjs" as Enemies
 import "../../logic/generator.mjs" as Generator
+import "../../logic/highScores.mjs" as HighScores
 import "../../logic/level.mjs" as Level
+import "../../logic/menu.mjs" as Menu
 import "../../logic/messages.mjs" as Messages
 import "../../logic/physics.mjs" as Physics
 import "../../logic/random.mjs" as Random
@@ -12,6 +14,7 @@ import "../../logic/run.mjs" as Run
 import "../../logic/score.mjs" as Score
 import "../../logic/screen.mjs" as Screen
 import "../../logic/seed.mjs" as Seed
+import "../../logic/story.mjs" as Story
 import "../../logic/testLevel.mjs" as TestLevel
 import "../../logic/theme.mjs" as Theme
 import "../../logic/validator.mjs" as Validator
@@ -42,6 +45,15 @@ QtObject {
       const arena = World.createWorld(Boss.arenaLevel(0x7f3a91c2))
       for (let i = 0; i < 600; i++) World.stepWorld(arena, input, 1 / 60)
       Boss.phaseOrder(arena.level.seed, 10)
+      Run.levelSummary(run)
+      HighScores.insertScore(HighScores.parseScores("[]"), HighScores.scoreEntry(run, "2026-11-23"))
+      Menu.mainMenuItems(run)
+      Seed.typeSeed("7f3a", "9")
+      Story.bootLog(run.stats, Run.runBits(run), Run.runSeconds(run))
+      Story.sparkAt(Story.fireworks(run.seed)[0], 6)
+      Story.victoryScene(9)
+      Story.shippedShown(3)
+      Story.commitHash(run.seed, 1)
       Random.shuffle(Random.subStream(1, "check"), Chunks.CHUNKS)
       console.log("GLYPHRUN_MODULES_OK " + Seed.formatSeed(run.seed) + " " + run.score + " " + Screen.SCREEN_WIDTH + " " + world.hero.y + " " + envelope.maxGap + " " + generated.cols)
       Qt.exit(0)

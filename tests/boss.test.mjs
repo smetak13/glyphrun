@@ -13,6 +13,7 @@ import {
   INTRO_SECONDS,
   PHASES,
   PAUSE_SECONDS,
+  PHASE_SECONDS,
   TRACE_LENGTH,
 } from "../logic/boss.mjs";
 import { createHero } from "../logic/physics.mjs";
@@ -164,14 +165,38 @@ test("touching the core from the side does nothing", () => {
 });
 
 test("each hit speeds the attacks up", () => {
-  const durations = [0, 1, 2].map(hits => {
+  const firstRepeats = [0, 1, 2].map(hits => {
     const f = fight();
     f.boss.hits = hits;
     stepUntil(f, boss => boss.state === "attack");
-    return reachCore(f).seconds;
+    return stepUntil(f, boss => boss.drops.length + boss.traces.length >= 3).seconds;
   });
 
-  assert.ok(durations[1] < durations[0] && durations[2] < durations[1], durations.join(", "));
+  assert.ok(firstRepeats[1] < firstRepeats[0] && firstRepeats[2] < firstRepeats[1], firstRepeats.join(", "));
+});
+
+test("each hit makes the phases longer: 10, 15 and 20 seconds of attacks", () => {
+  const emitting = [0, 1, 2].map(hits => {
+    const f = fight();
+    f.boss.hits = hits;
+    stepUntil(f, boss => boss.state === "attack");
+    let last = 0;
+    let seconds = 0;
+    let count = 0;
+    stepUntil(f, boss => {
+      seconds += STEP_SECONDS;
+      const now = boss.drops.length + boss.traces.length;
+      if (now > count) last = seconds;
+      count = now;
+      return boss.state === "core";
+    });
+    return last;
+  });
+
+  emitting.forEach((seconds, hits) => {
+    const expected = PHASE_SECONDS[hits];
+    assert.ok(seconds > expected - 2.1 && seconds <= expected, hits + " hits: " + seconds);
+  });
 });
 
 test("the third hit crashes the boss, reports its defeat and then reboots", () => {

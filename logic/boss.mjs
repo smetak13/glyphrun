@@ -6,25 +6,25 @@ import { subStream, pick, randomInt } from "./random.mjs";
 
 export const PHASES = ["spikes+trace", "spikes+spawn", "trace+spawn"];
 export const BOSS_HITS = 3;
-export const BOSS_SPEEDS = [1, 1.2, 1.4];
+export const BOSS_SPEEDS = [1, 1.1, 1.2];
 export const INTRO_SECONDS = 2;
-export const ATTACK_SECONDS = 6;
-export const CORE_SECONDS = 3.5;
+export const PHASE_SECONDS = [10, 15, 20];
+export const CORE_SECONDS = 4;
 export const PAUSE_SECONDS = 1;
 export const CRASH_SECONDS = 1.2;
 export const REBOOT_SECONDS = 2;
 export const DROP_TOP_ROW = 9;
-export const DROP_WARNING_SECONDS = 0.85;
-export const DROP_FALL_SPEED = 560;
+export const DROP_WARNING_SECONDS = 1;
+export const DROP_FALL_SPEED = 480;
 export const SPIKE_SIZE = 14;
-export const SPIKE_INTERVAL = 0.55;
-export const TRACE_INTERVAL = 1.1;
+export const SPIKE_INTERVAL = 0.75;
+export const TRACE_INTERVAL = 2;
 export const TRACE_WARNING_SECONDS = 0.8;
-export const TRACE_SPEED = 220;
-export const TRACE_LENGTH = 4 * TILE;
+export const TRACE_SPEED = 190;
+export const TRACE_LENGTH = 3 * TILE;
 export const TRACE_HEIGHT = 8;
 export const TRACE_TEXTS = ["panic+0x5c", "do_exit+0x2a", "oops_end+0x9", "die+0x41", "schedule+0x3e", "page_fault+0x1e"];
-export const SPAWN_INTERVAL = 1.5;
+export const SPAWN_INTERVAL = 2;
 export const CORE_COLS = [5, 19, 33];
 export const CORE_WIDTH = 2 * TILE;
 export const CORE_HEIGHT = 16;
@@ -83,6 +83,10 @@ export function bossSpeed(boss) {
   return BOSS_SPEEDS[Math.min(boss.hits, BOSS_SPEEDS.length - 1)];
 }
 
+function attackLength(boss) {
+  return PHASE_SECONDS[Math.min(boss.hits, PHASE_SECONDS.length - 1)] * bossSpeed(boss);
+}
+
 function startAttack(boss) {
   const phase = phaseOrder(boss.seed, boss.attacks + 1)[boss.attacks];
   boss.attacks++;
@@ -126,14 +130,15 @@ function emit(boss, what, hero) {
 
 function runAttack(boss, hero, fast) {
   const attack = boss.attack;
+  const length = attackLength(boss);
   for (const emitter of attack.emitters) {
-    while (emitter.next <= attack.time && emitter.next < ATTACK_SECONDS) {
+    while (emitter.next <= attack.time && emitter.next < length) {
       emit(boss, emitter.what, hero);
       emitter.next += emitter.interval;
     }
   }
   attack.time += fast;
-  if (attack.time >= ATTACK_SECONDS && boss.drops.length === 0 && boss.traces.length === 0) {
+  if (attack.time >= length && boss.drops.length === 0 && boss.traces.length === 0) {
     boss.state = "core";
     boss.attack = null;
     const col = pick(boss.random, CORE_COLS);

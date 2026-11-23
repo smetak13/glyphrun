@@ -4,8 +4,10 @@ import {
   createRun,
   hitHero,
   killEnemy,
+  levelSummary,
   nextLevel,
   runBits,
+  runSeconds,
   stepRun,
   DEATH_SECONDS,
   INVULNERABLE_SECONDS,
@@ -302,4 +304,76 @@ test("the third hit defeats the boss, says the kernel is rebooting and finishes 
   assert.equal(toast, "kernel: rebooting…");
   assert.equal(run.score, 3 * BOSS_HIT_POINTS + BOSS_DEFEATED_POINTS);
   assert.equal(run.world.finished, true);
+});
+
+test("a run is won only when the boss is defeated", () => {
+  const run = bossRun();
+  stompCore(run);
+  stompCore(run);
+  const before = run.won;
+  stompCore(run);
+
+  stepUntil(run, IDLE, r => r.world.finished);
+
+  assert.deepEqual([before, run.won], [false, true]);
+});
+
+test("the run counts kills, reaped zombies, hits and deaths", () => {
+  const run = createRun(1, PIT);
+  killEnemy(run, "zombie", 0, 0, false);
+  killEnemy(run, "bug", 0, 0, false);
+  run.world.hero.big = true;
+  hitHero(run, "bug");
+
+  fallIntoPit(run);
+
+  assert.deepEqual(run.stats, { kills: 2, zombies: 1, hits: 2, deaths: 1, seconds: 0 });
+});
+
+test("the run's time adds up the levels played", () => {
+  const run = createRun(1, FLAT);
+  steps(run, IDLE, 2);
+
+  nextLevel(run, FLAT);
+  steps(run, IDLE, 1);
+
+  assert.ok(Math.abs(runSeconds(run) - 3) < 0.01);
+});
+
+test("the level summary breaks this level's score into bits, kills, sudo and time", () => {
+  const run = createRun(1, BITS);
+  stepUntil(run, RIGHT, r => r.world.bits[1].collected);
+  killEnemy(run, "leak", 0, 0, false);
+  killEnemy(run, "bug", 0, 0, false);
+  run.world.time = 48.24;
+  run.timeBonus = 220;
+
+  const rows = levelSummary(run);
+
+  assert.deepEqual(rows, [
+    { label: "bits", detail: "2 × 10", points: 20 },
+    { label: "kills", detail: "2", points: 300 },
+    { label: "sudo", detail: "—", points: 0 },
+    { label: "time", detail: "48.2 s", points: 220 },
+  ]);
+});
+
+test("the level summary shows sudo as granted or already root", () => {
+  const granted = createRun(1, SUDO);
+  const root = bigRun(SUDO);
+
+  stepUntil(granted, RIGHT, r => r.world.bits[0].collected);
+  stepUntil(root, RIGHT, r => r.world.bits[0].collected);
+
+  assert.deepEqual(levelSummary(granted)[2], { label: "sudo", detail: "granted", points: 250 });
+  assert.deepEqual(levelSummary(root)[2], { label: "sudo", detail: "already root", points: 500 });
+});
+
+test("the level summary starts afresh on the next level", () => {
+  const run = createRun(1, FLAT);
+  killEnemy(run, "bug", 0, 0, false);
+
+  nextLevel(run, FLAT);
+
+  assert.deepEqual(levelSummary(run)[1], { label: "kills", detail: "0", points: 0 });
 });

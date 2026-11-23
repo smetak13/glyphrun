@@ -39,7 +39,7 @@ Plugin id: `smetak13.glyphrun`.
 
 ## 3. Story and levels
 
-The five levels are the stages of building software, ending in the worst idea in the trade.
+The run is one innocent ticket: a five-minute fix that escalates. The five levels are the stages it goes through on its way to production, ending in the worst idea in the trade. The Friday joke lives only on level 5's title card; the time `16:59:58` before the boss echoes it without repeating it. Every text outside the title cards is terminal output, never prose.
 
 | Level | Title | Subtitle on the title card |
 |---|---|---|
@@ -51,21 +51,28 @@ The five levels are the stages of building software, ending in the worst idea in
 
 The story is told only on transition screens, never during play:
 
-- **Intro** (start of a run, skippable with any key): a terminal types by itself:
+- **Main menu** tagline: `one small change. five minutes, tops.`
+- **Intro** (start of a new run, skippable with any key; retrying a seed skips it): a terminal types by itself:
   ```
-  $ cat TODO.md
-  - [ ] write perfect software
-  - [ ] deploy on Friday (what could go wrong)
-  $ ./start
+  $ cat TICKET-1337.md
+  # Change the button colour
+  priority: low
+  estimate: 5 min
+
+  $ git checkout -b quick-fix
   ```
-- **Title card** before each level: the level's title and subtitle.
-- **Level summary**: presented as a commit, with a random message from a list (`fix bugs (hopefully)`, `remove console.log`, `it works, don't touch it`, …), followed by the score breakdown.
-- **Game over**: `Segmentation fault (core dumped)`, the cause of the last death with the level reached, and a random tip at the bottom (`Tip: have you tried turning it off and on again?`, `Tip: it's not a bug, it's a feature.`, …).
-- **Shipped**: finishing level 5 is a soft win. Its summary shows the run's score like any other level, then a transition screen:
+- **Title card** before each level: the level's title and subtitle. It moves on by itself after a few seconds or with any key.
+- **Level summary**: presented as a commit, with a message and hash drawn from the seed (`fix bugs (hopefully)`, `remove console.log`, `quick fix (3rd attempt)`, …), followed by this level's breakdown (bits, kills, sudo, time bonus) and the run's score.
+- **Game over**: `Segmentation fault (core dumped)`, the cause of the last death with the level reached, the score and seed, a new high score's place, and a tip at the bottom (`Tip: have you tried turning it off and on again?`, `Tip: it's not a bug, it's a feature.`, …).
+- **Shipped**, the punchline: finishing level 5 is a soft win. Its summary shows the run's score like any other level, then the one-line change is deployed and takes production down. The terminal types it by itself, pausing for a second after `Shipped.`; Space shows it all at once:
   ```
+  $ git diff --stat
+   button.css | 2 +-
+   1 file changed, 1 insertion(+), 1 deletion(-)
+
   $ deploy --prod
   Deploying to production... done.
-  [  OK  ] Shipped. On a Friday.
+  [  OK  ] Shipped.
 
   $ uptime
    16:59:58 up 0 min, 1 user
@@ -73,19 +80,24 @@ The story is told only on transition screens, never during play:
   [    0.000000] Kernel panic - not syncing: Fatal exception
   [    0.000001] ---[ end Kernel panic ]---
   ```
-  `Space · face it` starts the boss stage.
-- **Victory** after the boss, a Pyrrhic one:
+  `Space · face it` starts the boss stage: the fallout to clean up.
+- **Victory** after the boss:
   1. The screen goes black and a boot log scrolls in theme colours. The numbers are the run's real statistics:
      ```
-     [  OK  ] Started perfect_program.service
+     [  OK  ] Started button-colour.service
      [  OK  ] Resolved 47 bugs (3 were features)
-     [  OK  ] Reaped all zombie processes
-     [  OK  ] Deployed to production. On a Friday.
+     [  OK  ] Reaped 5 zombie processes
+     [  OK  ] Recovered from 2 core dumps
+     [  OK  ] Collected 312 bits
+     [  OK  ] Closed TICKET-1337 (estimate: 5 min, actual: 7:05)
      ```
+     Bugs are all kills, features the hits taken (shrinks and lost lives, pits included), core dumps the lives lost, bits those collected over the run. The actual time is the run's playing time over all levels and the boss: pauses, menus, title cards, summaries and death beats do not count. Under five minutes it reads `actual: 4:41 · under estimate. suspicious.`; from an hour on, `1:07:12`.
   2. `@` walks to a `PRODUCTION` sign while the bits around it burst into fireworks of `0` and `1`.
   3. A big `BUILD PASSED · 0 errors · 0 warnings`.
-  4. The punchline: a tiny bug `ж` crawls across the screen, a notification says `1 new issue opened`, `@` turns to look at it, a beat of silence.
-  5. A closing line (wording to be settled during implementation; *Thanks for playing. Ship it.* is the placeholder), then the run summary, high score entry and Copy seed.
+  4. The change itself: a small `Submit` button appears beside the sign and changes colour.
+  5. `$ logout`, the score, the seed and a new high score's place, with New run, Copy seed and Main menu.
+
+  Space skips the sequence to its end.
 
 All texts here are defaults and may be tuned during implementation.
 
@@ -184,12 +196,12 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 - The arena is one screen of flat ground; the hero starts at its left. The HUD shows `BOSS` instead of the level.
 - A giant face of ASCII art and the text `KERNEL PANIC` fills the top of the arena, with the hits so far as `[ ■□□ ]`. It cannot be touched; its attacks can. The face changes while it dumps core and after it is beaten.
 - Three attack patterns:
-  1. **Falling spikes**: `^` appear faint under the face with a shadow `▁▁` on the ground where they will land, drop after 0.85 s, and keep coming every 0.55 s. Every other one aims at the hero's column. They hit only while falling.
-  2. **Stack trace**: bars of stack trace text (`panic+0x5c`, …) four tiles long sweep across the arena, one every 1.1 s, in the lowest tile row above the ground (jump it) or the second (the small hero stays under it, the big one must jump). Each bar shows faint and harmless for 0.8 s at the arena edge before it moves. Within one phase all bars come from the same side, so two never reach the hero at once.
-  3. **Spawn**: bugs drop into the arena every 1.5 s at random places, marked by a shadow like the spikes. A dropping bug hurts; once landed it walks and can be stomped as usual. Bugs left over vanish when the core window ends.
-- The fight is a sequence of phases, and **every phase combines two patterns** at full rate: spikes + stack trace, spikes + spawn or stack trace + spawn. The fight starts 2 s after the stage begins. A phase emits its hazards for 6 s and ends when the last one is gone.
-- After each phase the boss "dumps core": a `[core]` block appears on the floor for 3.5 s at one of three fixed positions (the arena's left, middle and right), blinking in its last second. Stomping it is a hit and bounces the hero; touching it from the side does nothing. If the window is missed, the next phase starts after a 1 s pause, as it does after a hit.
-- Three hits win. Each hit speeds the attacks up (×1.2, then ×1.4): their rhythm, warnings, falls and sweeps. The core window does not shrink. After the third hit the face dies, then `kernel: rebooting…`, and the victory follows.
+  1. **Falling spikes**: `^` appear faint under the face with a shadow `▁▁` on the ground where they will land, drop after 1 s, and keep coming every 0.75 s. Every other one aims at the hero's column. They hit only while falling.
+  2. **Stack trace**: bars of stack trace text (`panic+0x5c`, …) three tiles long sweep across the arena, one every 2 s, in the lowest tile row above the ground (jump it) or the second (the small hero stays under it, the big one must jump). Each bar shows faint and harmless for 0.8 s at the arena edge before it moves. Within one phase all bars come from the same side, so two never reach the hero at once.
+  3. **Spawn**: bugs drop into the arena every 2 s at random places, marked by a shadow like the spikes. A dropping bug hurts; once landed it walks and can be stomped as usual. Bugs left over vanish when the core window ends.
+- The fight is a sequence of phases, and **every phase combines two patterns** at full rate: spikes + stack trace, spikes + spawn or stack trace + spawn. The fight starts 2 s after the stage begins. A phase emits its hazards for 10 s, and ends when the last one is gone. Each hit lengthens the phases that follow: 15 s after the first hit, 20 s after the second. Like the speed, the length changes only with hits; a missed core window keeps it.
+- After each phase the boss "dumps core": a `[core]` block appears on the floor for 4 s at one of three fixed positions (the arena's left, middle and right), blinking in its last second. Stomping it is a hit and bounces the hero; touching it from the side does nothing. If the window is missed, the next phase starts after a 1 s pause, as it does after a hit.
+- Three hits win. Each hit speeds the attacks up (×1.1, then ×1.2): their rhythm, warnings, falls and sweeps, while a phase's length stays in real seconds. The core window does not shrink. After the third hit the face dies, then `kernel: rebooting…`, and the victory follows.
 - The order of phases is random but drawn from the seed, so the same seed always fights the same way and can be learned. Fairness rules: the same phase never comes twice in a row, and every pattern has a warning. A phase's place in the order does not depend on hits or misses: the n-th phase of a seed is always the same combination, and hits only set its speed, so a player can learn the order at base speed.
 - Lives and sudo carry into the boss stage. Losing a life respawns the hero at the arena's start and the fight starts over: no hits, the same phase order from the beginning. Losing the last life ends the run with the game over screen, as anywhere else.
 - All timings are tuning values.
@@ -251,7 +263,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 ## 9. Scoring and high scores
 
 - Points for bits, kills, sudo, boss hits and a time bonus per level. Initial values (tunable): bit 10, kill 100, small fork bomb 50, memory leak 200, sudo 250 (500 when already big), boss hit 1,000, boss defeated 5,000, time bonus of 20 per whole second under the level's par time (60 s until the generator sets a par per level).
-- Local top 10: score, seed, level reached, date. From the list a seed can be copied or started directly.
+- Local top 10: score, seed, level reached (`3/5`, `BOSS` or `WIN`), date. A run is entered when it ends, by game over or victory, if it scored anything; a run abandoned for a new one is not. Equal scores keep the older entry above. From the list a seed can be copied or started directly (←→ chooses play or copy).
 
 ## 10. Screens, menus and controls
 
@@ -261,7 +273,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 - **Closing the window** during play hides it and opens the in-game menu, so nothing runs in the background. Opening it again from the bar shows that menu.
 - **Between levels**: the level summary (section 3).
 - **Game over** and **victory**: section 3 and section 5. Both offer Copy seed.
-- **Enter seed**: type a seed in the `xxxx-xxxx` format (the dash optional); invalid input is rejected with a message.
+- **Enter seed**: type a seed in the `xxxx-xxxx` format (the dash is added after four digits; only hex digits are accepted); an incomplete seed is rejected with a message. Ctrl+V (and Super+V, Omarchy's universal paste) pastes a seed from the clipboard; when the clipboard holds one, the screen offers it.
 - **Settings**: Effects (full / reduced).
 - Controls: arrows move; Space or Arrow Up jumps; P freezes; Esc opens the in-game menu. Menus are fully keyboard-driven (arrows, Enter or Space), like Omatris.
 - The run in progress (for Continue) is kept while the plugin is loaded; it is not written to disk.
@@ -300,7 +312,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 
 ## 14. Storage
 
-- High scores and settings are stored locally in the plugin's state, like Omatris's high scores.
+- High scores and settings are stored locally in `~/.config/glyphrun.ini` through Qt's `Settings`, as Omatris stores its own.
 - Nothing is sent anywhere.
 
 ## 15. Tests

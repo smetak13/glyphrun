@@ -19,6 +19,8 @@ export const EVENTS = {
   alreadyRoot: "already root",
   checkpoint: "snapshot saved",
   seedCopied: "seed copied",
+  nothingToPaste: "no seed in the clipboard",
+  seedRejected: "not a seed: 8 hex digits, like 7f3a-91c2",
   bossDefeated: "kernel: rebooting…",
 };
 

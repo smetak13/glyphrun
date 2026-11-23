@@ -10,10 +10,13 @@ Item {
   property var run
   property var world
   property bool paused: false
-  property bool story: false
   property bool menuOpen: false
   property int menuIndex: 0
   property var menuItems: []
+  property var overItems: []
+  property real summaryTime: 0
+  property bool summaryReady: false
+  property int rank: 0
   property var colors
   property real pixelRatio: 1
   readonly property real gameScale: Math.min(width / Screen.SCREEN_WIDTH, height / Screen.SCREEN_HEIGHT)
@@ -24,32 +27,14 @@ Item {
   property bool over: false
   property string hudLeft: ""
   property string hudRight: ""
-  property string finishedTitle: ""
-  property string finishedText: ""
   property string overCause: ""
   readonly property real heroBaselineDrop: 2
   readonly property real bigHeroOffset: 20
   readonly property int popupPoolSize: 8
   readonly property real popupRise: 40
-  readonly property string panicStory: [
-    "$ deploy --prod",
-    "Deploying to production... done.",
-    "[  OK  ] Shipped. On a Friday.",
-    "",
-    "$ uptime",
-    " 16:59:58 up 0 min, 1 user",
-    "",
-    "[    0.000000] Kernel panic - not syncing: Fatal exception",
-    "[    0.000001] ---[ end Kernel panic ]---",
-  ].join("\n")
 
   function stageName() {
     return run.levelNumber > Run.LEVEL_COUNT ? "KERNEL PANIC" : "level " + run.levelNumber + "/" + Run.LEVEL_COUNT
-  }
-
-  function nextStep() {
-    if (run.levelNumber < Run.LEVEL_COUNT) return "next level"
-    return run.levelNumber === Run.LEVEL_COUNT ? "continue" : "new run"
   }
 
   function pad(value, length) {
@@ -108,12 +93,9 @@ Item {
     for (let i = 0; i < enemies.count; i++) enemies.itemAt(i).sync(world.enemies[i], world.time)
     boss.sync(world.boss, world.time)
     checkpointLit = world.checkpointReached
-    finished = world.finished
+    finished = world.finished && !run.won
     over = run.over
     overCause = run.over ? run.cause + " · " + stageName() : ""
-    finishedTitle = run.levelNumber > Run.LEVEL_COUNT ? "BUILD PASSED · 0 errors · 0 warnings" : "$ exit 0"
-    const bonus = run.levelNumber > Run.LEVEL_COUNT ? "" : "time bonus +" + run.timeBonus + "   "
-    finishedText = (run.levelNumber >= Run.LEVEL_COUNT ? "score " + pad(run.score, 5) + "   " : "") + bonus + "Space · " + nextStep()
     syncHud()
     syncMessages()
   }
@@ -301,74 +283,29 @@ Item {
       }
     }
 
-    Column {
-      anchors.centerIn: parent
-      visible: view.finished
-      spacing: 12
-
-      Glyph {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: view.finishedTitle
-        size: view.run.levelNumber > Run.LEVEL_COUNT ? 26 : 40
-        color: view.colors.cyan
-      }
-
-      Glyph {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: view.finishedText
-        size: 14
-        color: view.colors.text
-      }
-    }
-
-    Column {
-      anchors.centerIn: parent
-      visible: view.over
-      spacing: 12
-
-      Glyph {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: "Segmentation fault (core dumped)"
-        size: 24
-        color: view.colors.hostile
-      }
-
-      Glyph {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: view.overCause
-        size: 14
-        color: view.colors.muted
-      }
-
-      Glyph {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: "Space · retry this seed"
-        size: 14
-        color: view.colors.muted
-      }
-    }
-
-    Rectangle {
+    Loader {
       anchors.fill: parent
-      visible: view.story
-      color: view.colors.background
+      active: view.finished
 
-      Glyph {
-        x: 80
-        y: 120
-        text: view.panicStory
-        lineHeightMode: Text.FixedHeight
-        lineHeight: 24
-        size: 16
-        color: view.colors.text
+      sourceComponent: LevelSummary {
+        run: view.run
+        time: view.summaryTime
+        ready: view.summaryReady
+        colors: view.colors
       }
+    }
 
-      Glyph {
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: 440
-        text: "Space · face it"
-        size: 14
-        color: view.colors.muted
+    Loader {
+      anchors.fill: parent
+      active: view.over
+
+      sourceComponent: GameOver {
+        run: view.run
+        cause: view.overCause
+        rank: view.rank
+        items: view.overItems
+        index: view.menuIndex
+        colors: view.colors
       }
     }
 
