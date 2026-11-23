@@ -2,10 +2,10 @@ import QtQuick
 import Quickshell
 import "ui"
 import "logic/clock.mjs" as Clock
-import "logic/generator.mjs" as Generator
 import "logic/messages.mjs" as Messages
 import "logic/run.mjs" as Run
 import "logic/seed.mjs" as Seed
+import "logic/validator.mjs" as Validator
 
 Item {
   id: root
@@ -64,11 +64,11 @@ Item {
   }
 
   function startingRun(seed) {
-    return Run.createRun(seed, Generator.generateLevel(seed, 1, 0))
+    return Run.createRun(seed, Validator.playableLevel(seed, 1))
   }
 
   function advanceLevel() {
-    Run.nextLevel(run, Generator.generateLevel(run.seed, run.levelNumber + 1, 0))
+    Run.nextLevel(run, Validator.playableLevel(run.seed, run.levelNumber + 1))
     showWorld()
   }
 

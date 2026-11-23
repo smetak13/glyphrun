@@ -32,7 +32,7 @@ function cameraTarget(world) {
   return Math.min(Math.max(world.hero.x - CAMERA_LEAD, 0), maxCameraX);
 }
 
-function keepInsideLevel(hero, level) {
+export function keepInsideLevel(hero, level) {
   const half = HERO_WIDTH / 2;
   const right = level.cols * TILE - half;
   if (hero.x < half || hero.x > right) {
@@ -46,14 +46,16 @@ export function respawnHero(world) {
   placeHero(world, world.checkpointReached ? world.level.checkpoint : world.level.start);
 }
 
+export function touchesBit(hero, bit) {
+  const touchesX = Math.abs((bit.col + 0.5) * TILE - hero.x) < HERO_WIDTH / 2 + BIT_REACH;
+  const centerY = (bit.row + 0.5) * TILE;
+  return touchesX && centerY > hero.y - heroHeight(hero) - BIT_REACH && centerY < hero.y + BIT_REACH;
+}
+
 function collectBits(world, events) {
-  const hero = world.hero;
   for (const bit of world.bits) {
     if (bit.collected) continue;
-    const touchesX = Math.abs((bit.col + 0.5) * TILE - hero.x) < HERO_WIDTH / 2 + BIT_REACH;
-    const centerY = (bit.row + 0.5) * TILE;
-    const touchesY = centerY > hero.y - heroHeight(hero) - BIT_REACH && centerY < hero.y + BIT_REACH;
-    if (touchesX && touchesY) {
+    if (touchesBit(world.hero, bit)) {
       bit.collected = true;
       if (!bit.sudo) world.bitsCollected++;
       events.push({ type: "bit", bit });

@@ -9,11 +9,11 @@ export const DRAFTED_BASIC = 4;
 export const PACE_TILES_PER_SECOND = 4;
 export const HANG_ROW = 4;
 export const DIFFICULTY = [
-  { gapFraction: 0.6, enemiesPerScreen: 1.5, narrowestPlatform: 4, restEvery: 3, seconds: 60 },
-  { gapFraction: 0.65, enemiesPerScreen: 2, narrowestPlatform: 3, restEvery: 3, seconds: 66 },
-  { gapFraction: 0.72, enemiesPerScreen: 2.5, narrowestPlatform: 3, restEvery: 4, seconds: 72 },
-  { gapFraction: 0.8, enemiesPerScreen: 3, narrowestPlatform: 2, restEvery: 4, seconds: 78 },
-  { gapFraction: 0.88, enemiesPerScreen: 3.5, narrowestPlatform: 2, restEvery: 5, seconds: 84 },
+  { gapFraction: 0.6, enemiesPerScreen: 1.5, narrowestPlatform: 4, restEvery: 3, seconds: 60, hazardsPerScreen: [2, 3.5] },
+  { gapFraction: 0.65, enemiesPerScreen: 2, narrowestPlatform: 3, restEvery: 3, seconds: 66, hazardsPerScreen: [2.5, 4] },
+  { gapFraction: 0.72, enemiesPerScreen: 2.5, narrowestPlatform: 3, restEvery: 4, seconds: 72, hazardsPerScreen: [3, 4.5] },
+  { gapFraction: 0.8, enemiesPerScreen: 3, narrowestPlatform: 2, restEvery: 4, seconds: 78, hazardsPerScreen: [3.25, 4.5] },
+  { gapFraction: 0.88, enemiesPerScreen: 3.5, narrowestPlatform: 2, restEvery: 5, seconds: 84, hazardsPerScreen: [3.5, 4.75] },
 ];
 
 const ENVELOPE = computeEnvelope();
@@ -45,7 +45,7 @@ export function introductions(seed) {
   return [drafted.slice(0, 2), drafted.slice(2, afterLevel2), [], drafted.slice(afterLevel2), []];
 }
 
-function kindsUpTo(intros, levelNumber) {
+export function kindsUpTo(intros, levelNumber) {
   let kinds = [];
   for (let i = 0; i < levelNumber; i++) kinds = kinds.concat(intros[i]);
   return kinds;
@@ -240,12 +240,23 @@ export function levelColumns(levelNumber) {
 }
 
 export function generateLevel(seed, levelNumber, attempt) {
-  const random = subStream(seed, "level-" + levelNumber + "-attempt-" + attempt);
+  const kinds = kindsUpTo(introductions(seed), levelNumber);
+  const body = CHUNKS.filter(chunk => chunk.role === "body" && chunkFits(chunk, levelNumber, kinds));
+  return assembleLevel(seed, levelNumber, "attempt-" + attempt, body);
+}
+
+export function generateSafeLevel(seed, levelNumber) {
+  const kinds = kindsUpTo(introductions(seed), levelNumber);
+  const body = CHUNKS.filter(chunk => chunk.role === "body" && chunk.difficulty === 1 && !chunk.gap && chunkFits(chunk, levelNumber, kinds));
+  return assembleLevel(seed, levelNumber, "safe", body);
+}
+
+function assembleLevel(seed, levelNumber, label, body) {
+  const random = subStream(seed, "level-" + levelNumber + "-" + label);
   const intros = introductions(seed);
   const kinds = kindsUpTo(intros, levelNumber);
   const table = DIFFICULTY[levelNumber - 1];
   const targetCols = levelColumns(levelNumber);
-  const body = CHUNKS.filter(chunk => chunk.role === "body" && chunkFits(chunk, levelNumber, kinds));
   const rests = CHUNKS.filter(chunk => chunk.role === "rest");
   const exit = chunkNamed("exit");
   const grid = [];

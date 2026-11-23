@@ -71,13 +71,15 @@ Notes: levels 3–5 are generated too, with basic enemies only. With the current
 
 ## 6. Validator and quality gate
 
-- Status: todo
+- Status: done
 
 SPEC 8.4: reachability search over hero states with the real physics, static hazards, start → checkpoint → exit and sudo reachability, quality rules, deterministic retries and the safe fallback layout per level. Per-chunk safe-passage tests for every hazard chunk. A script that generates many seeds and reports the first-attempt pass rate and failure reasons.
 
 Tests: the validator rejects hand-made impossible levels for each rule; generated levels over a large seed sample all pass (after retries); hazard chunks have a safe passage at every phase.
 
 Done when: the pass-rate report runs, every level offered is completable, and the first-attempt pass rate is recorded in this task's notes.
+
+Notes: `node scripts/pass-rate.mjs 1000` gives a first-attempt pass rate of 98.5 % (level 1: 96.5 %, 2: 97.3 %, 3: 99.5 %, 4: 99.6 %, 5: 99.4 %). Every failure is the difficulty rule (hazards per screen out of range); no generated level failed reachability, introductions, rest zones or hazard placement. All failed levels pass on a retry; no seed needed the fallback. Validating a level takes about 5 ms in Node and 60–100 ms in the QML engine on the development machine.
 
 ## 7. Advanced enemies and levels 3–5
 

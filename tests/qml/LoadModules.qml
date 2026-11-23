@@ -13,6 +13,7 @@ import "../../logic/screen.mjs" as Screen
 import "../../logic/seed.mjs" as Seed
 import "../../logic/testLevel.mjs" as TestLevel
 import "../../logic/theme.mjs" as Theme
+import "../../logic/validator.mjs" as Validator
 import "../../logic/world.mjs" as World
 
 QtObject {
@@ -35,6 +36,7 @@ QtObject {
       Level.checkpointGlyphs(level.checkpoint, world.checkpointReached)
       const envelope = Physics.computeEnvelope()
       const generated = Generator.generateLevel(Seed.parseSeed("7f3a-91c2"), 2, 0)
+      Validator.playableLevel(Seed.parseSeed("7f3a-91c2"), 5)
       Level.levelSections(generated)
       Random.shuffle(Random.subStream(1, "check"), Chunks.CHUNKS)
       console.log("GLYPHRUN_MODULES_OK " + Seed.formatSeed(run.seed) + " " + run.score + " " + Screen.SCREEN_WIDTH + " " + world.hero.y + " " + envelope.maxGap + " " + generated.cols)

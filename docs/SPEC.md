@@ -201,15 +201,15 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 - Heights have a fixed limit instead: no step up the ground and no platform is more than one tile below the maximum jump height above what the hero stands on (3 tiles with the current physics).
 - Initial difficulty table, to be tuned by playing:
 
-| Level | Max gap (of envelope) | Enemies per screen | Narrowest platform | Rest zones | Target time |
-|---|---|---|---|---|---|
-| 1 | 60 % | 1.5 | 4 tiles | every 3 chunks | 60 s |
-| 2 | 65 % | 2 | 3 tiles | every 3 chunks | 66 s |
-| 3 | 72 % | 2.5 | 3 tiles | every 4 chunks | 72 s |
-| 4 | 80 % | 3 | 2 tiles | every 4 chunks | 78 s |
-| 5 | 88 % | 3.5 | 2 tiles | every 5 chunks | 84 s |
+| Level | Max gap (of envelope) | Enemies per screen | Narrowest platform | Rest zones | Target time | Hazards per screen |
+|---|---|---|---|---|---|---|
+| 1 | 60 % | 1.5 | 4 tiles | every 3 chunks | 60 s | 2–3.5 |
+| 2 | 65 % | 2 | 3 tiles | every 3 chunks | 66 s | 2.5–4 |
+| 3 | 72 % | 2.5 | 3 tiles | every 4 chunks | 72 s | 3–4.5 |
+| 4 | 80 % | 3 | 2 tiles | every 4 chunks | 78 s | 3.25–4.5 |
+| 5 | 88 % | 3.5 | 2 tiles | every 5 chunks | 84 s | 3.5–4.75 |
 
-The narrowest platform also limits ground islands between two pits.
+The narrowest platform also limits ground islands between two pits. Hazards per screen is the validator's difficulty score (section 8.4).
 
 Level 1 should feel like the first level of a classic platformer: readable and teaching, but not a walk. Level 5 must be challenging but always completable.
 
@@ -217,12 +217,13 @@ Level 1 should feel like the first level of a classic platformer: readable and t
 
 Before a level is offered, the validator checks it:
 
-- **Reachability**: a search over hero states (position, velocity, facing) using the real physics module finds a path from start to checkpoint to exit, and to the sudo bit.
+- **Reachability**: a search over hero states (position, velocity, facing) using the real physics module finds a path from start to checkpoint and from checkpoint to exit for the small hero (it respawns small), from start to exit for the big hero (it may carry sudo in from the last level, and it bumps its head where the small one does not), and to the sudo bit. The search steps the physics exactly, from the hero's standing state, through a fixed set of moves: walking, waiting, and jumps of three heights, steering forward, back or braking in the air. Similar states are merged, but each keeps the real state it was reached in, so every path found is one a player can play; the search may only miss paths, never invent them.
 - **Static hazards** (spikes, pits) are part of that search.
-- **Dynamic hazards** (enemies, cron, pipes, pointers, leaks) are safe by construction: each chunk that holds one is verified by its own tests to have a safe passage at every phase of the hazard. The runtime validator checks only that such chunks are placed under the conditions they were verified for.
-- **Quality rules**: the difficulty score is within the level's range, rest zones are present, the first appearance of each enemy is in a safe introduction chunk, no blind jumps (every landing is visible before the jump).
+- **Dynamic hazards** (enemies, cron, pipes, pointers, leaks) are safe by construction: each chunk that holds one is verified by its own tests to have a safe passage at every phase of the hazard, with every enemy it can hold. The tests run the same search with the enemies moving, from a standing start in front of the chunk, at phases a quarter second apart. The runtime validator checks only that such chunks are placed under the conditions they were verified for: every enemy stands in a chunk that may hold its kind, and every pit is within the level's limit.
+- **Quality rules**: the difficulty score, hazards per screen (enemies and pits per 40 columns), is within the level's range (table in 8.3), rest zones are present, the first appearance of each enemy is in a safe introduction chunk and no enemy appears before its level.
+- **No blind jumps**: every landing is visible before the jump. This holds by the geometry rather than by a check: a level is one screen tall, and the camera shows about 25 tiles ahead of the hero even when lagging at full speed, while the longest jump is under 7 tiles.
 
-If a level fails, the generator tries again with the next attempt's sub-stream. Attempts are deterministic, so the same seed always yields the same level. After a fixed number of failed attempts a built-in safe layout for that level is used. Tests track the first-attempt pass rate over many seeds; the goal is to make it so high that the validator is only a safety net.
+If a level fails, the generator tries again with the next attempt's sub-stream. Attempts are deterministic, so the same seed always yields the same level. After 8 failed attempts a safe layout for that level is used: the same assembly from the seed, but with only the easiest body chunks without pits. Its difficulty may fall under the range; everything else passes. Tests track the first-attempt pass rate over many seeds; the goal is to make it so high that the validator is only a safety net. `scripts/pass-rate.mjs` reports it.
 
 ## 9. Scoring and high scores
 
