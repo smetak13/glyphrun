@@ -1,7 +1,8 @@
 import { TILE } from "./screen.mjs";
 import { createWorld, respawnHero, stepWorld } from "./world.mjs";
-import { EVENTS, hitMessage, killMessage } from "./messages.mjs";
-import { ALREADY_ROOT_POINTS, BIT_POINTS, SUDO_POINTS, killPoints, timeBonus } from "./score.mjs";
+import { BOSS_HITS } from "./boss.mjs";
+import { EVENTS, bossHitMessage, hitMessage, killMessage } from "./messages.mjs";
+import { ALREADY_ROOT_POINTS, BIT_POINTS, BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, SUDO_POINTS, killPoints, timeBonus } from "./score.mjs";
 
 export const LIVES = 3;
 export const LEVEL_COUNT = 5;
@@ -119,6 +120,13 @@ function handleEvent(run, event) {
     hitHero(run, event.source);
   } else if (event.type === "kill") {
     killEnemy(run, event.source, event.x, event.y, event.small);
+  } else if (event.type === "bossHit") {
+    addPopup(run, event.x, event.y, BOSS_HIT_POINTS, "", "hostile");
+    showToast(run, bossHitMessage(event.hits, BOSS_HITS), "hostile");
+  } else if (event.type === "bossDefeated") {
+    const boss = run.world.boss;
+    addPopup(run, (boss.left + boss.right) / 2, boss.ground - 4 * TILE, BOSS_DEFEATED_POINTS, "", "hostile");
+    showToast(run, EVENTS.bossDefeated, "cyan");
   }
 }
 

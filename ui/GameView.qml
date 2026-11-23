@@ -10,6 +10,7 @@ Item {
   property var run
   property var world
   property bool paused: false
+  property bool story: false
   property bool menuOpen: false
   property int menuIndex: 0
   property var menuItems: []
@@ -23,12 +24,33 @@ Item {
   property bool over: false
   property string hudLeft: ""
   property string hudRight: ""
+  property string finishedTitle: ""
   property string finishedText: ""
   property string overCause: ""
   readonly property real heroBaselineDrop: 2
   readonly property real bigHeroOffset: 20
   readonly property int popupPoolSize: 8
   readonly property real popupRise: 40
+  readonly property string panicStory: [
+    "$ deploy --prod",
+    "Deploying to production... done.",
+    "[  OK  ] Shipped. On a Friday.",
+    "",
+    "$ uptime",
+    " 16:59:58 up 0 min, 1 user",
+    "",
+    "[    0.000000] Kernel panic - not syncing: Fatal exception",
+    "[    0.000001] ---[ end Kernel panic ]---",
+  ].join("\n")
+
+  function stageName() {
+    return run.levelNumber > Run.LEVEL_COUNT ? "KERNEL PANIC" : "level " + run.levelNumber + "/" + Run.LEVEL_COUNT
+  }
+
+  function nextStep() {
+    if (run.levelNumber < Run.LEVEL_COUNT) return "next level"
+    return run.levelNumber === Run.LEVEL_COUNT ? "continue" : "new run"
+  }
 
   function pad(value, length) {
     return String(value).padStart(length, "0")
@@ -71,7 +93,7 @@ Item {
   }
 
   function syncHud() {
-    hudLeft = "LVL " + run.levelNumber + "/" + Run.LEVEL_COUNT
+    hudLeft = run.levelNumber > Run.LEVEL_COUNT ? "BOSS" : "LVL " + run.levelNumber + "/" + Run.LEVEL_COUNT
     hudRight = "bits " + pad(Run.runBits(run), 3) + "   score " + pad(run.score, 5) + "   " + pad(world.time.toFixed(1), 4) + "s   @ x" + run.lives
   }
 
@@ -84,11 +106,14 @@ Item {
       item.y = item.restY + Math.sin(world.time * 3 + item.x) * 3
     }
     for (let i = 0; i < enemies.count; i++) enemies.itemAt(i).sync(world.enemies[i], world.time)
+    boss.sync(world.boss, world.time)
     checkpointLit = world.checkpointReached
     finished = world.finished
     over = run.over
-    overCause = run.over ? run.cause + " · level " + run.levelNumber + "/" + Run.LEVEL_COUNT : ""
-    finishedText = "time bonus +" + run.timeBonus + "   Space · " + (run.levelNumber < Run.LEVEL_COUNT ? "next level" : "new run")
+    overCause = run.over ? run.cause + " · " + stageName() : ""
+    finishedTitle = run.levelNumber > Run.LEVEL_COUNT ? "BUILD PASSED · 0 errors · 0 warnings" : "$ exit 0"
+    const bonus = run.levelNumber > Run.LEVEL_COUNT ? "" : "time bonus +" + run.timeBonus + "   "
+    finishedText = (run.levelNumber >= Run.LEVEL_COUNT ? "score " + pad(run.score, 5) + "   " : "") + bonus + "Space · " + nextStep()
     syncHud()
     syncMessages()
   }
@@ -174,6 +199,11 @@ Item {
           enemy: modelData
           colors: view.colors
         }
+      }
+
+      Boss {
+        id: boss
+        colors: view.colors
       }
 
       Glyph {
@@ -278,8 +308,8 @@ Item {
 
       Glyph {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: "$ exit 0"
-        size: 40
+        text: view.finishedTitle
+        size: view.run.levelNumber > Run.LEVEL_COUNT ? 26 : 40
         color: view.colors.cyan
       }
 
@@ -313,6 +343,30 @@ Item {
       Glyph {
         anchors.horizontalCenter: parent.horizontalCenter
         text: "Space · retry this seed"
+        size: 14
+        color: view.colors.muted
+      }
+    }
+
+    Rectangle {
+      anchors.fill: parent
+      visible: view.story
+      color: view.colors.background
+
+      Glyph {
+        x: 80
+        y: 120
+        text: view.panicStory
+        lineHeightMode: Text.FixedHeight
+        lineHeight: 24
+        size: 16
+        color: view.colors.text
+      }
+
+      Glyph {
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: 440
+        text: "Space · face it"
         size: 14
         color: view.colors.muted
       }

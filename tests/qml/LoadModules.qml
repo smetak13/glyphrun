@@ -1,4 +1,5 @@
 import QtQuick
+import "../../logic/boss.mjs" as Boss
 import "../../logic/chunks.mjs" as Chunks
 import "../../logic/clock.mjs" as Clock
 import "../../logic/enemies.mjs" as Enemies
@@ -36,8 +37,11 @@ QtObject {
       Level.checkpointGlyphs(level.checkpoint, world.checkpointReached)
       const envelope = Physics.computeEnvelope()
       const generated = Generator.generateLevel(Seed.parseSeed("7f3a-91c2"), 2, 0)
-      Validator.playableLevel(Seed.parseSeed("7f3a-91c2"), 5)
       Level.levelSections(generated)
+      Validator.playableLevel(Seed.parseSeed("7f3a-91c2"), 5)
+      const arena = World.createWorld(Boss.arenaLevel(0x7f3a91c2))
+      for (let i = 0; i < 600; i++) World.stepWorld(arena, input, 1 / 60)
+      Boss.phaseOrder(arena.level.seed, 10)
       Random.shuffle(Random.subStream(1, "check"), Chunks.CHUNKS)
       console.log("GLYPHRUN_MODULES_OK " + Seed.formatSeed(run.seed) + " " + run.score + " " + Screen.SCREEN_WIDTH + " " + world.hero.y + " " + envelope.maxGap + " " + generated.cols)
       Qt.exit(0)

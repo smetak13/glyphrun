@@ -10,16 +10,19 @@ const SOURCES = {
   fork: { hit: "fork: resource unavailable", kill: "forked", smallKill: "wait()" },
   leak: { hit: "out of memory", kill: "free()" },
   pit: { hit: "/dev/null: write successful", kill: null },
+  trace: { hit: "Call Trace: you+0x0/0x1", kill: null },
 };
+const NOT_ENEMIES = ["pit", "trace"];
 
 export const EVENTS = {
   sudo: "sudo: privileges granted",
   alreadyRoot: "already root",
   checkpoint: "snapshot saved",
   seedCopied: "seed copied",
+  bossDefeated: "kernel: rebooting…",
 };
 
-export const ENEMY_SOURCES = Object.keys(SOURCES).filter(source => source !== "pit");
+export const ENEMY_SOURCES = Object.keys(SOURCES).filter(source => NOT_ENEMIES.indexOf(source) < 0);
 export const KILLABLE_SOURCES = Object.keys(SOURCES).filter(source => SOURCES[source].kill !== null);
 
 export function hitMessage(source) {
@@ -28,4 +31,8 @@ export function hitMessage(source) {
 
 export function killMessage(source, small) {
   return small ? SOURCES[source].smallKill : SOURCES[source].kill;
+}
+
+export function bossHitMessage(hits, of) {
+  return "core dumped (" + hits + "/" + of + ")";
 }

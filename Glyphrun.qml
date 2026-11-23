@@ -5,6 +5,7 @@ import "logic/clock.mjs" as Clock
 import "logic/messages.mjs" as Messages
 import "logic/run.mjs" as Run
 import "logic/seed.mjs" as Seed
+import "logic/boss.mjs" as Boss
 import "logic/validator.mjs" as Validator
 
 Item {
@@ -23,6 +24,7 @@ Item {
   property bool jumpHeld: false
   property bool jumpPressed: false
   property bool paused: false
+  property bool story: false
   property bool menuOpen: false
   property int menuIndex: 0
   readonly property var menuItems: ["Resume", "Copy seed", "Main menu"]
@@ -79,14 +81,22 @@ Item {
   }
 
   function startRun(seed) {
+    story = false
     run = startingRun(seed)
+    showWorld()
+  }
+
+  function startBoss() {
+    story = false
+    Run.nextLevel(run, Boss.arenaLevel(run.seed))
     showWorld()
   }
 
   function finishWaiting() {
     if (run.over) startRun(run.seed)
-    else if (run.levelNumber === Run.LEVEL_COUNT) startRun(newSeed())
-    else advanceLevel()
+    else if (run.levelNumber < Run.LEVEL_COUNT) advanceLevel()
+    else if (run.levelNumber === Run.LEVEL_COUNT) story = true
+    else startRun(newSeed())
   }
 
   function openMenu() {
@@ -128,12 +138,22 @@ Item {
       Run.killEnemy(run, kill.source, world.hero.x, world.hero.y - 60, kill.small)
     } else if (key === Qt.Key_L) {
       if (run.levelNumber < Run.LEVEL_COUNT) advanceLevel()
+    } else if (key === Qt.Key_B) {
+      if (!world.boss) {
+        run.levelNumber = Run.LEVEL_COUNT
+        startBoss()
+      }
     } else return false
     return true
   }
 
   function frame(frameTime) {
     if (paused || menuOpen) return
+    if (story) {
+      if (jumpPressed) startBoss()
+      jumpPressed = false
+      return
+    }
     const waiting = run.over || world.finished
     const steps = Clock.stepsFor(clock, frameTime)
     for (let i = 0; i < steps; i++) {
@@ -194,6 +214,7 @@ Item {
         run: root.run
         world: root.world
         paused: root.paused
+        story: root.story
         menuOpen: root.menuOpen
         menuIndex: root.menuIndex
         menuItems: root.menuItems

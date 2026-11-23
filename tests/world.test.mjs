@@ -5,6 +5,7 @@ import { createClock, stepsFor, STEP_SECONDS } from "../logic/clock.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { TEST_LEVEL } from "../logic/testLevel.mjs";
 import { SCREEN_WIDTH, TILE } from "../logic/screen.mjs";
+import { arenaLevel } from "../logic/boss.mjs";
 
 const IDLE = { direction: 0, jumpHeld: false, jumpPressed: false };
 const RIGHT = { direction: 1, jumpHeld: false, jumpPressed: false };
@@ -184,4 +185,22 @@ test("a bit out of reach stays", () => {
   stepUntil(world, RIGHT, w => w.hero.x > 6 * TILE);
 
   assert.equal(world.bitsCollected, 0);
+});
+
+test("the boss arena starts its fight with the world", () => {
+  const world = createWorld(arenaLevel(1));
+
+  assert.deepEqual([world.boss.state, world.cameraX], ["intro", 0]);
+});
+
+test("respawning in the arena puts the hero back at its start against a fresh boss", () => {
+  const world = createWorld(arenaLevel(1));
+  const start = world.hero.x;
+  stepUntil(world, RIGHT, w => w.boss.state === "attack");
+  const fought = world.boss;
+
+  respawnHero(world);
+
+  assert.notEqual(world.boss, fought);
+  assert.deepEqual([world.boss.state, world.boss.hits, world.hero.x], ["intro", 0, start]);
 });

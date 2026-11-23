@@ -95,11 +95,11 @@ Notes: after the first round of play, cron lost its warning and its column grew 
 
 ## 8. KERNEL PANIC
 
-- Status: todo
+- Status: done
 
-The boss arena at the end of level 5 (SPEC 7): camera lock, the face, the three attack patterns with warnings, core dump windows, three hits, speed-up after each hit, seeded pattern order with the no-three-in-a-row rule, hit and defeat messages.
+The boss stage after level 5 (SPEC 7): the arena, the transition from level 5's soft win, the face, the three attack patterns with warnings combined two per phase, core dump windows, three hits, speed-up after each hit, seeded phase order with the no-twice-in-a-row rule, hit and defeat messages.
 
-Tests: pattern order is deterministic per seed and never repeats a pattern three times in a row; core window timing; hit counting and speed-up.
+Tests: phase order is deterministic per seed and never repeats a phase twice in a row; every phase runs both its patterns; core window timing; hit counting and speed-up.
 
 Done when: the boss is beatable, fair and fun to the user.
 

@@ -9,6 +9,7 @@ import {
   stepRun,
   DEATH_SECONDS,
   INVULNERABLE_SECONDS,
+  LEVEL_COUNT,
   LIVES,
   POPUP_SECONDS,
   TOAST_SECONDS,
@@ -16,7 +17,8 @@ import {
 import { parseLevel } from "../logic/level.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { TILE } from "../logic/screen.mjs";
-import { PAR_SECONDS, TIME_BONUS_PER_SECOND } from "../logic/score.mjs";
+import { BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, PAR_SECONDS, TIME_BONUS_PER_SECOND } from "../logic/score.mjs";
+import { arenaLevel, coreBox } from "../logic/boss.mjs";
 
 const IDLE = { direction: 0, jumpHeld: false, jumpPressed: false };
 const RIGHT = { direction: 1, jumpHeld: false, jumpPressed: false };
@@ -258,4 +260,46 @@ test("sudo is gone in the next level once it was lost", () => {
   nextLevel(run, FLAT);
 
   assert.equal(run.world.hero.big, false);
+});
+
+function bossRun() {
+  const run = createRun(1, FLAT);
+  run.levelNumber = LEVEL_COUNT;
+  nextLevel(run, arenaLevel(1));
+  run.invulnerable = 1000;
+  return run;
+}
+
+function stompCore(run) {
+  stepUntil(run, IDLE, r => r.world.boss.state === "core");
+  const hero = run.world.hero;
+  const box = coreBox(run.world.boss);
+  hero.x = (box.left + box.right) / 2;
+  hero.y = box.top - 0.5;
+  hero.vy = 300;
+  hero.grounded = false;
+  stepRun(run, IDLE, STEP_SECONDS);
+}
+
+test("stomping the boss's core scores and says how many cores were dumped", () => {
+  const run = bossRun();
+
+  stompCore(run);
+
+  assert.deepEqual([run.score, run.toast.text], [BOSS_HIT_POINTS, "core dumped (1/3)"]);
+});
+
+test("the third hit defeats the boss, says the kernel is rebooting and finishes the stage without a time bonus", () => {
+  const run = bossRun();
+  stompCore(run);
+  stompCore(run);
+  stompCore(run);
+
+  stepUntil(run, IDLE, r => r.toast.text !== "core dumped (3/3)");
+  const toast = run.toast.text;
+  stepUntil(run, IDLE, r => r.world.finished);
+
+  assert.equal(toast, "kernel: rebooting…");
+  assert.equal(run.score, 3 * BOSS_HIT_POINTS + BOSS_DEFEATED_POINTS);
+  assert.equal(run.world.finished, true);
 });

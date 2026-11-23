@@ -1,6 +1,7 @@
 import { TILE, SCREEN_WIDTH, SCREEN_HEIGHT } from "./screen.mjs";
 import { createHero, stepHero, heroHeight, HERO_WIDTH } from "./physics.mjs";
 import { createEnemies, resetEnemy, stepEnemies, touchEnemies } from "./enemies.mjs";
+import { createBoss, stepBoss } from "./boss.mjs";
 
 export const CAMERA_LEAD = 320;
 export const CAMERA_FOLLOW_RATE = 6;
@@ -13,6 +14,7 @@ export function createWorld(level) {
     hero: null,
     bits: level.bits.map(bit => ({ col: bit.col, row: bit.row, text: bit.text, sudo: bit.sudo, collected: false })),
     enemies: createEnemies(level.enemies),
+    boss: level.arena ? createBoss(level.seed, level.arena) : null,
     bitsCollected: 0,
     checkpointReached: false,
     finished: false,
@@ -43,7 +45,15 @@ export function keepInsideLevel(hero, level) {
 
 export function respawnHero(world) {
   for (const enemy of world.enemies) resetEnemy(enemy);
+  if (world.boss) world.boss = createBoss(world.level.seed, world.level.arena);
   placeHero(world, world.checkpointReached ? world.level.checkpoint : world.level.start);
+}
+
+function stepArena(world, previousBottom, seconds, events) {
+  for (const event of stepBoss(world.boss, world.level, world.hero, previousBottom, seconds)) {
+    if (event.type === "rebooted") world.finished = true;
+    events.push(event);
+  }
 }
 
 export function touchesBit(hero, bit) {
@@ -77,6 +87,7 @@ export function stepWorld(world, input, seconds) {
   keepInsideLevel(hero, world.level);
   stepEnemies(world.enemies, world.level, hero, seconds, world.cameraX);
   for (const event of touchEnemies(world.enemies, hero, previousBottom)) events.push(event);
+  if (world.boss) stepArena(world, previousBottom, seconds, events);
   collectBits(world, events);
   if (!world.checkpointReached && reached(world, world.level.checkpoint)) {
     world.checkpointReached = true;

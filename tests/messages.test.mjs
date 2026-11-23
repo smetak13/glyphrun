@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ENEMY_SOURCES, KILLABLE_SOURCES, hitMessage, killMessage } from "../logic/messages.mjs";
+import { ENEMY_SOURCES, KILLABLE_SOURCES, bossHitMessage, hitMessage, killMessage } from "../logic/messages.mjs";
 
 test("every enemy and trap has its own hit message", () => {
   const messages = ENEMY_SOURCES.map(hitMessage);
@@ -25,4 +25,12 @@ test("kill messages match the source", () => {
 
 test("a big fork bomb is forked and a small one waited for", () => {
   assert.deepEqual([killMessage("fork", false), killMessage("fork", true)], ["forked", "wait()"]);
+});
+
+test("the boss's stack trace has its own hit message", () => {
+  assert.equal(hitMessage("trace"), "Call Trace: you+0x0/0x1");
+});
+
+test("a boss hit says how many cores were dumped", () => {
+  assert.deepEqual([1, 2, 3].map(hits => bossHitMessage(hits, 3)), ["core dumped (1/3)", "core dumped (2/3)", "core dumped (3/3)"]);
 });

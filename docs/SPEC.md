@@ -1,6 +1,6 @@
 # Glyphrun — Specification (MVP)
 
-Glyphrun is a retro side-scrolling platformer made of ASCII, living in your Omarchy theme. It runs as an Omarchy shell (Quickshell) plugin in its own window, like Omatris. Every run is procedurally generated from a seed: five levels, ten kinds of enemies and traps, one final boss.
+Glyphrun is a retro side-scrolling platformer made of ASCII, living in your Omarchy theme. It runs as an Omarchy shell (Quickshell) plugin in its own window, like Omatris. Every run is procedurally generated from a seed: five levels, ten kinds of enemies and traps, and a final boss as a bonus stage.
 
 The hero is `@`, a programmer trying to ship perfect software. Bugs, zombie processes and worse stand in the way. The game is in English.
 
@@ -23,9 +23,10 @@ Plugin id: `smetak13.glyphrun`.
 
 ## 2. Domain
 
-- **Run**: one attempt at five levels in a row, started from a seed. Holds lives, score, the sudo state and the drafted enemy set.
+- **Run**: one attempt at five levels in a row and the boss stage after them, started from a seed. Holds lives, score, the sudo state and the drafted enemy set.
 - **Seed**: 8 hex digits shown as `7f3a-91c2`. The seed alone determines every level layout, every enemy placement, the drafted enemy set and the boss's attack order. Two players on the same seed get the same game.
-- **Level**: a horizontally scrolling stage about 60–90 seconds long for a decent player, one screen tall. Levels 1–5; level 5 ends in the boss arena.
+- **Level**: a horizontally scrolling stage about 60–90 seconds long for a decent player, one screen tall. Levels 1–5, each ending at an exit.
+- **Boss stage**: the one-screen arena of KERNEL PANIC after level 5 (section 7). Finishing level 5 already wins the run softly; beating the boss is the true win.
 - **Tile**: the 24 px grid cell. The logical screen is 40 × 22 tiles (960 × 540 px).
 - **Chunk**: a hand-designed piece of level, a few to a dozen tiles wide, with tags (difficulty, which enemies it may hold, whether it is a safe introduction or a rest zone) and connection rules.
 - **Bit**: a collectible `0` or `1`.
@@ -60,6 +61,19 @@ The story is told only on transition screens, never during play:
 - **Title card** before each level: the level's title and subtitle.
 - **Level summary**: presented as a commit, with a random message from a list (`fix bugs (hopefully)`, `remove console.log`, `it works, don't touch it`, …), followed by the score breakdown.
 - **Game over**: `Segmentation fault (core dumped)`, the cause of the last death with the level reached, and a random tip at the bottom (`Tip: have you tried turning it off and on again?`, `Tip: it's not a bug, it's a feature.`, …).
+- **Shipped**: finishing level 5 is a soft win. Its summary shows the run's score like any other level, then a transition screen:
+  ```
+  $ deploy --prod
+  Deploying to production... done.
+  [  OK  ] Shipped. On a Friday.
+
+  $ uptime
+   16:59:58 up 0 min, 1 user
+
+  [    0.000000] Kernel panic - not syncing: Fatal exception
+  [    0.000001] ---[ end Kernel panic ]---
+  ```
+  `Space · face it` starts the boss stage.
 - **Victory** after the boss, a Pyrrhic one:
   1. The screen goes black and a boot log scrolls in theme colours. The numbers are the run's real statistics:
      ```
@@ -133,7 +147,7 @@ The memory leak's source sits at the far end of its frame, on a one-tile target,
 ### 6.3 Draft and introduction
 
 - Each run drafts **4 of the 5 basic** and **3 of the 5 advanced**, from the seed. Some surprises are left for later runs.
-- Level 1: 2 basic. Level 2: plus 1–2 basic. Level 3: plus 1–2 advanced. Level 4: the rest of the draft. Level 5: a mix of everything drafted, then the boss.
+- Level 1: 2 basic. Level 2: plus 1–2 basic. Level 3: plus 1–2 advanced. Level 4: the rest of the draft. Level 5: a mix of everything drafted.
 - The first time an enemy appears in a run, it appears in a chunk tagged as a safe introduction: visible from afar, with room to watch it, where a mistake does not kill (no pit beside it). One introduction chunk serves every enemy except the memory leak, which has its own so that it is introduced at full size.
 
 ### 6.4 Messages
@@ -153,6 +167,8 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 | fork bomb | `fork: resource unavailable` | `forked` (big), `wait()` (small) |
 | memory leak | `out of memory` | `free()` |
 | pit | `/dev/null: write successful` | — |
+| boss: falling spike | `kernel: stack overflow` | — |
+| boss: stack trace | `Call Trace: you+0x0/0x1` | — |
 
 | Event | Message |
 |---|---|
@@ -164,15 +180,19 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 
 ## 7. Final boss: KERNEL PANIC
 
-- Level 5 ends in a hand-designed arena one screen wide. The camera locks when the hero enters it; there is no way back.
-- A giant face of ASCII art and the text `KERNEL PANIC` fills the top of the arena. It cannot be touched; its attacks can.
+- A bonus stage after level 5, in the spirit of a secret final act: the run is already won softly (section 3), and beating the boss is the true win. It is meant to be hard: an experienced player should need several tries and learn the seed's phase order, but it is always winnable.
+- The arena is one screen of flat ground; the hero starts at its left. The HUD shows `BOSS` instead of the level.
+- A giant face of ASCII art and the text `KERNEL PANIC` fills the top of the arena, with the hits so far as `[ ■□□ ]`. It cannot be touched; its attacks can. The face changes while it dumps core and after it is beaten.
 - Three attack patterns:
-  1. **Falling spikes**: `^` drop from the top; a shadow on the ground marks where each one lands.
-  2. **Stack trace**: horizontal lines of stack trace text sweep across at jump heights; each line appears faint first as a warning.
-  3. **Spawn**: bugs drop into the arena while one of the other two patterns runs at a lower rate.
-- After each attack the boss "dumps core": a `[core]` block appears on the floor for a few seconds at one of a few fixed positions. Stomping it is a hit. If the window is missed, the next attack starts.
-- Three hits win. After each hit the boss's attacks speed up.
-- The order of attack patterns is random but drawn from the seed, so the same seed always fights the same way and can be learned. Fairness rules: the same pattern never comes three times in a row, and every pattern has a warning.
+  1. **Falling spikes**: `^` appear faint under the face with a shadow `▁▁` on the ground where they will land, drop after 0.85 s, and keep coming every 0.55 s. Every other one aims at the hero's column. They hit only while falling.
+  2. **Stack trace**: bars of stack trace text (`panic+0x5c`, …) four tiles long sweep across the arena, one every 1.1 s, in the lowest tile row above the ground (jump it) or the second (the small hero stays under it, the big one must jump). Each bar shows faint and harmless for 0.8 s at the arena edge before it moves. Within one phase all bars come from the same side, so two never reach the hero at once.
+  3. **Spawn**: bugs drop into the arena every 1.5 s at random places, marked by a shadow like the spikes. A dropping bug hurts; once landed it walks and can be stomped as usual. Bugs left over vanish when the core window ends.
+- The fight is a sequence of phases, and **every phase combines two patterns** at full rate: spikes + stack trace, spikes + spawn or stack trace + spawn. The fight starts 2 s after the stage begins. A phase emits its hazards for 6 s and ends when the last one is gone.
+- After each phase the boss "dumps core": a `[core]` block appears on the floor for 3.5 s at one of three fixed positions (the arena's left, middle and right), blinking in its last second. Stomping it is a hit and bounces the hero; touching it from the side does nothing. If the window is missed, the next phase starts after a 1 s pause, as it does after a hit.
+- Three hits win. Each hit speeds the attacks up (×1.2, then ×1.4): their rhythm, warnings, falls and sweeps. The core window does not shrink. After the third hit the face dies, then `kernel: rebooting…`, and the victory follows.
+- The order of phases is random but drawn from the seed, so the same seed always fights the same way and can be learned. Fairness rules: the same phase never comes twice in a row, and every pattern has a warning. A phase's place in the order does not depend on hits or misses: the n-th phase of a seed is always the same combination, and hits only set its speed, so a player can learn the order at base speed.
+- Lives and sudo carry into the boss stage. Losing a life respawns the hero at the arena's start and the fight starts over: no hits, the same phase order from the beginning. Losing the last life ends the run with the game over screen, as anywhere else.
+- All timings are tuning values.
 - Later boss variants are in `ROADMAP.md`; when they exist, the seed chooses one.
 
 ## 8. Level generation
@@ -184,7 +204,7 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 
 ### 8.2 Assembly
 
-- A level is assembled from chunks: a start chunk, a sequence of body chunks, the checkpoint chunk in the middle, more body chunks and the exit chunk. Level 5 ends in the boss arena instead of an exit.
+- A level is assembled from chunks: a start chunk, a sequence of body chunks, the checkpoint chunk in the middle, more body chunks and the exit chunk.
 - Chunks are text tile maps in the source (`logic/chunks.mjs`), one character per tile, bottom-aligned on the level's three ground rows: `#` ground, `B` block, `=` platform. Some cells are parameters the generator fills in:
   - `G`: a gap in the ground. Each run of gap columns becomes a pit as wide as the generator draws from the chunk's range, cut to the level's envelope fraction; a bit is placed over its middle.
   - `P`: a platform the generator may lift by up to the chunk's `lift` rows, together with everything above it, as long as it stays within the rise limit.
