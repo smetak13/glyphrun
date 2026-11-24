@@ -317,6 +317,16 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 - **Effects: full / reduced.** Reduced turns off glow, glitch and CRT; particles, shake, flash and the hexdump stay. The game switches to reduced by itself when the frame rate stays under 50 fps, and says so once (`under 50 fps · effects set to reduced`): the frame rate is measured only during play, in windows of 2 s, ignoring single frames over 0.25 s (such as loading a level), and two slow windows in a row switch. It switches at most once while the plugin is loaded; the player can turn full effects back on in Settings.
 - HUD: level `LVL 1/5`, seed, bits, score, time, lives. The lives flash and grow for a moment when a 1-up is earned.
 
+### Rich ASCII (planned)
+
+A visual redesign before the release, so the game looks less old school while staying made of text. The details of each part are settled in its own grilling session (`docs/IMPLEMENTATION.md`, tasks 14–16) and written here when it is done. Agreed so far:
+
+- The game stays drawn in glyphs of the game's font, coloured from the theme's 16-colour palette, so it still follows every Omarchy theme. No sprites or images.
+- Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change.
+- **Hero and enemies**: a more interesting hero built from glyphs instead of a single `@`, and lively, animated enemies.
+- **Level themes**: each level's terrain looks like its meaning (for `deploy --prod`, server racks and the like), with many design variants of ground, blocks and platforms (about 30 in total) that only change how a tile is drawn.
+- **Backgrounds**: each level's own background, matching its theme, instead of the shared hexdump.
+
 ### Sound
 
 - The music and effects are generated, not hand-made: `node scripts/generate-audio.mjs` (synth and composer in `scripts/audio/`, no npm dependencies, needs `ffmpeg`) writes `assets/audio/music/*.ogg` and `assets/audio/sfx/*.wav`. The output is deterministic.

@@ -12,7 +12,12 @@ Music and sound effects moved into the MVP (`docs/IMPLEMENTATION.md`, task 10). 
 ## Modes
 
 - **Practice**: one level with a chosen difficulty and seed.
-- **Daily seed**: everyone plays the same seed each day; a natural home for speedrun times.
+- **Daily seed**: everyone plays the same seed each day; a natural home for speedrun times. In two steps:
+  1. **Offline**: the seed comes from the UTC date through the seeded generator, so everyone on the same game version gets the same levels without a server. A Daily item in the main menu, a local score and time board per day, and a share line to copy (`glyphrun daily 2026-11-24 · 12,340 · 4:41.32 · 2 lives lost`). Nothing is sent anywhere. To decide: whether only the first attempt counts, and whether the boss counts.
+  2. **Online board** for the daily seed only: one board per day and game version; the client submits at the end of a daily run and shows today's top entries and the player's place. Opt-in in Settings with a clear note of what is sent (nickname, seed, score, time, per-level breakdown); minimal stored data, no IPs kept. Anonymous nickname with a locally stored token, a name filter and manual removal of entries. Host to choose (a serverless Worker with a database, or similar).
+     - **Anti-cheat by limits**: the client cannot be trusted with a secret (the game is open source, so hashing or signing the score stops nobody). Instead the server generates the day's levels once and rejects impossible submissions: more bits or kill points than the levels hold, a time faster than running flat-out through their width, a per-level breakdown (bits, kills, sudo, time) that does not add up to the score or fit the levels, more than one entry per nickname per day, and rate limits. Plausible invented scores still pass; obvious fakes are removed by hand.
+     - **Versioning**: a change to physics, chunks or the generator changes what a seed produces, so every submission carries a ruleset version and boards are kept per version.
+     - **Later, only if cheating becomes a problem: replays.** The client records the per-step inputs (only their changes, a few KB per run) and the server replays them through the same `logic/*.mjs` modules. This needs the logic to be bit-identical in Qt's JavaScript engine and V8: `Math.sin` and `Math.cos` (spinlock arm, zombie bob) replaced by our own version, and a test that a run recorded in the game replays exactly in Node. Replays are also useful offline (watch your best run, race a ghost).
 - **Campaign**: hand-designed levels built on the same design principles as the generator (introduce, test, twist, combine).
 
 ## Levels and sharing

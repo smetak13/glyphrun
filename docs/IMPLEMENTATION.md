@@ -198,7 +198,31 @@ Tests: the ramp to running speed and the braking back, a running jump as high as
 
 Done when: running feels good to the user and adds to the game; otherwise the task is reverted.
 
-## 14. Release preparation
+## 14. Rich ASCII: hero and enemies
+
+- Status: todo
+
+Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change; everything stays glyphs coloured from the theme palette.
+
+A more interesting hero built from glyphs instead of a single `@`, and lively, animated enemies (all eleven).
+
+## 15. Rich ASCII: level themes
+
+- Status: todo
+
+Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change; everything stays glyphs coloured from the theme palette.
+
+Each level's terrain looks like its meaning (for `deploy --prod`, server racks and the like), with many design variants of ground, blocks and platforms, about 30 in total, that only change how a tile is drawn.
+
+## 16. Rich ASCII: backgrounds
+
+- Status: todo
+
+Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change; everything stays glyphs coloured from the theme palette.
+
+Each level gets its own background matching its theme, instead of the shared hexdump.
+
+## 17. Release preparation
 
 - Status: todo
 
