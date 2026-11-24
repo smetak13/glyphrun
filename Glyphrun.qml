@@ -16,6 +16,7 @@ import "logic/seed.mjs" as Seed
 import "logic/story.mjs" as Story
 import "logic/boss.mjs" as Boss
 import "logic/validator.mjs" as Validator
+import "logic/heroFigure.mjs" as HeroFigure
 
 Item {
   id: root
@@ -27,6 +28,7 @@ Item {
   property bool devTools: false
   property var run: null
   property var world: null
+  property var heroAnimator: null
   property var clock: Clock.createClock()
   property var frameTimer: Clock.createFrameTimer()
   property var effects: Effects.createEffects()
@@ -120,8 +122,13 @@ Item {
     showScreen("menu")
   }
 
+  function heroDirection() {
+    return (rightHeld ? 1 : 0) - (leftHeld ? 1 : 0)
+  }
+
   function showWorld() {
     world = run.world
+    heroAnimator = HeroFigure.createHeroAnimator(world.hero)
     levelNumber = run.levelNumber
     clock = Clock.createClock()
     summaryTime = 0
@@ -134,6 +141,7 @@ Item {
   function startRun(seed, withIntro) {
     const next = Run.createRun(seed, Validator.playableLevel(seed, 1))
     world = next.world
+    heroAnimator = HeroFigure.createHeroAnimator(world.hero)
     run = next
     rank = 0
     timeRank = 0
@@ -440,12 +448,13 @@ Item {
     const waiting = run.over || world.finished
     const steps = Clock.stepsFor(clock, frameTime)
     for (let i = 0; i < steps; i++) {
-      const input = { direction: (rightHeld ? 1 : 0) - (leftHeld ? 1 : 0), jumpHeld: jumpHeld, jumpPressed: jumpPressed && !waiting, sprint: sprintHeld }
+      const input = { direction: heroDirection(), jumpHeld: jumpHeld, jumpPressed: jumpPressed && !waiting, sprint: sprintHeld }
       Run.stepRun(run, input, Clock.STEP_SECONDS)
       if (!waiting) jumpPressed = false
     }
     if (waiting) jumpPressed = false
     playCues()
+    HeroFigure.stepHeroAnimator(heroAnimator, world.hero, heroDirection(), frameTime)
     Effects.stepEffects(effects, frameTime)
     stageEnded = run.over || world.finished
     if (run.won) {
@@ -532,6 +541,8 @@ Item {
         sourceComponent: GameView {
           run: root.run
           world: root.world
+          heroAnimator: root.heroAnimator
+          heroDirection: root.heroDirection()
           paused: root.paused
           menuOpen: root.menuOpen
           menuIndex: root.menuIndex

@@ -6,12 +6,15 @@ import "../logic/seed.mjs" as Seed
 import "../logic/backdrop.mjs" as BackdropLogic
 import "../logic/effects.mjs" as Effects
 import "../logic/physics.mjs" as Physics
+import "../logic/heroFigure.mjs" as HeroFigureLogic
 
 Item {
   id: view
 
   property var run
   property var world
+  property var heroAnimator
+  property int heroDirection: 0
   property bool paused: false
   property bool menuOpen: false
   property int menuIndex: 0
@@ -39,7 +42,6 @@ Item {
   property bool livesFlashing: false
   property string overCause: ""
   readonly property real heroBaselineDrop: 2
-  readonly property real bigHeroOffset: 20
   readonly property int popupPoolSize: 8
   readonly property real popupRise: 40
   readonly property real trailGap: 22
@@ -55,18 +57,27 @@ Item {
   }
 
   function heroBlinkedOut() {
-    return run.dying > 0 || (run.invulnerable > 0 && Math.floor(run.invulnerable * 16) % 2 === 0)
+    return run.over || (run.invulnerable > 0 && Math.floor(run.invulnerable * 16) % 2 === 0)
+  }
+
+  function heroParts(pose, dying) {
+    const parts = HeroFigureLogic.heroParts(pose, HeroFigureLogic.shownBig(heroAnimator, world.hero), heroAnimator.facing, heroAnimator.time, Math.abs(world.hero.vx))
+    return dying ? HeroFigureLogic.deathParts(parts, Run.DEATH_SECONDS - run.dying) : parts
   }
 
   function syncHero() {
-    hero.x = Math.round(world.hero.x - hero.width / 2)
-    hero.y = Math.round(world.hero.y - hero.baselineOffset + heroBaselineDrop)
+    const dying = run.dying > 0
+    const state = dying ? "dead" : HeroFigureLogic.heroState(heroAnimator, world.hero, world.level, heroDirection)
+    const pose = HeroFigureLogic.heroPose(state, heroAnimator.time)
+    hero.x = Math.round(world.hero.x)
+    hero.y = Math.round(world.hero.y)
+    hero.parts = heroParts(pose, dying)
+    hero.lean = pose.lean * heroAnimator.facing
+    hero.stretchX = pose.scaleX
+    hero.stretchY = pose.scaleY
     hero.visible = !heroBlinkedOut()
-    heroTop.x = hero.x
-    heroTop.y = hero.y - bigHeroOffset
-    heroTop.visible = hero.visible && world.hero.big
     const direction = world.hero.vx > 0 ? 1 : -1
-    trail.visible = hero.visible && world.hero.grounded && Math.abs(world.hero.vx) > trailSpeed
+    trail.visible = hero.visible && !dying && world.hero.grounded && Math.abs(world.hero.vx) > trailSpeed
     trail.text = direction > 0 ? "»" : "«"
     trail.x = Math.round(world.hero.x - direction * trailGap - trail.width / 2)
     trail.y = Math.round(world.hero.y - trail.height + heroBaselineDrop)
@@ -305,18 +316,9 @@ Item {
               color: view.colors.muted
             }
 
-            Glyph {
-              id: heroTop
-              text: "@"
-              size: 28
-              color: view.colors.hero
-            }
-
-            Glyph {
+            HeroFigure {
               id: hero
-              text: "@"
-              size: 28
-              color: view.colors.hero
+              colors: view.colors
             }
 
             Repeater {

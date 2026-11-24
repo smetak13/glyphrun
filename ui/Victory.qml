@@ -3,6 +3,8 @@ import "../logic/run.mjs" as Run
 import "../logic/score.mjs" as Score
 import "../logic/seed.mjs" as Seed
 import "../logic/story.mjs" as Story
+import "../logic/heroFigure.mjs" as HeroFigureLogic
+import "../logic/physics.mjs" as Physics
 
 Rectangle {
   id: screen
@@ -17,6 +19,8 @@ Rectangle {
   readonly property var bootLog: Story.bootLog(run.stats, Run.runBits(run), Run.runSeconds(run))
   readonly property var sparks: Story.fireworks(run.seed)
   readonly property real groundY: 440
+  readonly property bool heroWalking: time >= Story.WALK_START && time < Story.WALK_END
+  readonly property var heroPose: HeroFigureLogic.heroPose(heroWalking ? "victory" : "idle", time)
 
   color: colors.background
 
@@ -81,12 +85,14 @@ Rectangle {
       }
     }
 
-    Glyph {
-      x: screen.scene.heroX
-      y: screen.groundY - height + 4
-      text: "@"
-      size: 28
-      color: screen.colors.hero
+    HeroFigure {
+      x: screen.scene.heroX + 8
+      y: screen.groundY + 2
+      parts: HeroFigureLogic.heroParts(screen.heroPose, screen.run.world.hero.big, 1, screen.time, screen.heroWalking ? Physics.WALK_SPEED : 0)
+      lean: screen.heroPose.lean
+      stretchX: screen.heroPose.scaleX
+      stretchY: screen.heroPose.scaleY
+      colors: screen.colors
     }
 
     Rectangle {

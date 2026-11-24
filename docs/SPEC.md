@@ -319,11 +319,12 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 
 ### Rich ASCII (planned)
 
-A visual redesign before the release, so the game looks less old school while staying made of text. The details of each part are settled in its own grilling session (`docs/IMPLEMENTATION.md`, tasks 14–16) and written here when it is done. Agreed so far:
+A visual redesign before the release, so the game looks less old school while staying made of text. The details of each part are settled in its own grilling session (`docs/IMPLEMENTATION.md`, tasks 14–17) and written here when it is done. Agreed so far:
 
 - The game stays drawn in glyphs of the game's font, coloured from the theme's 16-colour palette, so it still follows every Omarchy theme. No sprites or images.
 - Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change.
-- **Hero and enemies**: a more interesting hero built from glyphs instead of a single `@`, and lively, animated enemies.
+- **Hero**: a chibi stick coder built from glyphs: an `@` head on a short body of heavy strokes, a scarf `~` that grows with speed, and a `#` root badge when big. It is drawn up to about one tile wide and a few pixels taller than its hitbox, feet on the hitbox's bottom. It blinks, takes a coding break with a laptop after 3 s still, walks and runs with held stride poses, jumps, squashes on landing, skids when reversing, ducks under low ceilings, flickers when growing or shrinking and glitches apart when it dies. All of it is cosmetic. `docs/prototype/hero.html` is its visual target.
+- **Enemies**: lively, animated enemies (movement frames, facing, death animations, tells only where a warning already exists). Two colours per character; hazards stay in the red family.
 - **Level themes**: each level's terrain looks like its meaning (for `deploy --prod`, server racks and the like), with many design variants of ground, blocks and platforms (about 30 in total) that only change how a tile is drawn.
 - **Backgrounds**: each level's own background, matching its theme, instead of the shared hexdump.
 

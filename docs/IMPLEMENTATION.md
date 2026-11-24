@@ -198,15 +198,55 @@ Tests: the ramp to running speed and the braking back, a running jump as high as
 
 Done when: running feels good to the user and adds to the game; otherwise the task is reverted.
 
-## 14. Rich ASCII: hero and enemies
+## 14. Rich ASCII: hero
 
-- Status: todo
+- Status: done
 
 Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change; everything stays glyphs coloured from the theme palette.
 
-A more interesting hero built from glyphs instead of a single `@`, and lively, animated enemies (all eleven).
+A more interesting hero built from glyphs instead of a single `@`. It started as "hero and enemies"; the enemies moved to task 15 so that each gets its own session.
 
-## 15. Rich ASCII: level themes
+Shaped in a grilling session:
+
+- An HTML prototype before the game, `docs/prototype/hero.html`, iterated with the user; it stays as the hero's visual target.
+- A drawing may be up to about one tile wide and a few pixels taller than its hitbox, feet on the hitbox's bottom.
+- Only glyphs that JetBrainsMono Nerd Font has (`▬` and `▭` do not exist in it), and no Nerd Font icons on characters.
+- Two colours per character: a main colour and one accent. The hero never uses red.
+- Animation is pose frames plus squash, stretch and lean, computed in a pure logic module from the game state and time and drawn by QML. It is cosmetic and never feeds back into the game.
+- The boss stage and the victory scene show the new hero; the HUD and text screens stay text.
+- **Hero**: the chibi stick coder (C2 in the prototype). An `@` head about 1.5× the old size on a short body of heavy strokes (`┃`, about twice as thick); short arms held forward at the waist, so they never read as a second pair of legs; the far leg slightly dimmer, the far arm faint. Bright yellow body, the foreground colour as its accent: a scarf `~` that grows longer with speed, and a `#` root badge on the chest when big. Big is taller with a bigger head and longer limbs.
+- Hero states: idle with a blink; after 3 s still, a coding break (sits down with a laptop `┛` on the lap and types, the screen flickering); walk and run cycles with the stride poses held longer than the passing frames (walk 0.48 s, run 0.38 s per cycle, not tied to speed), the run with a longer stride and a forward lean; jump, peak and fall poses; a squash on landing; a skid when reversing at speed; a duck under a ceiling right above the small hero (a one-tile tunnel), purely visual; a flicker between small and big when growing or shrinking; the invulnerable blink; a death glitch (freeze, then the glyphs scatter, scramble and fade); and the victory walk with a wave.
+
+Tests: the state chosen from the hero's physics (jump, peak, fall, land, walk, run, skid, coding break, duck), the size flicker, that animating never changes the hero, the held stride poses, the figure's parts (count, feet on the ground, big taller with the badge, mirroring, scarf, laptop), and the death glitch fading out.
+
+Notes: `logic/heroFigure.mjs` turns the hero's state into a pose and the pose into nine glyph parts, each with a target ink height (or width), rotation and stretch; `ui/FigurePart.qml` sizes each glyph by its tight ink box from `FontMetrics`, so Qt draws the figure as the browser prototype does. `ui/HeroFigure.qml` holds the parts and applies lean and squash; the game view, the boss stage and the victory scene use it. The animator lives in `Glyphrun.qml` and is stepped once per frame with the held direction.
+
+## 15. Rich ASCII: enemies
+
+- Status: todo
+
+Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual, as task 14.
+
+Lively, animated enemies (all eleven) and the boss. Settled while shaping task 14:
+
+- An HTML prototype first, `docs/prototype/enemies.html`, iterated with the user, then the game.
+- A drawing may be up to about one tile wide; the parts that hurt (spikes, the spinlock arm, pointer shots, the cron column, the leak puddle, the daemon's head) are drawn exactly to their hitboxes.
+- Two colours per character; hazards stay in the red family. No Nerd Font icons on characters.
+- Lively means movement frames, facing and death animations, and tells only where a warning already exists: the pointer's blink and the boss's falling-spike shadows, faint stack-trace bars and spawn shadows. The cron vent, the pipe daemon and the hang keep having no warning. No cosmetic reactions to the hero.
+- The boss's face, its attacks and the core follow the new look.
+- Animation follows the hero's model: a pure logic module computes the parts from the game state and time, and QML draws them.
+
+Open questions for the grilling session, with the recommendations from the first round:
+
+1. Keep each signature glyph (`ж`, `Z`, `◎`, `▼`, `&`, `%`) as the body and build around it, or new multi-glyph creatures? Recommended: keep the glyph.
+2. Faces on creatures (bug, zombie, ping, hang, fork bomb, the leak's source) and mechanical animation on traps? Recommended: yes.
+3. Accent colour: the foreground for eyes, another red for mechanical details? Recommended: yes.
+4. Death animations: squash and pop by default, with the zombie fading upward, the fork bomb's split shown and the leak's puddle drying away? Recommended: yes.
+5. One design per enemy, two variants only where unsure (bug, zombie)? Recommended: yes.
+6. The boss in the same prototype, as its own section? Recommended: yes.
+7. Prototype form: a gallery with today's look beside each enemy, plus a short strip where the steerable hero walks past a few of them? Recommended: both.
+
+## 16. Rich ASCII: level themes
 
 - Status: todo
 
@@ -214,7 +254,7 @@ Before implementing, settle the design in a grilling session and write its decis
 
 Each level's terrain looks like its meaning (for `deploy --prod`, server racks and the like), with many design variants of ground, blocks and platforms, about 30 in total, that only change how a tile is drawn.
 
-## 16. Rich ASCII: backgrounds
+## 17. Rich ASCII: backgrounds
 
 - Status: todo
 
@@ -222,7 +262,7 @@ Before implementing, settle the design in a grilling session and write its decis
 
 Each level gets its own background matching its theme, instead of the shared hexdump.
 
-## 17. Release preparation
+## 18. Release preparation
 
 - Status: todo
 

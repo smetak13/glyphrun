@@ -7,6 +7,7 @@ import "../../logic/clock.mjs" as Clock
 import "../../logic/effects.mjs" as Effects
 import "../../logic/enemies.mjs" as Enemies
 import "../../logic/frameRate.mjs" as FrameRate
+import "../../logic/heroFigure.mjs" as HeroFigure
 import "../../logic/generator.mjs" as Generator
 import "../../logic/highScores.mjs" as HighScores
 import "../../logic/level.mjs" as Level
