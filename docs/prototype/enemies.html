@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glyphrun enemies prototype</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;font:14px/1.5 "JetBrainsMono Nerd Font","JetBrains Mono",monospace;background:var(--page);color:var(--ink)}
+main{max-width:1500px;margin:0 auto;padding:18px 22px 40px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:15px;margin:26px 0 8px}
+.sub,.hint{color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:12px 0}
+select,button{font:inherit;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+button.on{border-color:var(--acc);color:var(--acc)}
+canvas{display:block;border:1px solid var(--line);border-radius:6px}
+.wrap{overflow-x:auto}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--panel)}
+</style>
+</head>
+<body>
+<main>
+<h1>Glyphrun · enemies prototype</h1>
+<div class="sub">The approved enemies and the KERNEL PANIC boss, in the hacker style: creatures have angled slit eyes in the foreground colour that glare, a glitch tick on their own clock and deaths that scramble into glitch glyphs; traps have mechanical details in a second red. Dashed boxes are the hitboxes; the parts that hurt are drawn exactly to them.</div>
+
+<div class="bar">
+  <label>theme <select id="theme"></select></label>
+  <span class="hint"><kbd>[</kbd> <kbd>]</kbd> switch theme</span>
+  <span>zoom <button data-zoom="1">1×</button><button data-zoom="2">2×</button><button data-zoom="3">3×</button></span>
+  <span>effects <button id="fx">full</button></span>
+  <span>hitbox <button id="hb">shown</button></span>
+</div>
+
+<h2>Playable strip</h2>
+<div class="hint">
+  <kbd>←</kbd><kbd>→</kbd> move · <kbd>Space</kbd>/<kbd>↑</kbd> jump · <kbd>Shift</kbd> run · <kbd>B</kbd> sudo (grow) ·
+  stomp creatures to see their deaths (they come back after 2.5 s) · hits only show a message
+</div>
+<div class="wrap"><canvas id="strip"></canvas></div>
+
+<h2>Gallery</h2>
+<div class="hint">Each row: today's look first, then the new design in its states. Deaths loop.</div>
+<div class="wrap"><canvas id="gallery"></canvas></div>
+
+<h2>KERNEL PANIC</h2>
+<div class="bar">
+  <span>face <button data-face="cycle">cycle</button><button data-face="angry">angry</button><button data-face="dumping">dumping core</button><button data-face="dead">dead</button></span>
+</div>
+<div class="hint">One arena screen. Below the face: a falling spike with its shadow, a spawned bug with its shadow, a stack trace bar, the core and the patch.</div>
+<div class="wrap"><canvas id="boss"></canvas></div>
+</main>
+
+<script>
+const PALETTES = {"catppuccin":{"background":"#1e1e2e","text":"#cdd6f4","hexdump":"#585b70","muted":"#585b70","ground":"#a6e3a1","platform":"#89b4fa","block":"#f5c2e7","hero":"#f9e2af","bit":"#f9e2af","cyan":"#94e2d5","hostile":"#f38ba8","hostileAlt":"#f38ba8","hostileAlt2":"#f5c2e7"},"catppuccin-latte":{"background":"#eff1f5","text":"#4c4f69","hexdump":"#acb0be","muted":"#acb0be","ground":"#40a02b","platform":"#1e66f5","block":"#ea76cb","hero":"#df8e1d","bit":"#df8e1d","cyan":"#179299","hostile":"#d20f39","hostileAlt":"#d20f39","hostileAlt2":"#ea76cb"},"ethereal":{"background":"#060b1e","text":"#ffcead","hexdump":"#6d7db6","muted":"#6d7db6","ground":"#92a593","platform":"#7d82d9","block":"#c89dc1","hero":"#f7dc9c","bit":"#e9bb4f","cyan":"#a3bfd1","hostile":"#ed5b5a","hostileAlt":"#faaaa9","hostileAlt2":"#ead7e7"},"everforest":{"background":"#2d353b","text":"#d3c6aa","hexdump":"#475258","muted":"#475258","ground":"#a7c080","platform":"#7fbbb3","block":"#d699b6","hero":"#dbbc7f","bit":"#dbbc7f","cyan":"#83c092","hostile":"#e67e80","hostileAlt":"#e67e80","hostileAlt2":"#d699b6"},"flexoki-light":{"background":"#fffcf0","text":"#100f0f","hexdump":"#b7b5ac","muted":"#b7b5ac","ground":"#879a39","platform":"#205ea6","block":"#ce5d97","hero":"#d0a215","bit":"#d0a215","cyan":"#3aa99f","hostile":"#d14d41","hostileAlt":"#d14d41","hostileAlt2":"#ce5d97"},"gruvbox":{"background":"#282828","text":"#d4be98","hexdump":"#665c54","muted":"#665c54","ground":"#a9b665","platform":"#7daea3","block":"#d3869b","hero":"#d8a657","bit":"#d8a657","cyan":"#89b482","hostile":"#ea6962","hostileAlt":"#ea6962","hostileAlt2":"#d3869b"},"hackerman":{"background":"#0b0c16","text":"#ddf7ff","hexdump":"#2d3450","muted":"#2d3450","ground":"#4fe88f","platform":"#829dd4","block":"#86a7df","hero":"#a4ffec","bit":"#50f7d4","cyan":"#7cf8f7","hostile":"#50f872","hostileAlt":"#85ff9d","hostileAlt2":"#cddbf4"},"jade-horse":{"background":"#142620","text":"#dfede5","hexdump":"#64887b","muted":"#64887b","ground":"#8bcbb1","platform":"#96b7d0","block":"#b7a1c8","hero":"#dce1ac","bit":"#c5cc91","cyan":"#86c7c5","hostile":"#d88d91","hostileAlt":"#e6a6aa","hostileAlt2":"#cfbce0"},"kanagawa":{"background":"#1f1f28","text":"#dcd7ba","hexdump":"#54546d","muted":"#54546d","ground":"#76946a","platform":"#7e9cd8","block":"#957fb8","hero":"#e6c384","bit":"#c0a36e","cyan":"#6a9589","hostile":"#c34043","hostileAlt":"#e82424","hostileAlt2":"#938aa9"},"last-horizon":{"background":"#0c0b0c","text":"#fafcfb","hexdump":"#584e51","muted":"#584e51","ground":"#87a9b0","platform":"#b59790","block":"#c4d8e2","hero":"#6b5e73","bit":"#6b5e73","cyan":"#a5a0b6","hostile":"#c38b7b","hostileAlt":"#c38b7b","hostileAlt2":"#c4d8e2"},"lumon":{"background":"#16242d","text":"#d6e2ee","hexdump":"#304860","muted":"#304860","ground":"#5e95bc","platform":"#6fb8e3","block":"#8bc9eb","hero":"#9dcae5","bit":"#6fa4c9","cyan":"#b4e4f6","hostile":"#4d86b0","hostileAlt":"#73a6cb","hostileAlt2":"#b1d8ee"},"lupine":{"background":"#fafafa","text":"#212121","hexdump":"#9e9e9e","muted":"#9e9e9e","ground":"#4a2fd0","platform":"#3264eb","block":"#8a4ad7","hero":"#358fff","bit":"#026fde","cyan":"#0c67de","hostile":"#c900c4","hostileAlt":"#f930fb","hostileAlt2":"#b363ff"},"matte-black":{"background":"#121212","text":"#bebebe","hexdump":"#333333","muted":"#333333","ground":"#ffc107","platform":"#e68e0d","block":"#d35f5f","hero":"#b90a0a","bit":"#b91c1c","cyan":"#bebebe","hostile":"#d35f5f","hostileAlt":"#b91c1c","hostileAlt2":"#b91c1c"},"miasma":{"background":"#222222","text":"#c2c2b0","hexdump":"#666666","muted":"#666666","ground":"#5f875f","platform":"#78824b","block":"#bb7744","hero":"#b36d43","bit":"#b36d43","cyan":"#c9a554","hostile":"#685742","hostileAlt":"#685742","hostileAlt2":"#bb7744"},"nord":{"background":"#2e3440","text":"#d8dee9","hexdump":"#4c566a","muted":"#4c566a","ground":"#a3be8c","platform":"#81a1c1","block":"#b48ead","hero":"#ebcb8b","bit":"#ebcb8b","cyan":"#88c0d0","hostile":"#bf616a","hostileAlt":"#bf616a","hostileAlt2":"#b48ead"},"retro-82":{"background":"#05182e","text":"#f6dcac","hexdump":"#2a6b78","muted":"#2a6b78","ground":"#028391","platform":"#3f8f8a","block":"#3f8f8a","hero":"#e97b3c","bit":"#e97b3c","cyan":"#8cbfb8","hostile":"#f85525","hostileAlt":"#f85525","hostileAlt2":"#3f8f8a"},"ristretto":{"background":"#2c2525","text":"#e6d9db","hexdump":"#72696a","muted":"#72696a","ground":"#adda78","platform":"#f38d70","block":"#a8a9eb","hero":"#fcd675","bit":"#f9cc6c","cyan":"#85dacc","hostile":"#fd6883","hostileAlt":"#ff8297","hostileAlt2":"#bebffd"},"rose-pine":{"background":"#faf4ed","text":"#575279","hexdump":"#cecacd","muted":"#cecacd","ground":"#286983","platform":"#56949f","block":"#907aa9","hero":"#ea9d34","bit":"#ea9d34","cyan":"#d7827e","hostile":"#b4637a","hostileAlt":"#b4637a","hostileAlt2":"#907aa9"},"solitude":{"background":"#101315","text":"#cacccc","hexdump":"#4b4e55","muted":"#4b4e55","ground":"#9fa5a9","platform":"#798186","block":"#aeaeae","hero":"#c9c2b4","bit":"#d9dbdc","cyan":"#707070","hostile":"#565d60","hostileAlt":"#de6145","hostileAlt2":"#9a9a9a"},"starship":{"background":"#1c1c1e","text":"#f5f5f7","hexdump":"#8e8e93","muted":"#8e8e93","ground":"#ff9f0a","platform":"#8fb8de","block":"#ff8fa3","hero":"#ffd8a8","bit":"#ffc27a","cyan":"#a6dcef","hostile":"#ff5f4a","hostileAlt":"#ff8373","hostileAlt2":"#ffb3c1"},"tokyo-night":{"background":"#1a1b26","text":"#a9b1d6","hexdump":"#414868","muted":"#414868","ground":"#9ece6a","platform":"#7aa2f7","block":"#ad8ee6","hero":"#ff9e64","bit":"#e0af68","cyan":"#449dab","hostile":"#f7768e","hostileAlt":"#ff7a93","hostileAlt2":"#bb9af7"},"vantablack":{"background":"#000000","text":"#ffffff","hexdump":"#7a7a7a","muted":"#7a7a7a","ground":"#b6b6b6","platform":"#8d8d8d","block":"#9b9b9b","hero":"#cecece","bit":"#cecece","cyan":"#b0b0b0","hostile":"#a4a4a4","hostileAlt":"#a4a4a4","hostileAlt2":"#9b9b9b"},"white":{"background":"#ffffff","text":"#000000","hexdump":"#808080","muted":"#808080","ground":"#3a3a3a","platform":"#1a1a1a","block":"#2e2e2e","hero":"#4a4a4a","bit":"#4a4a4a","cyan":"#3e3e3e","hostile":"#2a2a2a","hostileAlt":"#2a2a2a","hostileAlt2":"#2e2e2e"},"aamis":{"background":"#0f0f0f","text":"#eadccc","hexdump":"#706a6a","muted":"#706a6a","ground":"#cea37f","platform":"#e2be8a","block":"#ede4c8","hero":"#edb95a","bit":"#f4bb54","cyan":"#e8ab3b","hostile":"#e25d6c","hostileAlt":"#e9838f","hostileAlt2":"#ede4c8"},"apollo":{"background":"#0c0a0a","text":"#e8e4e2","hexdump":"#5c5352","muted":"#5c5352","ground":"#a8b06a","platform":"#7f9fb8","block":"#e0506e","hero":"#ffc26b","bit":"#f2a13d","cyan":"#7fb0a8","hostile":"#e8323c","hostileAlt":"#ff5a5f","hostileAlt2":"#ff7a90"},"firesky":{"background":"#0f0f0f","text":"#e0d8d0","hexdump":"#585553","muted":"#585553","ground":"#1a6b6e","platform":"#2a7a80","block":"#c4753d","hero":"#e6a052","bit":"#e68040","cyan":"#40b8b4","hostile":"#e6441a","hostileAlt":"#e66b40","hostileAlt2":"#e6b375"},"neon-dusk":{"background":"#1a1033","text":"#f2e9ff","hexdump":"#5a4785","muted":"#5a4785","ground":"#72f1b8","platform":"#36a2ff","block":"#ff2a9d","hero":"#ffe45e","bit":"#ffd319","cyan":"#2de2e6","hostile":"#ff3864","hostileAlt":"#ff6b8b","hostileAlt2":"#ff6ec7"}};
+const FONT = '"JetBrainsMono Nerd Font","JetBrains Mono",monospace';
+const TILE = 24;
+const HERO_W = 16, HERO_H = 22, BIG_H = 44;
+
+let pal = PALETTES["tokyo-night"];
+let zoom = 2, fullFx = true, showHitbox = true;
+
+const metricCache = {};
+const measureCtx = document.createElement("canvas").getContext("2d");
+function metric(ch) {
+  if (metricCache[ch]) return metricCache[ch];
+  measureCtx.font = `700 100px ${FONT}`;
+  const m = measureCtx.measureText(ch);
+  return (metricCache[ch] = {
+    l: m.actualBoundingBoxLeft / 100, r: m.actualBoundingBoxRight / 100,
+    a: m.actualBoundingBoxAscent / 100, d: m.actualBoundingBoxDescent / 100,
+  });
+}
+function fitHeight(ch, h) { const m = metric(ch); return h / (m.a + m.d); }
+function fitWidth(ch, w) { const m = metric(ch); return w / (m.l + m.r); }
+
+function drawOp(ctx, op) {
+  const m = metric(op.ch);
+  ctx.save();
+  ctx.translate(op.x, op.y);
+  if (op.rot) ctx.rotate(op.rot);
+  if (op.sx) ctx.scale(op.sx, 1);
+  ctx.globalAlpha = op.alpha === undefined ? 1 : op.alpha;
+  ctx.font = `700 ${op.size}px ${FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = op.color;
+  if (fullFx && op.glow) { ctx.shadowColor = op.color; ctx.shadowBlur = op.glow * zoom; }
+  ctx.fillText(op.ch, -(m.r - m.l) / 2 * op.size, -(m.d - m.a) / 2 * op.size);
+  ctx.restore();
+}
+
+const DIMS = {
+  small: { leg: 8, torso: 7, head: 10, arm: 7, width: 1 },
+  big: { leg: 16, torso: 15, head: 15, arm: 13, width: 1.45 },
+};
+
+function limb(start, angle, length) {
+  const dx = Math.sin(angle), dy = Math.cos(angle);
+  return {
+    mid: { x: start.x + dx * length / 2, y: start.y + dy * length / 2 },
+    end: { x: start.x + dx * length, y: start.y + dy * length },
+    rot: -angle,
+  };
+}
+
+function joints(d, pose) {
+  const legRise = pose.crouch ? d.leg * Math.cos(Math.abs(pose.legs[0])) : d.leg;
+  const torso = d.torso * (pose.torsoScale || 1);
+  const hip = { x: 0, y: -legRise + (pose.bob || 0) };
+  const shoulder = { x: 0, y: hip.y - torso };
+  const head = { x: 0, y: shoulder.y - d.head * 0.55 };
+  return {
+    hip, shoulder, head, torso,
+    legs: pose.legs.map(a => limb(hip, a, d.leg)),
+    arms: pose.arms.map(a => limb({ x: 0, y: shoulder.y + 1 }, a, d.arm)),
+  };
+}
+
+function limbOp(ch, l, length, color, extra) {
+  return Object.assign({ ch, x: l.mid.x, y: l.mid.y, rot: l.rot, size: fitHeight(ch, length + 1), color }, extra || {});
+}
+
+const FAR_LEG_ALPHA = 0.85;
+const FAR_ARM_ALPHA = 0.55;
+
+function stickSkin(name, limb, glow, thick, dims) {
+  return {
+    name, dims,
+    ops(J, d, pose, t, big, speed) {
+      const main = pal.hero, acc = pal.text, w = d.width;
+      const ops = [];
+      const scarfLen = Math.min(3, 1 + Math.floor(speed / 100));
+      const wave = Math.floor(t * 8) % 2;
+      ops.push({ ch: "~".repeat(scarfLen), x: -(4 + scarfLen * 2.2) * w, y: J.shoulder.y - 1 + wave, size: fitWidth("~".repeat(scarfLen), scarfLen * 4.5 * w), color: acc, glow: 3, alpha: 0.85 });
+      ops.push(limbOp(limb, J.legs[1], d.leg, main, { alpha: FAR_LEG_ALPHA, sx: thick }));
+      ops.push(limbOp(limb, J.arms[1], d.arm, main, { alpha: FAR_ARM_ALPHA, sx: thick * 0.8 }));
+      ops.push({ ch: limb, x: 0, y: (J.hip.y + J.shoulder.y) / 2, size: fitHeight(limb, J.torso + 1), sx: thick * 1.2, color: main, glow });
+      ops.push(limbOp(limb, J.legs[0], d.leg, main, { glow, sx: thick }));
+      ops.push(limbOp(limb, J.arms[0], d.arm, main, { glow, sx: thick }));
+      ops.push({ ch: pose.face, x: 0, y: J.head.y, size: fitHeight("@", d.head), color: main, glow: glow + 1 });
+      if (big) ops.push({ ch: "#", x: 5 * w, y: (J.hip.y + J.shoulder.y) / 2, size: fitHeight("#", 6 * w), color: acc, glow: 3 });
+      if (pose.fidget) {
+        const flicker = Math.floor(t * 5) % 3 === 0 ? 0.65 : 1;
+        ops.push({ ch: "┛", chLeft: "┗", x: d.leg * 0.75, y: J.hip.y - 3 * w, size: fitHeight("┛", 7 * w), sx: 1.4, color: acc, glow: 6, alpha: flicker });
+      }
+      return ops;
+    },
+  };
+}
+
+const SKINS = {
+  C2: stickSkin("C2 · chibi stick coder", "┃", 5, 1.9, {
+    small: { leg: 7, torso: 6, head: 15, arm: 5, width: 1.15 },
+    big: { leg: 15, torso: 13, head: 21, arm: 9, width: 1.4 },
+  }),
+};
+const SKIN_KEYS = Object.keys(SKINS);
+
+const WALK_CYCLE = [
+  { legs: 0.7, seconds: 0.14 },
+  { legs: 0.2, seconds: 0.1 },
+  { legs: -0.7, seconds: 0.14 },
+  { legs: -0.2, seconds: 0.1 },
+];
+const RUN_CYCLE = [
+  { legs: 1.15, seconds: 0.13 },
+  { legs: 0.3, seconds: 0.06 },
+  { legs: -1.15, seconds: 0.13 },
+  { legs: -0.3, seconds: 0.06 },
+];
+
+function cycleFrame(t, cycle) {
+  const total = cycle.reduce((sum, frame) => sum + frame.seconds, 0);
+  let u = t % total;
+  for (let i = 0; i < cycle.length; i++) {
+    if (u < cycle[i].seconds) return i;
+    u -= cycle[i].seconds;
+  }
+  return cycle.length - 1;
+}
+
+const IDLE_BLINK = 3;
+function face(t, dead) {
+  if (dead) return "×";
+  return t % IDLE_BLINK > IDLE_BLINK - 0.14 ? "-" : "@";
+}
+
+function pose(state, t, speed) {
+  const p = { legs: [0.12, -0.12], arms: [0.15, -0.15], lean: 0, bob: 0, sx: 1, sy: 1, face: face(t) };
+  if (state === "idle") {
+    p.bob = Math.floor(t * 1.5) % 2 ? 0.5 : 0;
+  } else if (state === "fidget") {
+    const tap = Math.floor(t * 7) % 2;
+    p.legs = [1.45, 1.3];
+    p.crouch = true;
+    p.arms = tap ? [1.25, 1.5] : [1.5, 1.25];
+    p.fidget = true;
+  } else if (state === "walk" || state === "victory") {
+    const f = cycleFrame(t * (state === "victory" ? 0.7 : 1), WALK_CYCLE);
+    const L = WALK_CYCLE[f].legs;
+    p.legs = [L, -L];
+    p.arms = [0.5 - L * 0.5, 0.5 + L * 0.5];
+    p.bob = f % 2 ? -0.5 : 0;
+    if (state === "victory") p.arms = [Math.floor(t * 4) % 2 ? 2.85 : 3.15, L * 0.8];
+  } else if (state === "run") {
+    const f = cycleFrame(t, RUN_CYCLE);
+    const L = RUN_CYCLE[f].legs;
+    p.legs = [L, -L];
+    p.arms = [1.3 - L * 0.6, 1.3 + L * 0.6];
+    p.lean = 0.2;
+    p.bob = f % 2 ? -1 : 0;
+  } else if (state === "jump") {
+    p.legs = [0.75, -0.15];
+    p.arms = [2.6, 2.2];
+    p.sx = 0.92; p.sy = 1.1;
+  } else if (state === "peak") {
+    p.legs = [0.45, -0.35];
+    p.arms = [1.7, -1.7];
+  } else if (state === "fall") {
+    const f = Math.floor(t * 10) % 2;
+    p.legs = [0.2, -0.45];
+    p.arms = f ? [2.5, -2.3] : [2.3, -2.5];
+    p.sy = 1.04;
+  } else if (state === "land") {
+    p.legs = [0.6, -0.6];
+    p.arms = [0.6, -0.6];
+    p.sx = 1.28; p.sy = 0.72;
+  } else if (state === "skid") {
+    p.legs = [0.75, 0.35];
+    p.arms = [-0.9, -0.5];
+    p.lean = -0.3;
+  } else if (state === "duck") {
+    const f = Math.floor(t * 6) % 2;
+    p.legs = [1.05, -1.05];
+    p.crouch = true;
+    p.torsoScale = 0.6;
+    p.arms = f ? [0.7, -0.5] : [0.5, -0.7];
+  } else if (state === "dead") {
+    p.legs = [0.5, -0.5];
+    p.arms = [2.4, -2.4];
+    p.face = face(t, true);
+  }
+  return p;
+}
+
+function figureOps(skin, big, state, t, speed) {
+  const dims = SKINS[skin].dims;
+  const d = big ? dims.big : dims.small;
+  const p = pose(state, t, speed || 0);
+  return { ops: SKINS[skin].ops(joints(d, p), d, p, t, big, speed || 0), p };
+}
+
+function drawFigure(ctx, skin, big, state, t, x, y, facing, opts) {
+  opts = opts || {};
+  const { ops, p } = figureOps(skin, big, state, t, opts.speed);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(p.sx, p.sy);
+  ctx.rotate(p.lean * facing);
+  for (const op of ops) {
+    const o = Object.assign({}, op, { x: op.x * facing, rot: (op.rot || 0) * facing, ch: facing < 0 && op.chLeft ? op.chLeft : op.ch });
+    if (opts.glitch) glitchOp(ctx, o, opts.glitch, ops.indexOf(op));
+    else drawOp(ctx, o);
+  }
+  ctx.restore();
+}
+
+const GLITCH = "▓▒░#%&$!?";
+function glitchOp(ctx, op, g, i) {
+  const spread = g.spread;
+  const angle = i * 2.399;
+  const o = Object.assign({}, op, {
+    x: op.x + Math.cos(angle) * spread * (6 + i % 3 * 4),
+    y: op.y + Math.sin(angle) * spread * (6 + i % 4 * 3) - spread * 6,
+    rot: (op.rot || 0) + spread * (i % 2 ? 2 : -2),
+    alpha: (op.alpha === undefined ? 1 : op.alpha) * g.alpha,
+    ch: g.scramble ? GLITCH[(i + Math.floor(g.t * 20)) % GLITCH.length] : op.ch,
+  });
+  if (fullFx) {
+    drawOp(ctx, Object.assign({}, o, { x: o.x - 1.5, color: pal.hostile, alpha: o.alpha * 0.6, glow: 0 }));
+    drawOp(ctx, Object.assign({}, o, { x: o.x + 1.5, color: pal.cyan, alpha: o.alpha * 0.6, glow: 0 }));
+  }
+  drawOp(ctx, o);
+}
+
+function drawHitbox(ctx, x, y, big) {
+  if (!showHitbox) return;
+  ctx.save();
+  ctx.strokeStyle = pal.muted;
+  ctx.globalAlpha = 0.8;
+  ctx.setLineDash([2, 2]);
+  ctx.lineWidth = 0.5;
+  const h = big ? BIG_H : HERO_H;
+  ctx.strokeRect(x - HERO_W / 2, y - h, HERO_W, h);
+  ctx.restore();
+}
+
+function drawText(ctx, text, x, y, size, color, align) {
+  ctx.font = `700 ${size}px ${FONT}`;
+  ctx.textAlign = align || "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
+const ROLE = { bug: "hostile", zombie: "hostileAlt2", spikes: "hostile", ping: "hostileAlt", hang: "hostileAlt", cron: "hostile", pipe: "hostile", pointer: "hostileAlt", fork: "hostileAlt2", leak: "hostileAlt2", spinlock: "hostileAlt" };
+const SECOND_RED = { hostile: "hostileAlt", hostileAlt: "hostile", hostileAlt2: "hostile" };
+const mainOf = kind => pal[ROLE[kind]];
+const accOf = kind => pal[SECOND_RED[ROLE[kind]]];
+
+const SIZES = {
+  bug: [16, 16], zombie: [16, 20], ping: [16, 16], hang: [18, 18], cron: [20, 8], pipe: [24, 36],
+  pointer: [14, 14], fork: [16, 16], forkSmall: [12, 12], leak: [16, 14], spinlock: [24, 24],
+};
+
+function g(ch, x, y, h, color, extra) { return Object.assign({ ch, x, y, size: fitHeight(ch, h), color }, extra || {}); }
+function gw(ch, x, y, w, color, extra) { return Object.assign({ ch, x, y, size: fitWidth(ch, w), color }, extra || {}); }
+function gbox(ch, x, y, w, h, color, extra) {
+  const m = metric(ch);
+  const size = h / (m.a + m.d);
+  return Object.assign({ ch, x, y, size, sx: w / ((m.l + m.r) * size), color }, extra || {});
+}
+
+const blinking = (t, period, seed) => (t + seed) % period > period - 0.14;
+function eye(x, y, h, t, period, seed, extra) {
+  const o = Object.assign({}, extra || {});
+  const tilt = o.tilt === undefined ? (x < 0 ? 0.35 : x > 0 ? -0.35 : 0) : o.tilt;
+  return blinking(t, period, seed)
+    ? gbox("▁", x, y + h * 0.3, h * 1.3, h * 0.35, pal.text, Object.assign(o, { rot: tilt }))
+    : gbox("▀", x, y, h * 1.5, h * 0.45, pal.text, Object.assign(o, { rot: tilt }));
+}
+function wideEye(x, y, h) { return gbox("█", x, y, h * 0.8, h * 0.9, pal.text); }
+
+const FIG = {
+  bug(s) {
+    const main = mainOf("bug"), acc = accOf("bug"), t = s.t;
+    const step = s.moving ? Math.floor(t * 12) % 2 : 0;
+    const breathe = 1 + Math.sin(t * 3) * 0.04;
+    const scared = s.dropping;
+    return { sy: breathe, ops: [
+      g("╱", 11.5, -17.5, 6, acc, { rot: Math.sin(t * 6) * 0.15, alpha: 0.85 }),
+      g("ж", -3, -8.5, 17, main, { sx: step || scared && Math.floor(t * 20) % 2 ? 0.8 : 1, glow: 4 }),
+      g("◆", 7, -11, 11, main, { glow: 4 }),
+      scared ? wideEye(9, -12, 4.5) : eye(9, -12, 3.6, t, 2.6, 0, { tilt: -0.35 }),
+    ] };
+  },
+
+  zombie(s) {
+    const main = mainOf("zombie"), t = s.t;
+    const flicker = Math.floor(t * 9) % 23 === 0 ? 0.45 : 1;
+    const label = g("<defunct>", 0, -30, 6, main, { alpha: 0.75, fixed: true, size: 10 });
+    const sway = Math.sin(t * 3) * 0.12;
+    const x1 = blinking(t, 3.3, 0.4);
+    return { label, ops: [
+      gbox(Math.floor(t * 6) % 2 ? "░" : "▒", 0, 1, 12, 4, main, { alpha: 0.4 }),
+      gw("─", 11, -15, 8, main, { rot: sway, alpha: 0.9 }),
+      gw("─", 10, -11, 7, main, { rot: -sway, alpha: 0.55 }),
+      g("Z", 0, -11, 20, main, { glow: 4, alpha: flicker, fixed: true }),
+      x1 ? gw("-", -4.6, -14.5, 3.4, pal.text, { fixed: true }) : g("×", -4.6, -14.5, 3.6, pal.text, { fixed: true }),
+      x1 ? gw("-", -0.6, -14.5, 3.4, pal.text, { fixed: true }) : g("×", -0.6, -14.5, 3.6, pal.text, { fixed: true }),
+    ] };
+  },
+
+  ping(s) {
+    const main = mainOf("ping"), acc = accOf("ping"), t = s.t;
+    const k = s.height === 0 && s.sinceLand < 0.12 ? 1 - s.sinceLand / 0.12 : 0;
+    const air = s.height > 0;
+    const ops = [g("◎", 0, -9, 18, main, { glow: 5 }), eye(-3.4, -10, 3, t, 3.1, 0.7), eye(3.4, -10, 3, t, 3.1, 0.7)];
+    if (!air && s.sinceLand < 0.45) {
+      const u = s.sinceLand / 0.45;
+      ops.push(g("⟨", -9 - u * 12, -5, 7 + u * 5, acc, { alpha: 0.9 * (1 - u) }));
+      ops.push(g("⟩", 9 + u * 12, -5, 7 + u * 5, acc, { alpha: 0.9 * (1 - u) }));
+    }
+    return { sx: 1 + 0.3 * k - (air ? 0.06 : 0), sy: 1 - 0.3 * k + (air ? 0.08 : 0), ops };
+  },
+
+  hang(s) {
+    const main = mainOf("hang"), acc = accOf("hang"), t = s.t, st = s.state;
+    const curl = Math.sin(t * 2.2) * 0.2;
+    let legs;
+    if (st === "falling") legs = [g("╲", -11, -18, 9, acc, { fixed: true }), g("╱", 11, -18, 9, acc, { fixed: true })];
+    else if (st === "lying") legs = [gw("─", -11, -2, 7, acc, { fixed: true }), gw("─", 11, -2, 7, acc, { fixed: true })];
+    else if (st === "winding") legs = [g("╱", -7, -9, 6, acc, { fixed: true }), g("╲", 7, -9, 6, acc, { fixed: true })];
+    else legs = [g("╱", -11, -9, 9, acc, { rot: curl, fixed: true }), g("╲", 11, -9, 9, acc, { rot: -curl, fixed: true })];
+    let eyes;
+    if (st === "falling") eyes = [wideEye(-4, -14, 4.5), wideEye(4, -14, 4.5)];
+    else if (st === "lying") eyes = [g("×", -4, -14, 3.6, pal.text), g("×", 4, -14, 3.6, pal.text)];
+    else eyes = [eye(-4, -14, 3.2, t, 2.9, 0.3), eye(4, -14, 3.2, t, 2.9, 0.3)];
+    const hanging = st === "hanging" || st === "winding";
+    return {
+      rot: hanging ? Math.sin(t * 1.4) * 0.08 : 0, pivotY: -18,
+      sx: st === "lying" ? 1.15 : 1, sy: st === "lying" ? 0.8 : 1,
+      ops: legs.concat([g("▼", 0, -9.5, 18, main, { glow: 5 })], eyes),
+    };
+  },
+
+  spikes(s) {
+    const main = mainOf("spikes"), acc = accOf("spikes"), t = s.t;
+    const w = 24 * s.tiles - 6, n = Math.round(w / 9), each = w / n;
+    const glint = Math.floor(t * 10) % (n * 6);
+    const ops = [];
+    for (let i = 0; i < n; i++) {
+      const lit = i === glint;
+      ops.push(gbox("^", -w / 2 + each * (i + 0.5), -5, each * 0.85, 10, lit || i % 2 ? acc : main, { glow: lit ? 10 : 3, alpha: lit ? 1 : 0.9 }));
+    }
+    return { ops };
+  },
+
+  cron(s) {
+    const main = mainOf("cron"), acc = accOf("cron"), t = s.t;
+    const ops = [];
+    if (s.firing) {
+      const rows = s.columnTiles * 2, scroll = Math.floor(t * 16);
+      for (let r = 0; r < rows; r++) {
+        ops.push(gbox("#", Math.sin(r * 1.7 + t * 23) * 1.2, -(r + 0.5) * 12, 20, 11, (r + scroll) % 2 ? main : acc, { glow: 6, alpha: r === rows - 1 ? 0.8 : 1 }));
+      }
+    }
+    ops.push(g("[", -8, -5.5, 11, acc), g("]", 8, -5.5, 11, acc), g("*", 0, -5.5, 8, main, { rot: t * 1.8, glow: 3 }));
+    return { ops };
+  },
+
+  pipe(s) {
+    const main = mainOf("pipe"), acc = accOf("pipe"), t = s.t;
+    return { ops: [
+      gbox("┃", 0, -11, 4, 22, acc, { alpha: 0.55 }),
+      gbox("}", -6.5, -28.5, 11, 15, main, { glow: 6, rot: Math.sin(t * 7) * 0.15 }),
+      gbox("<", 6, -28.5, 12, 15, main, { glow: 6 }),
+    ] };
+  },
+
+  pointer(s) {
+    const main = mainOf("pointer"), acc = accOf("pointer"), t = s.t;
+    const faint = s.warning && Math.floor(t * 8) % 2 === 1;
+    return { ops: [
+      gbox("▁", 0, -1, 12, 2, acc, { fixed: true }),
+      g("‹", -8.5, -7, 7, acc, { fixed: true }),
+      g("*", 0, -7, s.warning ? 12.5 : 11, main, { rot: t * (s.warning ? 14 : 1.5), glow: s.warning ? 9 : 4, alpha: faint ? 0.3 : 1, fixed: true }),
+    ] };
+  },
+
+  fork(s) {
+    const main = mainOf("fork"), t = s.t, k = s.small ? 0.75 : 1;
+    const step = Math.floor(t * (s.small ? 14 : 9)) % 2;
+    const waddle = s.moving ? (step ? 0.12 : -0.12) : Math.sin(t * 2) * 0.04;
+    return { alpha: s.ghost ? 0.45 : 1, ops: [
+      g("&", 0, -9 * k, 18 * k, main, { glow: 4, rot: waddle, fixed: true }),
+      eye(-0.6 * k, -14 * k, 3 * k, t, 2.8, 1.1),
+      eye(3 * k, -14 * k, 3 * k, t, 2.8, 1.1),
+    ] };
+  },
+
+  leak(s) {
+    const main = mainOf("leak"), acc = accOf("leak"), t = s.t;
+    const shut = blinking(t, 3.4, 1.7);
+    const u = (t * 1.3) % 1;
+    const ops = [g("%", 0, -8, 16, main, { glow: 4, fixed: true }), g(".", -9.5, -13 + u * 12, 3, acc, { alpha: 1 - u * 0.6, fixed: true })];
+    const pupil = "▪";
+    if (!shut) ops.push(g(pupil, -3.3, -12, 2.8, pal.text, { fixed: true }), g(pupil, 3.3, -3.8, 2.8, pal.text, { fixed: true }));
+    return { ops };
+  },
+
+  spinlock(s) {
+    const main = mainOf("spinlock"), acc = accOf("spinlock"), t = s.t, cy = -12;
+    const ops = [g("(", -8.5, cy, 13, acc, { fixed: true }), g(")", 8.5, cy, 13, acc, { fixed: true }), g("o", 0, cy, 8, main, { glow: 4, fixed: true }),
+      g("•", Math.cos(s.angle) * 3.2, cy - Math.sin(s.angle) * 3.2, 2.2, acc, { fixed: true })];
+    const angles = s.double ? [s.angle, s.angle + Math.PI] : [s.angle];
+    for (const a of angles) for (let i = 1; i <= s.arm; i++) {
+      const x = Math.cos(a) * i * 14, y = cy - Math.sin(a) * i * 14;
+      if (s.buried && s.buried(x, y)) continue;
+      ops.push(i === s.arm
+        ? g("✶", x, y, 10, main, { rot: t * 5, glow: 6, fixed: true })
+        : g("●", x, y, 8, i % 2 ? main : acc, { alpha: 0.9, glow: 3, fixed: true }));
+    }
+    return { ops };
+  },
+};
+
+const CREATURES = ["bug", "zombie", "ping", "hang", "fork", "leak"];
+const SEEDS = { bug: 0, zombie: 1.3, ping: 2.1, hang: 0.7, fork: 1.8, leak: 2.6 };
+const HEX = "0x7f3a9cde";
+const DEATH_SECONDS = { zombie: 0.5, fork: 0.15 };
+const deathSeconds = (kind, small) => kind === "fork" && small ? 0.4 : DEATH_SECONDS[kind] || 0.4;
+
+function drawEnemy(ctx, kind, s, x, y, facing, death) {
+  const fig = FIG[kind](s);
+  ctx.save();
+  ctx.translate(x, y);
+  let alpha = fig.alpha === undefined ? 1 : fig.alpha, sx = fig.sx || 1, sy = fig.sy || 1, scatter = 0;
+  if (death !== undefined) {
+    if (kind === "zombie") {
+      ctx.translate(0, -26 * death);
+      alpha *= 1 - death; sx *= 1 - 0.3 * death; sy *= 1 + 0.3 * death;
+    } else if (kind === "fork" && !s.small) {
+      sx *= 1 + 1.4 * death; sy *= 1 - 0.3 * death;
+    } else {
+      const k = Math.min(death / 0.35, 1);
+      sx *= 1 + 0.5 * k; sy *= 1 - 0.65 * k;
+      if (death > 0.35) { scatter = (death - 0.35) / 0.65; alpha *= 1 - scatter; }
+    }
+  }
+  if (fig.label) drawOp(ctx, Object.assign({}, fig.label, { alpha: fig.label.alpha * alpha }));
+  if (fig.rot) { ctx.translate(0, fig.pivotY); ctx.rotate(fig.rot); ctx.translate(0, -fig.pivotY); }
+  ctx.scale(sx, sy);
+  const creature = CREATURES.includes(kind);
+  const tick = fullFx && creature && death === undefined && (s.t + SEEDS[kind]) % 3.1 < 0.09;
+  fig.ops.forEach((op, i) => {
+    const mirror = op.fixed ? 1 : facing;
+    const o = Object.assign({}, op, {
+      x: op.x * mirror, rot: (op.rot || 0) * mirror,
+      ch: mirror < 0 && op.chLeft ? op.chLeft : op.ch,
+      alpha: (op.alpha === undefined ? 1 : op.alpha) * alpha,
+      glow: Math.min(op.glow || 2, 3),
+    });
+    if (tick) {
+      o.x += i % 2 ? 1.5 : -1.5;
+      drawOp(ctx, Object.assign({}, o, { x: o.x + 2, color: pal.cyan, alpha: o.alpha * 0.5, glow: 0 }));
+    }
+    if (scatter) {
+      const a = i * 2.399;
+      o.x += Math.cos(a) * scatter * 14;
+      o.y += Math.sin(a) * scatter * 10 - scatter * 8;
+      o.rot += scatter * (i % 2 ? 3 : -3);
+      if (scatter > 0.15) o.ch = GLITCH[(i + Math.floor(s.t * 20)) % GLITCH.length];
+    }
+    drawOp(ctx, o);
+  });
+  if (scatter) {
+    for (let j = 0; j < 6; j++) {
+      const a = j / 6 * Math.PI * 2, r = 6 + scatter * 18;
+      drawOp(ctx, { ch: HEX[(j + Math.floor(s.t * 15)) % HEX.length], x: Math.cos(a) * r, y: -8 + Math.sin(a) * r, size: 10, color: accOf(kind), alpha: 1 - scatter, glow: 3 });
+    }
+  }
+  ctx.restore();
+}
+
+function drawBox(ctx, left, top, w, h) {
+  if (!showHitbox) return;
+  ctx.save();
+  ctx.strokeStyle = pal.muted;
+  ctx.globalAlpha = 0.8;
+  ctx.setLineDash([2, 2]);
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(left, top, w, h);
+  ctx.restore();
+}
+function drawSizeBox(ctx, kind, x, y) {
+  const [w, h] = SIZES[kind];
+  drawBox(ctx, x - w / 2, y - h, w, h);
+}
+
+function drawThread(ctx, x, top, bottom) {
+  ctx.save();
+  ctx.strokeStyle = pal.muted;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+  ctx.restore();
+}
+
+function drawShot(ctx, left, cy, t) {
+  const main = mainOf("pointer"), acc = accOf("pointer");
+  drawOp(ctx, gbox("<", left + 4, cy, 8, 7, main, { glow: 5 }));
+  drawOp(ctx, gbox("-", left + 12.5, cy, 7, 2.5, acc, { glow: 3 }));
+  drawOp(ctx, gbox("-", left + 20.5, cy, 7, 2.5, acc, { glow: 3, alpha: Math.floor(t * 12) % 2 ? 0.45 : 0.8 }));
+  drawBox(ctx, left, cy - 3, 24, 6);
+}
+
+function drawPuddle(ctx, right, ground, grown, extent, t, alpha) {
+  const main = mainOf("leak"), acc = accOf("leak");
+  ctx.save();
+  ctx.setLineDash([2, 3]);
+  ctx.strokeStyle = pal.muted;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(right - extent * TILE, ground - TILE, extent * TILE, TILE);
+  ctx.restore();
+  drawText(ctx, `malloc(${extent})`, right - extent * TILE, ground - TILE - 3, 10, pal.muted);
+  if (grown <= 0) return;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(right - grown, ground - 8, grown, 9); ctx.clip();
+  const cells = Math.ceil(extent * TILE / 6);
+  const wave = Math.floor(t * 6);
+  for (let i = 0; i < cells; i++) {
+    const xc = right - (i + 0.5) * 6;
+    drawOp(ctx, gbox("▄", xc, ground - 1.5, 6, 3, main, { alpha: 0.5 * alpha }));
+    drawOp(ctx, gbox((i + wave) % 3 ? "~" : "≈", xc, ground - 4.5, 6, 3, (i + wave) % 4 ? main : acc, { glow: 3, alpha }));
+  }
+  ctx.restore();
+  drawBox(ctx, right - grown, ground - 6, grown, 6);
+}
+
+const LOOKS = {
+  bug: { text: "ж", size: 26, role: "hostile", drop: 2 },
+  zombie: { text: "Z", size: 26, role: "hostileAlt2", drop: 2 },
+  spikes: { text: "^", size: 20, role: "hostile", drop: 8 },
+  ping: { text: "◎", size: 26, role: "hostileAlt", drop: 2 },
+  hang: { text: "▼", size: 22, role: "hostileAlt", drop: 2 },
+  cron: { text: "[*]", size: 16, role: "hostile", drop: 4 },
+  pipe: { text: "}<", size: 36, role: "hostile", drop: 4 },
+  pointer: { text: "*", size: 26, role: "hostileAlt", drop: 8 },
+  fork: { text: "&", size: 26, role: "hostileAlt2", drop: 2 },
+  leak: { text: "%", size: 22, role: "hostileAlt2", drop: 2 },
+  spinlock: { text: "(o)", size: 18, role: "hostileAlt", drop: 4 },
+};
+
+function drawToday(ctx, kind, x, y, o) {
+  o = o || {};
+  const look = LOOKS[kind], color = pal[look.role];
+  ctx.save();
+  if (fullFx) { ctx.shadowColor = color; ctx.shadowBlur = 4 * zoom; }
+  const text = kind === "spikes" ? "^".repeat((o.tiles || 1) * 2) : look.text;
+  const size = kind === "fork" && o.small ? 18 : look.size;
+  const font = `700 ${size}px ${FONT}`;
+  ctx.font = font;
+  const m = ctx.measureText(text);
+  const fontAscent = m.fontBoundingBoxAscent, fontDescent = m.fontBoundingBoxDescent;
+  const hop = (kind === "bug" || kind === "fork") && o.moving ? -Math.abs(Math.sin(o.t * 8)) * 2 : 0;
+  const baseY = y + look.drop + hop;
+  if (kind !== "pipe") drawText(ctx, text, x, baseY, size, color, "center");
+  if (kind === "zombie") drawText(ctx, "<defunct>", x, baseY - fontAscent + 6, 10, pal.hostileAlt2, "center");
+  if (kind === "hang") { ctx.restore(); ctx.save(); drawThread(ctx, x, o.threadTop, y - 18); }
+  if (kind === "pipe") {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x - 24, y - 72, 48, 72); ctx.clip();
+    drawText(ctx, text, x, y + 36 - (o.rise || 0) + look.drop, size, color, "center");
+    ctx.restore();
+  }
+  if (kind === "pointer") drawText(ctx, "<--", x - 40, y - 8, 16, pal.hostile, "left");
+  if (kind === "cron" && o.firing) for (let r = 0; r < 5; r++) drawText(ctx, "#", x, y - r * TILE - 4, 22, pal.hostileAlt, "center");
+  if (kind === "leak") drawText(ctx, "~~~", x - 12, y + 6, 20, pal.hostileAlt2, "right");
+  if (kind === "spinlock") for (let i = 1; i <= 3; i++) drawText(ctx, i === 3 ? "*" : "·", x + i * 14, y - 12 + 7, i === 3 ? 22 : 20, pal.hostile, "center");
+  ctx.restore();
+}
+
+function pingHeight(time) {
+  const cycle = 1.7, t = (time % cycle) - 0.9;
+  if (t <= 0) return 0;
+  const u = t / 0.8;
+  return 4 * 96 * u * (1 - u);
+}
+function pingState(t) { return { t, height: pingHeight(t), sinceLand: t % 1.7 }; }
+
+function pipeRaise(seconds) {
+  if (seconds <= 0) return 0;
+  if (seconds < 0.25) return 36 * seconds / 0.25;
+  const up = seconds - 1.25;
+  if (up <= 0) return 36;
+  return Math.max(36 * (1 - up / 0.25), 0);
+}
+const pipeRise = t => pipeRaise(t % 3.3 - 1.8);
+
+function patrol(t, speed, range) {
+  const s = (t * speed) % (4 * range);
+  return s < 2 * range ? { off: -range + s, facing: 1 } : { off: 3 * range - s, facing: -1 };
+}
+
+function leakLength(seconds, extent) {
+  const full = extent * TILE, grow = full / 72, shrink = full / 96;
+  let t = seconds % (grow + 0.8 + shrink + 0.6);
+  if (t < grow) return t * 72;
+  t -= grow;
+  if (t < 0.8) return full;
+  t -= 0.8;
+  return Math.max(full - t * 96, 0);
+}
+
+function wallOp(ctx, ch, x, y, h, color, alpha) { drawOp(ctx, g(ch, x, y, h, color, { alpha, glow: 3 })); }
+
+function drawPipeBody(ctx, x, top, rows) {
+  for (let r = 0; r < rows; r++) {
+    wallOp(ctx, "║", x - 12, top + r * TILE + 12, 24, pal.cyan, 1);
+    wallOp(ctx, "║", x + 12, top + r * TILE + 12, 24, pal.cyan, 1);
+  }
+  drawOp(ctx, gbox("═", x, top + 2, 48, 4, pal.cyan, { glow: 3 }));
+}
+
+function drawPipeDaemon(ctx, x, pipeTop, rise, t) {
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x - 30, pipeTop - 60, 60, 60); ctx.clip();
+  const y = pipeTop + 36 - rise;
+  drawEnemy(ctx, "pipe", { t }, x, y, 1);
+  drawSizeBox(ctx, "pipe", x, y);
+  ctx.restore();
+}
+
+const GALLERY = [
+  { name: "bug", h: 70, cells: ["today", "walk", "idle", "death"] },
+  { name: "zombie", h: 80, cells: ["today", "drift", "death"] },
+  { name: "ping", h: 140, cells: ["today", "hop", "death"] },
+  { name: "hang", h: 140, cells: ["today", "hanging", "drop", "death"] },
+  { name: "spikes", h: 60, cells: ["today", "1 tile", "2 tiles"] },
+  { name: "cron job", h: 160, cells: ["today", "idle", "fire cycle"] },
+  { name: "pipe daemon", h: 130, cells: ["today", "cycle"] },
+  { name: "dangling pointer", h: 70, cells: ["today", "idle", "warning", "firing"] },
+  { name: "fork bomb", h: 70, cells: ["today", "walk", "split", "small", "small ghost", "small death"] },
+  { name: "memory leak", h: 80, cells: ["today", "cycle", "death"] },
+  { name: "spinlock", h: 170, cells: ["today", "single", "double"] },
+];
+const WIDE = { "fire cycle": 110, "firing": 260, "cycle": 200, "single": 190, "double": 190, "split": 150, "2 tiles": 110, "drop": 110 };
+const gallery = document.getElementById("gallery");
+const LABEL_W = 150, CELL_W = 110, HEAD_PAD = 8;
+
+function deathLoop(t, seconds) {
+  const u = t % 2.2;
+  if (u < 1) return { alive: true };
+  if (u < 1 + seconds) return { death: (u - 1) / seconds };
+  return { gone: true };
+}
+
+function galleryCell(ctx, row, kind, variant, cell, t, cx, ground, top) {
+  const facing = 1;
+  if (cell === "today") {
+    const o = { t, tiles: 1, threadTop: top + 4, firing: Math.floor(t / 1.2) % 2 === 0, rise: pipeRise(t) };
+    if (kind === "pipe") { drawToday(ctx, kind, cx, ground - 48, o); drawPipeBody(ctx, cx, ground - 48, 2); return; }
+    if (kind === "ping") { drawToday(ctx, kind, cx, ground - pingHeight(t), o); return; }
+    if (kind === "hang") { drawToday(ctx, kind, cx, top + 50, o); return; }
+    drawToday(ctx, kind, cx, kind === "zombie" ? ground - 4 : ground, o);
+    return;
+  }
+  if (kind === "bug") {
+    const s = { t, variant, moving: cell === "walk" };
+    const p = cell === "walk" ? patrol(t, 48, 22) : { off: 0, facing: 1 };
+    if (cell === "death") { const d = deathLoop(t, 0.4); if (d.gone) return; drawSizeBox(ctx, kind, cx, ground); drawEnemy(ctx, kind, s, cx, ground, 1, d.death); return; }
+    drawSizeBox(ctx, kind, cx + p.off, ground);
+    drawEnemy(ctx, kind, s, cx + p.off, ground, p.facing);
+    return;
+  }
+  if (kind === "zombie") {
+    const y = ground - 6 + Math.sin(t * 2.5) * 4;
+    const s = { t, variant };
+    if (cell === "death") { const d = deathLoop(t, 0.5); if (d.gone) return; drawSizeBox(ctx, kind, cx, y); drawEnemy(ctx, kind, s, cx, y, 1, d.death); return; }
+    const p = patrol(t, 30, 24);
+    drawSizeBox(ctx, kind, cx + p.off, y);
+    drawEnemy(ctx, kind, s, cx + p.off, y, p.facing);
+    return;
+  }
+  if (kind === "ping") {
+    const s = pingState(t);
+    if (cell === "death") { const d = deathLoop(t, 0.4); if (d.gone) return; drawSizeBox(ctx, kind, cx, ground); drawEnemy(ctx, kind, { t, height: 0, sinceLand: 1 }, cx, ground, 1, d.death); return; }
+    drawSizeBox(ctx, kind, cx, ground - s.height);
+    drawEnemy(ctx, kind, s, cx, ground - s.height, 1);
+    return;
+  }
+  if (kind === "hang") {
+    const hangY = top + 50;
+    if (cell === "hanging") { drawThread(ctx, cx, top + 4, hangY - 18); drawSizeBox(ctx, kind, cx, hangY); drawEnemy(ctx, kind, { t, state: "hanging" }, cx, hangY, 1); return; }
+    if (cell === "death") { const d = deathLoop(t, 0.4); if (d.gone) return; drawSizeBox(ctx, kind, cx, ground); drawEnemy(ctx, kind, { t, state: "lying" }, cx, ground, 1, d.death); return; }
+    const u = t % 5;
+    const fall = ground - hangY;
+    let y = hangY, state = "hanging";
+    const fallTime = Math.sqrt(2 * fall / 1800);
+    if (u > 1 && u < 1 + fallTime) { state = "falling"; y = hangY + 900 * (u - 1) ** 2; }
+    else if (u >= 1 + fallTime && u < 2.5 + fallTime) { state = "lying"; y = ground; }
+    else if (u >= 2.5 + fallTime) { state = "winding"; y = Math.max(ground - (u - 2.5 - fallTime) * 60, hangY); if (y === hangY) state = "hanging"; }
+    y = Math.min(y, ground);
+    drawThread(ctx, cx, top + 4, y - 18);
+    drawSizeBox(ctx, kind, cx, y);
+    drawEnemy(ctx, kind, { t, state }, cx, y, 1);
+    drawText(ctx, state, cx, top + 14, 8, pal.muted, "left");
+    return;
+  }
+  if (kind === "spikes") {
+    const tiles = cell === "2 tiles" ? 2 : 1, w = 24 * tiles - 6;
+    drawBox(ctx, cx - w / 2, ground - 10, w, 10);
+    drawEnemy(ctx, kind, { t, tiles }, cx, ground, 1);
+    return;
+  }
+  if (kind === "cron") {
+    const firing = cell === "fire cycle" && t % 2.4 >= 1.4;
+    if (firing) drawBox(ctx, cx - 10, ground - 120, 20, 120);
+    drawSizeBox(ctx, kind, cx, ground);
+    drawEnemy(ctx, kind, { t, firing, columnTiles: 5 }, cx, ground, 1);
+    return;
+  }
+  if (kind === "pipe") {
+    const pipeTop = ground - 48;
+    drawPipeDaemon(ctx, cx, pipeTop, pipeRise(t), t);
+    drawPipeBody(ctx, cx, pipeTop, 2);
+    return;
+  }
+  if (kind === "pointer") {
+    const x = cx + (cell === "firing" ? 100 : 0);
+    const warning = cell === "warning" || cell === "firing" && t % 2.5 >= 2;
+    drawSizeBox(ctx, kind, x, ground);
+    drawEnemy(ctx, kind, { t, warning }, x, ground, 1);
+    if (cell === "firing") {
+      const sinceShot = t % 2.5;
+      const left = x - 7 - 24 - sinceShot * 180;
+      if (left > cx - 120) drawShot(ctx, left, ground - 12, t);
+    }
+    return;
+  }
+  if (kind === "fork") {
+    const small = cell.startsWith("small");
+    if (cell === "split") {
+      const u = t % 2.2;
+      if (u < 1) { drawSizeBox(ctx, kind, cx, ground); drawEnemy(ctx, kind, { t, moving: false }, cx, ground, 1); return; }
+      if (u < 1.15) { drawEnemy(ctx, kind, { t }, cx, ground, 1, (u - 1) / 0.15); return; }
+      const k = u - 1.15;
+      const off = Math.min(k, 0.3) * 300 * 0.2 + Math.max(k - 0.3, 0) * 84 * 0.2;
+      for (const dir of [-1, 1]) {
+        const x = cx + dir * Math.min(off, 60);
+        drawSizeBox(ctx, "forkSmall", x, ground);
+        drawEnemy(ctx, kind, { t, small: true, moving: true, ghost: k < 0.5 }, x, ground, dir);
+      }
+      return;
+    }
+    if (cell === "small death") { const d = deathLoop(t, 0.4); if (d.gone) return; drawSizeBox(ctx, "forkSmall", cx, ground); drawEnemy(ctx, kind, { t, small: true }, cx, ground, 1, d.death); return; }
+    const p = cell === "walk" || small ? patrol(t, small ? 84 : 48, 22) : { off: 0, facing: 1 };
+    drawSizeBox(ctx, small ? "forkSmall" : kind, cx + p.off, ground);
+    drawEnemy(ctx, kind, { t, small, moving: true, ghost: cell === "small ghost" }, cx + p.off, ground, p.facing);
+    return;
+  }
+  if (kind === "leak") {
+    const x = cx + 40;
+    if (cell === "death") {
+      const d = deathLoop(t, 0.4);
+      const grown = d.alive ? 72 : d.gone ? 0 : 72 * (1 - d.death);
+      drawPuddle(ctx, x - 12, ground, grown, 3, t, d.alive ? 1 : d.gone ? 0 : 1 - d.death);
+      if (d.gone) return;
+      drawSizeBox(ctx, kind, x, ground);
+      drawEnemy(ctx, kind, { t }, x, ground, 1, d.death);
+      return;
+    }
+    drawPuddle(ctx, x - 12, ground, leakLength(t, 3), 3, t, 1);
+    drawSizeBox(ctx, kind, x, ground);
+    drawEnemy(ctx, kind, { t }, x, ground, 1);
+    return;
+  }
+  if (kind === "spinlock") {
+    const double = cell === "double";
+    const angle = 2 * Math.PI * t / 3;
+    drawSizeBox(ctx, kind, cx, ground);
+    drawEnemy(ctx, kind, { t, angle, arm: double ? 3 : 4, double }, cx, ground, 1);
+    if (showHitbox) {
+      for (const a of double ? [angle, angle + Math.PI] : [angle]) for (let i = 1; i <= (double ? 3 : 4); i++) {
+        drawBox(ctx, cx + Math.cos(a) * i * 14 - 5, ground - 12 - Math.sin(a) * i * 14 - 5, 10, 10);
+      }
+    }
+  }
+}
+
+const KIND_OF = { "bug": ["bug"], "zombie": ["zombie"], "ping": ["ping"], "hang": ["hang"], "spikes": ["spikes"], "cron job": ["cron"], "pipe daemon": ["pipe"], "dangling pointer": ["pointer"], "fork bomb": ["fork"], "memory leak": ["leak"], "spinlock": ["spinlock"] };
+const cellWidth = name => name === "today" ? CELL_W : WIDE[name] || CELL_W;
+
+function drawGallery(t) {
+  const W = LABEL_W + Math.max(...GALLERY.map(r => r.cells.reduce((sum, c) => sum + cellWidth(c), 0)));
+  const H = GALLERY.reduce((sum, r) => sum + r.h + HEAD_PAD + 14, 0);
+  const dpr = window.devicePixelRatio || 1;
+  if (gallery.width !== Math.round(W * zoom * dpr) || gallery.height !== Math.round(H * zoom * dpr)) {
+    gallery.width = Math.round(W * zoom * dpr); gallery.height = Math.round(H * zoom * dpr);
+    gallery.style.width = W * zoom + "px"; gallery.style.height = H * zoom + "px";
+  }
+  const ctx = gallery.getContext("2d");
+  ctx.setTransform(zoom * dpr, 0, 0, zoom * dpr, 0, 0);
+  ctx.fillStyle = pal.background;
+  ctx.fillRect(0, 0, W, H);
+  let top = 0;
+  for (const row of GALLERY) {
+    const [kind, variant] = KIND_OF[row.name];
+    const ground = top + 14 + row.h;
+    drawText(ctx, row.name, 10, top + 14 + row.h / 2, 11, pal.text);
+    if (row.sub) drawText(ctx, row.sub, 10, top + 14 + row.h / 2 + 14, 9, pal.muted);
+    let x = LABEL_W;
+    for (const cell of row.cells) {
+      const w = cellWidth(cell);
+      drawText(ctx, cell, x + w / 2, top + 11, 9, cell === "today" ? pal.muted : pal.text, "center");
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, top + 12, w, row.h + 8); ctx.clip();
+      ctx.fillStyle = pal.ground; ctx.globalAlpha = 0.45; ctx.fillRect(x + 4, ground, w - 8, 1); ctx.globalAlpha = 1;
+      galleryCell(ctx, row, kind, variant, cell, t, x + w / 2, ground, top + 12);
+      ctx.restore();
+      x += w;
+    }
+    top += row.h + HEAD_PAD + 14;
+    ctx.fillStyle = pal.muted; ctx.globalAlpha = 0.25; ctx.fillRect(0, top - 3, W, 1); ctx.globalAlpha = 1;
+  }
+}
+
+const STRIP_MAP = [
+  "............................................................................",
+  "............................................................................",
+  "............................................................................",
+  "............................................................................",
+  "............................................................................",
+  ".......................................PP...................................",
+  ".......................................PP...................................",
+  ".......................................PP...................................",
+  "############################################################################",
+  "############################################################################",
+];
+const ROWS = STRIP_MAP.length, COLS = STRIP_MAP[0].length;
+function tileAt(c, r) {
+  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return ".";
+  return STRIP_MAP[r][c];
+}
+const solid = ch => ch === "#" || ch === "B" || ch === "P";
+const GROUND = 8 * TILE;
+const P = { WALK: 216, SPRINT: 288, SPRINT_ACC: 144, ACC: 1800, AIR: 1200, G: 1500, FG: 2100, MAXF: 720, JUMP: 560, CUT: 200, COYOTE: 0.1, BUFFER: 0.12 };
+const keys = {};
+let skin = "C2";
+const hero = { x: 3 * TILE, y: 8 * TILE, vx: 0, vy: 0, big: false, grounded: true, jumping: false, coyote: 0, buffer: 0, facing: 1, idle: 0, landed: 1, anim: 0, change: null, victory: false };
+
+function approach(v, target, d) { return v < target ? Math.min(v + d, target) : Math.max(v - d, target); }
+function heroH() { return hero.big ? BIG_H : HERO_H; }
+
+function stepPhysics(dt, input) {
+  const atWalk = input.dir !== 0 && hero.vx * input.dir >= P.WALK;
+  if (input.sprint && atWalk) hero.vx = approach(hero.vx, input.dir * P.SPRINT, P.SPRINT_ACC * dt);
+  else hero.vx = approach(hero.vx, input.dir * P.WALK, (hero.grounded ? P.ACC : P.AIR) * dt);
+  hero.coyote = hero.grounded ? P.COYOTE : Math.max(hero.coyote - dt, 0);
+  hero.buffer = input.pressed ? P.BUFFER : Math.max(hero.buffer - dt, 0);
+  if (hero.buffer > 0 && hero.coyote > 0) { hero.vy = -P.JUMP; hero.jumping = true; hero.buffer = 0; hero.coyote = 0; }
+  if (hero.jumping && !input.held && hero.vy < -P.CUT) hero.vy = -P.CUT;
+  if (hero.vy >= 0) hero.jumping = false;
+  hero.vy = Math.min(hero.vy + (hero.vy < 0 ? P.G : P.FG) * dt, P.MAXF);
+  hero.x += hero.vx * dt;
+  const rows = [Math.floor((hero.y - heroH()) / TILE), Math.floor((hero.y - 1e-6) / TILE)];
+  if (hero.vx > 0) {
+    const c = Math.floor((hero.x + 8 - 1e-6) / TILE);
+    for (let r = rows[0]; r <= rows[1]; r++) if (solid(tileAt(c, r))) { hero.x = c * TILE - 8; hero.vx = 0; break; }
+  } else if (hero.vx < 0) {
+    const c = Math.floor((hero.x - 8) / TILE);
+    for (let r = rows[0]; r <= rows[1]; r++) if (solid(tileAt(c, r))) { hero.x = (c + 1) * TILE + 8; hero.vx = 0; break; }
+  }
+  const oldBottom = hero.y, wasGrounded = hero.grounded;
+  hero.y += hero.vy * dt;
+  hero.grounded = false;
+  const cols = [Math.floor((hero.x - 8) / TILE), Math.floor((hero.x + 8 - 1e-6) / TILE)];
+  if (hero.vy > 0) {
+    const r = Math.floor((hero.y - 1e-6) / TILE);
+    for (let c = cols[0]; c <= cols[1]; c++) {
+      const ch = tileAt(c, r);
+      if (solid(ch) || (ch === "=" && oldBottom <= r * TILE + 1e-6)) { hero.y = r * TILE; hero.vy = 0; hero.grounded = true; break; }
+    }
+  } else if (hero.vy < 0) {
+    const r = Math.floor((hero.y - heroH()) / TILE);
+    for (let c = cols[0]; c <= cols[1]; c++) if (solid(tileAt(c, r))) { hero.y = (r + 1) * TILE + heroH(); hero.vy = 0; break; }
+  }
+  if (hero.grounded && !wasGrounded) hero.landed = 0;
+  if (hero.x > COLS * TILE + 10) hero.x = -8;
+  if (hero.x < -10) hero.x = COLS * TILE + 8;
+  if (hero.y > ROWS * TILE + 60) Object.assign(hero, { x: 3 * TILE, y: 8 * TILE, vx: 0, vy: 0 });
+}
+
+function heroState(input) {
+  if (hero.victory) return "victory";
+  if (!hero.grounded) return hero.vy < -120 ? "jump" : hero.vy < 120 ? "peak" : "fall";
+  if (hero.landed < 0.12) return "land";
+  if (!hero.big && underCeiling()) return "duck";
+  if (input.dir !== 0 && Math.sign(hero.vx) === -input.dir && Math.abs(hero.vx) > 90) return "skid";
+  if (Math.abs(hero.vx) > P.WALK + 0.5) return "run";
+  if (Math.abs(hero.vx) > 5) return "walk";
+  return hero.idle > 3 ? "fidget" : "idle";
+}
+
+function tileOp(ch, c, r, height, color, alpha) {
+  const size = fitHeight(ch, height);
+  const m = metric(ch);
+  return { ch, x: c * TILE + 12, y: r * TILE + height / 2, size, sx: TILE / ((m.l + m.r) * size), color, alpha, glow: 3 };
+}
+
+function underCeiling() {
+  const row = Math.floor((hero.y - 1) / TILE) - 1;
+  const cols = [Math.floor((hero.x - 8) / TILE), Math.floor((hero.x + 8 - 1e-6) / TILE)];
+  for (let c = cols[0]; c <= cols[1]; c++) if (solid(tileAt(c, row))) return true;
+  return false;
+}
+
+const VIEW_W = 40 * TILE;
+const homeX = (col, tiles) => (col + (tiles || 1) / 2) * TILE;
+const ACTORS = [
+  { kind: "bug", variant: "A", col: 8, range: 60 },
+  { kind: "zombie", variant: "A", col: 15 },
+  { kind: "ping", col: 21 },
+  { kind: "spikes", col: 25, tiles: 2 },
+  { kind: "cron", col: 30, columnTiles: 5 },
+  { kind: "hang", col: 35, hangY: 3 * TILE },
+  { kind: "pipe", col: 39, tiles: 2 },
+  { kind: "fork", col: 47, range: 60 },
+  { kind: "leak", col: 59, extent: 7 },
+  { kind: "pointer", col: 64 },
+  { kind: "spinlock", col: 70, arm: 4 },
+];
+const KILLABLE = ["bug", "zombie", "ping", "hang", "fork", "leak"];
+const KILL_MESSAGES = { bug: "resolved", zombie: "reaped", ping: "pong", hang: "kill -9", fork: "forked", leak: "free()" };
+const HIT_MESSAGES = { bug: "unhandled exception", zombie: "<defunct> process attached", spikes: "kernel: stack overflow", ping: "request timed out", hang: "process not responding", cron: "cron: job executed (you)", pipe: "broken pipe", pointer: "use after free", fork: "fork: resource unavailable", leak: "out of memory", spinlock: "spinlock: deadlock detected" };
+
+for (const a of ACTORS) {
+  a.x = homeX(a.col, a.tiles);
+  a.y = GROUND;
+  a.facing = -1;
+  a.alive = true;
+  a.diedAt = -99;
+  a.shots = [];
+  a.charge = 1.5;
+  a.seen = 0;
+  a.state = "hanging";
+  a.vy = 0;
+  a.children = [];
+}
+
+let toast = { text: "", at: -9 }, lastHit = -9;
+
+function actorBox(a) {
+  if (a.kind === "spikes") { const w = 24 * a.tiles - 6; return { l: a.x - w / 2, r: a.x + w / 2, t: a.y - 10, b: a.y }; }
+  if (a.kind === "pipe") return { l: a.x - 12, r: a.x + 12, t: 5 * TILE - pipeRise(now), b: 5 * TILE + 36 - pipeRise(now) };
+  const [w, h] = SIZES[a.small ? "forkSmall" : a.kind];
+  return { l: a.x - w / 2, r: a.x + w / 2, t: a.y - h, b: a.y };
+}
+function harmful(a) {
+  if (a.kind === "spinlock") return linkBoxes(a);
+  if (a.kind === "cron") return a.firing ? [{ l: a.x - 10, r: a.x + 10, t: GROUND - a.columnTiles * TILE, b: GROUND }] : [];
+  if (a.kind === "pointer") return [actorBox(a)].concat(a.shots.map(x => ({ l: x, r: x + 24, t: GROUND - 15, b: GROUND - 9 })));
+  if (a.kind === "leak") return a.grown > 0 ? [actorBox(a), { l: a.x - 12 - a.grown, r: a.x - 12, t: GROUND - 6, b: GROUND }] : [actorBox(a)];
+  if (a.kind === "pipe") return pipeRise(now) > 0 ? [actorBox(a)] : [];
+  return [actorBox(a)];
+}
+function linkBoxes(a) {
+  const angle = 2 * Math.PI * now / 3, out = [];
+  for (let i = 1; i <= a.arm; i++) {
+    const x = a.x + Math.cos(angle) * i * 14, y = GROUND - 12 - Math.sin(angle) * i * 14;
+    if (!solid(tileAt(Math.floor(x / TILE), Math.floor(y / TILE)))) out.push({ l: x - 5, r: x + 5, t: y - 5, b: y + 5 });
+  }
+  return out;
+}
+const overlap = (p, q) => p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b;
+const heroBox = () => ({ l: hero.x - 8, r: hero.x + 8, t: hero.y - heroH(), b: hero.y });
+
+function stepActors(t, dt, camX, prevBottom) {
+  for (const a of ACTORS) {
+    if (!a.alive) {
+      if (t - a.diedAt > 2.5 && a.children.every(c => !c.alive)) { a.alive = true; a.state = "hanging"; a.y = a.kind === "hang" ? a.hangY : GROUND; a.children = []; }
+      for (const c of a.children) stepChild(c, a, t, dt);
+      continue;
+    }
+    if (a.kind === "bug" || a.kind === "fork") { const p = patrol(t, 48, a.range); a.x = homeX(a.col) + p.off; a.facing = p.facing; }
+    if (a.kind === "zombie") { const p = patrol(t, 30, 48); a.x = homeX(a.col) + p.off; a.facing = p.facing; a.y = GROUND - 6 + Math.sin(t * 2.5) * 4; }
+    if (a.kind === "ping") a.y = GROUND - pingHeight(t);
+    if (a.kind === "cron") a.firing = t % 3 >= 2;
+    if (a.kind === "hang") stepHang(a, dt);
+    if (a.kind === "pointer") {
+      a.shots = a.shots.map(x => x - 180 * dt).filter(x => a.x - x < VIEW_W);
+      if (a.x > camX && a.x < camX + VIEW_W) {
+        a.charge += dt;
+        if (a.charge >= 2.5) { a.charge -= 2.5; a.shots.push(a.x - 7 - 24); }
+      }
+      a.warning = a.charge >= 2;
+    }
+    if (a.kind === "leak") {
+      if (a.x > camX && a.x < camX + VIEW_W) a.seen += dt;
+      a.grown = a.seen > 0 ? leakLength(a.seen, a.extent) : 0;
+    }
+  }
+  const hb = heroBox();
+  for (const a of ACTORS) {
+    const targets = a.alive ? [a] : a.children.filter(c => c.alive);
+    for (const e of targets) {
+      const body = e === a ? actorBox(a) : childBox(e);
+      const stompable = KILLABLE.includes(a.kind) && !e.ghost;
+      if (stompable && overlap(hb, body) && hero.vy > 0 && prevBottom <= body.t + 6) { kill(a, e, t); continue; }
+      const areas = e === a ? harmful(a) : [body];
+      if (e.ghost) continue;
+      if (areas.some(box => overlap(hb, box)) && t - lastHit > 0.8) { lastHit = t; toast = { text: HIT_MESSAGES[a.kind], at: t }; }
+    }
+  }
+}
+
+function kill(a, e, t) {
+  hero.vy = (keys[" "] || keys.ArrowUp) ? -560 : -420;
+  hero.jumping = true;
+  e.alive = false;
+  e.diedAt = t;
+  e.deathX = e.x; e.deathY = e.y;
+  if (e === a && a.kind === "fork") {
+    a.children = [-1, 1].map(dir => ({ x: a.x, y: GROUND, dir, alive: true, small: true, born: t, diedAt: -99 }));
+    toast = { text: "forked", at: t };
+  } else toast = { text: e === a ? KILL_MESSAGES[a.kind] : "wait()", at: t };
+}
+
+function stepChild(c, a, t, dt) {
+  if (!c.alive) return;
+  const age = t - c.born;
+  c.ghost = age < 0.5;
+  c.x += c.dir * (age < 0.3 ? 300 : 84) * dt;
+  const home = homeX(a.col);
+  if (c.x > home + a.range + 40) c.dir = -1;
+  if (c.x < home - a.range - 40) c.dir = 1;
+}
+function childBox(c) { return { l: c.x - 6, r: c.x + 6, t: c.y - 12, b: c.y }; }
+
+function stepHang(a, dt) {
+  if (a.state === "hanging") {
+    a.y = a.hangY;
+    if (Math.abs(hero.x - a.x) < 5.5 * TILE && hero.y > a.y) a.state = "falling";
+  } else if (a.state === "falling") {
+    a.vy = Math.min(a.vy + 1800 * dt, 900);
+    a.y += a.vy * dt;
+    if (a.y >= GROUND) { a.y = GROUND; a.vy = 0; a.state = "lying"; a.lying = 1.5; }
+  } else if (a.state === "lying") {
+    a.lying -= dt;
+    if (a.lying <= 0) a.state = "winding";
+  } else {
+    a.y = Math.max(a.y - 60 * dt, a.hangY);
+    if (a.y === a.hangY) a.state = "hanging";
+  }
+}
+
+function drawActor(ctx, a, t) {
+  if (a.kind === "pipe") {
+    drawPipeDaemon(ctx, a.x, 5 * TILE, pipeRise(t), t);
+    drawPipeBody(ctx, a.x, 5 * TILE, 3);
+    return;
+  }
+  if (a.kind === "leak") {
+    const d = !a.alive && t - a.diedAt < 0.4 ? (t - a.diedAt) / 0.4 : null;
+    if (a.alive) drawPuddle(ctx, a.x - 12, GROUND, a.grown, a.extent, t, 1);
+    else if (d !== null) drawPuddle(ctx, a.x - 12, GROUND, a.grown * (1 - d), a.extent, t, 1 - d);
+    else drawPuddle(ctx, a.x - 12, GROUND, 0, a.extent, t, 1);
+  }
+  if (a.kind === "hang") drawThread(ctx, a.x, 0, (a.alive ? a.y : a.deathY) - 18);
+  for (const c of a.children) {
+    if (c.alive) { drawSizeBox(ctx, "forkSmall", c.x, c.y); drawEnemy(ctx, "fork", { t, small: true, moving: true, ghost: c.ghost }, c.x, c.y, c.dir); }
+    else if (t - c.diedAt < 0.4) drawEnemy(ctx, "fork", { t, small: true }, c.deathX, c.deathY, c.dir, (t - c.diedAt) / 0.4);
+  }
+  const s = { t, variant: a.variant, moving: true, tiles: a.tiles, firing: a.firing, columnTiles: a.columnTiles, state: a.state, warning: a.warning, arm: a.arm,
+    angle: 2 * Math.PI * t / 3, height: GROUND - a.y, sinceLand: t % 1.7,
+    buried: (x, y) => solid(tileAt(Math.floor((a.x + x) / TILE), Math.floor((GROUND + y) / TILE))) };
+  if (a.kind === "pointer") for (const x of a.shots) drawShot(ctx, x, GROUND - 12, t);
+  if (!a.alive) {
+    const seconds = deathSeconds(a.kind);
+    if (t - a.diedAt < seconds) drawEnemy(ctx, a.kind, Object.assign(s, { moving: false, state: "lying" }), a.deathX, a.deathY, a.facing, (t - a.diedAt) / seconds);
+    return;
+  }
+  if (a.kind === "cron" && a.firing) drawBox(ctx, a.x - 10, GROUND - a.columnTiles * TILE, 20, a.columnTiles * TILE);
+  if (a.kind === "spinlock") for (const b of linkBoxes(a)) drawBox(ctx, b.l, b.t, 10, 10);
+  if (a.kind === "spikes") { const b = actorBox(a); drawBox(ctx, b.l, b.t, b.r - b.l, 10); }
+  else drawSizeBox(ctx, a.kind, a.x, a.y);
+  drawEnemy(ctx, a.kind, s, a.x, a.y, a.facing);
+}
+
+const strip = document.getElementById("strip");
+const SH = ROWS * TILE + 20;
+let pressedLatch = false;
+function drawStrip(t, dt) {
+  const input = {
+    dir: (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0),
+    held: !!(keys[" "] || keys.ArrowUp),
+    pressed: pressedLatch,
+    sprint: !!keys.Shift,
+  };
+  pressedLatch = false;
+  const prevBottom = hero.y;
+  const steps = Math.min(8, Math.round(dt * 120));
+  for (let i = 0; i < steps; i++) stepPhysics(1 / 120, i === 0 ? input : Object.assign({}, input, { pressed: false }));
+  hero.landed += dt;
+  if (input.dir !== 0) hero.facing = input.dir;
+  hero.idle = Math.abs(hero.vx) < 5 && hero.grounded ? hero.idle + dt : 0;
+  const camX = Math.max(0, Math.min(hero.x - VIEW_W / 2, COLS * TILE - VIEW_W));
+  stepActors(t, dt, camX, prevBottom);
+
+  const dpr = window.devicePixelRatio || 1;
+  const z = Math.max(1, zoom - 0.5);
+  if (strip.width !== Math.round(VIEW_W * z * dpr)) {
+    strip.width = Math.round(VIEW_W * z * dpr); strip.height = Math.round(SH * z * dpr);
+    strip.style.width = VIEW_W * z + "px"; strip.style.height = SH * z + "px";
+  }
+  const ctx = strip.getContext("2d");
+  ctx.setTransform(z * dpr, 0, 0, z * dpr, 0, 0);
+  ctx.fillStyle = pal.background;
+  ctx.fillRect(0, 0, VIEW_W, SH);
+  ctx.save();
+  ctx.translate(-Math.round(camX), 0);
+  for (let r = 0; r < ROWS; r++) for (let c = Math.floor(camX / TILE); c <= Math.ceil((camX + VIEW_W) / TILE); c++) {
+    const ch = tileAt(c, r);
+    if (ch === "#") {
+      drawOp(ctx, tileOp("▓", c, r, 24, pal.ground, 0.6));
+      if (tileAt(c, r - 1) !== "#") drawOp(ctx, tileOp("▀", c, r, 12, pal.ground, 1));
+    }
+  }
+  for (const a of ACTORS) drawActor(ctx, a, t);
+  let state = heroState(input), big = hero.big;
+  if (hero.change) {
+    const u = t - hero.change.at;
+    if (u < 0.7) { big = Math.floor(u / 0.09) % 2 === 0 ? !hero.change.toBig : hero.change.toBig; }
+    else hero.change = null;
+  }
+  drawHitbox(ctx, hero.x, hero.y, hero.big);
+  drawFigure(ctx, skin, big, state, t, hero.x, hero.y, hero.facing, { speed: Math.abs(hero.vx) });
+  if (state === "run" && hero.grounded) drawOp(ctx, { ch: hero.facing > 0 ? "»" : "«", x: hero.x - hero.facing * 22, y: hero.y - 8, size: 14, color: pal.hero, alpha: 0.6, glow: 4 });
+  ctx.restore();
+  if (t - toast.at < 1.4) drawText(ctx, toast.text, VIEW_W / 2, 22, 13, pal.text, "center");
+  drawText(ctx, `${state}   x ${Math.round(hero.x / TILE)}`, 8, SH - 6, 11, pal.muted);
+}
+
+const BOSS_W = 960, BOSS_H = 528, BOSS_GROUND = 20 * TILE;
+const bossCanvas = document.getElementById("boss");
+let faceMode = "cycle";
+
+const pad30 = s => s.padEnd(30, " ").slice(0, 30);
+function teeth(phase) { let s = ""; for (let i = 0; i < 18; i++) s += (i + phase) % 2 ? "▄" : "▀"; return s; }
+function faceRows(state, t) {
+  const top = "╔" + "═".repeat(30) + "╗";
+  let bottom = "╚" + "═".repeat(30) + "╝";
+  let inner;
+  if (state === "angry") {
+    const shut = blinking(t, 3.7, 0.5);
+    const twitch = Math.floor(t * 4) % 7 === 0 ? 1 : 0;
+    inner = [
+      "▓▒░  ▀▄▄              ▄▄▀  ░▒▓",
+      shut ? "░                            ░" : "░     ▄████▄      ▄████▄     ░",
+      shut ? "      ▀▀▀▀▀▀      ▀▀▀▀▀▀      " : "      ██  ██      ██  ██      ",
+      shut ? "" : "       ▀▀▀▀        ▀▀▀▀       ",
+      "    ▄█" + teeth(twitch) + "█▄    ",
+    ];
+  } else if (state === "dumping") {
+    const hex = "0x" + ((Math.floor(t * 12) * 2654435761) >>> 0).toString(16).padStart(8, "0").slice(0, 6);
+    bottom = "╚" + "═".repeat(10) + "▌" + hex + "▐" + "═".repeat(10) + "╝";
+    inner = [
+      "▓▒░                        ░▒▓",
+      "      ▀▄  ▄▀      ▀▄  ▄▀      ",
+      "        ██          ██        ",
+      "      ▄▀  ▀▄      ▄▀  ▀▄      ",
+      "          ▄▀▀▀▀▀▀▀▀▄          ",
+    ];
+  } else {
+    const blip = Math.floor(t * 14) % 50;
+    let line = "▁".repeat(22).split("");
+    if (blip < 21) { line[blip] = "╱"; line[blip + 1] = "╲"; }
+    inner = [
+      "░                            ░",
+      "",
+      "      ────          ────      ",
+      "",
+      "    " + line.join("") + "    ",
+    ];
+  }
+  return [top].concat(inner.map(s => "║" + pad30(s) + "║"), [bottom]);
+}
+
+function faceCharStyle(state, ch, r, c, t) {
+  if ("░▒▓".includes(ch)) return { color: pal.hostileAlt, alpha: 0.55 };
+  if (state === "angry" && r === 3 && ch === " ") return null;
+  if (state === "dumping" && r >= 2 && r <= 4 && c > 4 && c < 27 && "▀▄█".includes(ch)) return { color: pal.text, alpha: 1 };
+  if (state === "dead" && r === 3 && ch === "─") return { color: pal.text, alpha: 0.6 };
+  if (state === "dead" && (ch === "╱" || ch === "╲")) return { color: pal.text, alpha: 0.8 };
+  if (state === "dumping" && r === 6 && c > 10 && c < 21) return { color: pal.text, alpha: 0.8 };
+  return { color: pal.hostile, alpha: 1 };
+}
+
+function drawFace(ctx, state, t) {
+  const rows = faceRows(state, t);
+  const size = 16, lineH = 20, charW = size * 0.6;
+  const left = BOSS_W / 2 - rows[0].length * charW / 2, topY = 18;
+  const glitchSlot = Math.floor(t / 2.2), glitchOn = t % 2.2 < 0.12;
+  const glitchRow = 1 + (glitchSlot * 7919) % 5, glitchShift = glitchSlot % 2 ? 1 : -2;
+  const look = Math.floor(t / 1.3) % 3;
+  ctx.save();
+  ctx.font = `700 ${size}px ${FONT}`;
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  const fade = state === "dead" ? 0.45 : 1;
+  rows.forEach((row, r) => {
+    const glitching = glitchOn && r === glitchRow;
+    [...row].forEach((ch, c) => {
+      const st = faceCharStyle(state, ch, r, c, t);
+      if (!st || ch === " ") return;
+      const shown = glitching && (c * 13 + glitchSlot) % 5 === 0 ? "▒" : ch;
+      ctx.globalAlpha = st.alpha * fade;
+      ctx.fillStyle = glitching ? pal.hostileAlt : st.color;
+      if (fullFx) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 4 * zoom; } else ctx.shadowBlur = 0;
+      ctx.fillText(shown, left + (c + (glitching ? glitchShift : 0)) * charW, topY + r * lineH);
+    });
+  });
+  if (state === "angry" && !blinking(t, 3.7, 0.5)) {
+    ctx.fillStyle = pal.text;
+    ctx.globalAlpha = 1;
+    for (const eyeStart of [8, 20]) ctx.fillText("█", left + (eyeStart + 1 + (look === 0 ? 0 : look === 1 ? 1 : 0.5)) * charW, topY + 3 * lineH);
+  }
+  ctx.restore();
+  const titleY = topY + rows.length * lineH + 6;
+  drawText(ctx, state === "dead" ? "rebooting…" : "KERNEL PANIC", BOSS_W / 2, titleY + 24, 26, pal.hostile, "center");
+  drawText(ctx, "[ ■■□ ]", BOSS_W / 2, titleY + 44, 13, pal.muted, "center");
+}
+
+function drawShadow(ctx, x, progress) {
+  const w = 10 + 10 * progress;
+  drawOp(ctx, gbox(progress > 0.7 ? "▂" : "▁", x, BOSS_GROUND - 2, w, progress > 0.7 ? 4 : 2, pal.hostile, { alpha: 0.35 + 0.5 * progress }));
+}
+
+function drawBossDemo(t) {
+  const dpr = window.devicePixelRatio || 1, z = Math.min(zoom, 1.5);
+  if (bossCanvas.width !== Math.round(BOSS_W * z * dpr)) {
+    bossCanvas.width = Math.round(BOSS_W * z * dpr); bossCanvas.height = Math.round(BOSS_H * z * dpr);
+    bossCanvas.style.width = BOSS_W * z + "px"; bossCanvas.style.height = BOSS_H * z + "px";
+  }
+  const ctx = bossCanvas.getContext("2d");
+  ctx.setTransform(z * dpr, 0, 0, z * dpr, 0, 0);
+  ctx.fillStyle = pal.background;
+  ctx.fillRect(0, 0, BOSS_W, BOSS_H);
+  for (let c = 0; c < 40; c++) {
+    drawOp(ctx, tileOp("▓", c, 20, 24, pal.ground, 0.6));
+    drawOp(ctx, tileOp("▀", c, 20, 12, pal.ground, 1));
+    drawOp(ctx, tileOp("▒", c, 21, 24, pal.ground, 0.5));
+  }
+  const faceState = faceMode === "cycle" ? ["angry", "angry", "dumping", "dead"][Math.floor(t / 3) % 4] : faceMode;
+  drawFace(ctx, faceState, t);
+
+  const dropTop = 9 * TILE;
+  const spikeU = t % 2;
+  const spikeX = 220;
+  if (spikeU < 1) {
+    drawShadow(ctx, spikeX, spikeU);
+    drawOp(ctx, g("^", spikeX, dropTop, 14, pal.hostile, { alpha: Math.floor(t * 8) % 2 ? 0.5 : 0.25, glow: 3 }));
+  } else {
+    const y = Math.min(dropTop + (spikeU - 1) * 480, BOSS_GROUND - 7);
+    if (y < BOSS_GROUND - 7) {
+      drawShadow(ctx, spikeX, 1);
+      drawOp(ctx, gbox("┆", spikeX, y - 16, 3, 18, pal.hostileAlt, { alpha: 0.45 }));
+      drawOp(ctx, g("^", spikeX, y, 14, pal.hostile, { glow: 6 }));
+      drawBox(ctx, spikeX - 7, y - 7, 14, 14);
+    }
+  }
+
+  const bugU = t % 3.2, bugX = 360;
+  if (bugU < 1) {
+    drawShadow(ctx, bugX, bugU);
+    drawEnemy(ctx, "bug", { t, variant: "A" }, bugX, dropTop + 8, 1);
+    ctx.globalAlpha = 1;
+  } else {
+    const y = Math.min(dropTop + 8 + (bugU - 1) * 480, BOSS_GROUND);
+    const landed = y >= BOSS_GROUND;
+    const x = landed ? bugX + (bugU - 1 - (BOSS_GROUND - dropTop - 8) / 480) * 48 : bugX;
+    if (!landed) drawShadow(ctx, bugX, 1);
+    drawSizeBox(ctx, "bug", x, y);
+    drawEnemy(ctx, "bug", { t, variant: "A", moving: landed, dropping: !landed }, x, y, 1);
+  }
+
+  const traceU = t % 6, traceY = BOSS_GROUND - 12;
+  const traceX = traceU < 0.8 ? 0 : (traceU - 0.8) * 190;
+  if (traceX < BOSS_W) {
+    const faint = traceU < 0.8 ? 0.3 : 1;
+    if (traceU >= 0.8) for (let i = 1; i <= 3; i++) drawOp(ctx, gbox("▒░ "[i - 1] || "░", traceX - i * 8 + 4, traceY, 8, 8, pal.hostileAlt, { alpha: 0.35 / i }));
+    for (let i = 0; i < 9; i++) drawOp(ctx, gbox(i === 8 ? "▓" : "█", traceX + i * 8 + 4, traceY, 8, 8, pal.hostileAlt, { alpha: faint * (i % 2 ? 0.85 : 1), glow: 4 }));
+    const label = "panic+0x5c";
+    const scrambled = traceU >= 0.8 ? label.slice(0, -1) + "▒░#%"[Math.floor(t * 20) % 4] : label;
+    ctx.save(); ctx.globalAlpha = faint; drawText(ctx, scrambled, traceX + 36, traceY - 7, 11, pal.hostileAlt, "center"); ctx.restore();
+    drawBox(ctx, traceX, traceY - 4, 72, 8);
+  }
+
+  const coreX = 19 * TILE + 24 + 120;
+  const pulse = 1 + Math.sin(t * 6) * 0.05;
+  for (let i = 0; i < 3; i++) {
+    const u = (t * 0.7 + i / 3) % 1;
+    drawOp(ctx, { ch: (i + Math.floor(t * 3)) % 2 ? "1" : "0", x: coreX - 14 + i * 14, y: BOSS_GROUND - 20 - u * 26, size: 10, color: pal.bit, alpha: (1 - u) * 0.6, glow: 3 });
+  }
+  drawOp(ctx, Object.assign(gbox("[core]", coreX, BOSS_GROUND - 8, 48 * pulse, 14 * pulse, pal.bit), { glow: 8 }));
+  drawOp(ctx, g("▼", coreX, BOSS_GROUND - 34 + Math.sin(t * 6) * 4, 10, pal.bit, { glow: 5 }));
+  drawBox(ctx, coreX - 24, BOSS_GROUND - 16, 48, 16);
+
+  const patchX = 900 - (t * 54) % 300;
+  const hopY = -Math.abs(Math.sin(t * 7)) * 2;
+  drawOp(ctx, Object.assign(gbox("[patch]", patchX, BOSS_GROUND - 8 + hopY, 48, 14, pal.bit), { glow: 8 }));
+  drawText(ctx, "hotfix", patchX, BOSS_GROUND - 22, 11, pal.bit, "center");
+  for (let i = 0; i < 4; i++) {
+    const behind = 24 + (i + 0.5) * 14;
+    drawOp(ctx, { ch: "+", x: patchX + behind, y: BOSS_GROUND - 10 + Math.sin(t * 9 + i * 2) * 4, size: 12, color: pal.bit, alpha: (1 - i / 4) * (Math.floor((t + i * 0.07) * 8) % 2 ? 0.4 : 0.9), glow: 3 });
+  }
+  drawBox(ctx, patchX - 24, BOSS_GROUND - 16, 48, 16);
+}
+
+addEventListener("keydown", e => {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(e.key)) e.preventDefault();
+  if (e.repeat) return;
+  if ((e.key === " " || e.key === "ArrowUp") && !keys[" "] && !keys.ArrowUp) pressedLatch = true;
+  keys[e.key] = true;
+  if (e.key === "b" || e.key === "B") { hero.big = !hero.big; hero.change = { at: now, toBig: hero.big }; }
+  if (e.key === "[" || e.key === "]") stepTheme(e.key === "]" ? 1 : -1);
+});
+addEventListener("keyup", e => { keys[e.key] = false; if (e.key === "Shift") keys.Shift = false; });
+addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+
+const themeSelect = document.getElementById("theme");
+const themeNames = Object.keys(PALETTES);
+for (const name of themeNames) themeSelect.add(new Option(name, name));
+function applyTheme(name) {
+  pal = PALETTES[name];
+  themeSelect.value = name;
+  const s = document.body.style;
+  s.setProperty("--page", pal.background);
+  s.setProperty("--panel", pal.background);
+  s.setProperty("--ink", pal.text);
+  s.setProperty("--muted", pal.muted);
+  s.setProperty("--line", pal.muted);
+  s.setProperty("--acc", pal.hostile);
+}
+function stepTheme(step) {
+  const i = themeNames.indexOf(themeSelect.value);
+  applyTheme(themeNames[(i + step + themeNames.length) % themeNames.length]);
+}
+themeSelect.addEventListener("change", () => { applyTheme(themeSelect.value); themeSelect.blur(); });
+applyTheme("tokyo-night");
+
+function markButtons() {
+  document.querySelectorAll("[data-zoom]").forEach(b => b.classList.toggle("on", +b.dataset.zoom === zoom));
+  document.querySelectorAll("[data-face]").forEach(b => b.classList.toggle("on", b.dataset.face === faceMode));
+  document.getElementById("fx").textContent = fullFx ? "full" : "reduced";
+  document.getElementById("hb").textContent = showHitbox ? "shown" : "hidden";
+}
+document.querySelectorAll("[data-zoom]").forEach(b => b.addEventListener("click", () => { zoom = +b.dataset.zoom; markButtons(); b.blur(); }));
+document.querySelectorAll("[data-face]").forEach(b => b.addEventListener("click", () => { faceMode = b.dataset.face; markButtons(); b.blur(); }));
+document.getElementById("fx").addEventListener("click", e => { fullFx = !fullFx; markButtons(); e.target.blur(); });
+document.getElementById("hb").addEventListener("click", e => { showHitbox = !showHitbox; markButtons(); e.target.blur(); });
+markButtons();
+
+const params = new URLSearchParams(location.search);
+if (params.get("theme") && PALETTES[params.get("theme")]) applyTheme(params.get("theme"));
+if (params.get("zoom")) { zoom = +params.get("zoom"); markButtons(); }
+if (params.get("face")) { faceMode = params.get("face"); markButtons(); }
+const frozen = params.has("t") ? +params.get("t") : null;
+
+let now = 0, last = performance.now();
+function frame(ms) {
+  const dt = Math.min((ms - last) / 1000, 0.1);
+  last = ms;
+  now = frozen === null ? ms / 1000 : frozen;
+  drawStrip(now, frozen === null ? dt : 0);
+  drawGallery(now);
+  drawBossDemo(now);
+  requestAnimationFrame(frame);
+}
+document.fonts.load(`700 24px ${FONT}`).then(() => document.fonts.ready).then(() => requestAnimationFrame(frame));
+</script>
+</body>
+</html>

@@ -5,8 +5,12 @@ Text {
 
   property var part: null
   property var colors
-  readonly property rect ink: metrics.tightBoundingRect(part ? part.measure : "")
-  readonly property real fit: !part || ink.height <= 0 ? 0 : part.width > 0 ? part.width / ink.width : part.height / ink.height
+  readonly property string measure: part ? part.measure : ""
+  readonly property rect ink: metrics.tightBoundingRect(measure)
+  readonly property real widthFit: !part || ink.width <= 0 ? 0 : part.width / ink.width
+  readonly property real heightFit: !part || ink.height <= 0 ? 0 : part.height / ink.height
+  readonly property real fitX: !part ? 0 : part.width > 0 ? widthFit : heightFit
+  readonly property real fitY: !part ? 0 : part.height > 0 ? heightFit : widthFit
   readonly property real inkCenterX: ink.x + ink.width / 2
   readonly property real inkCenterY: baselineOffset + ink.y + ink.height / 2
 
@@ -17,15 +21,15 @@ Text {
   text: part ? part.text : ""
   visible: part !== null && part.text !== "" && part.opacity > 0
   opacity: part ? part.opacity : 0
-  color: part && part.role === "heroAccent" ? colors.text : colors.hero
+  color: !part || part.role === "hero" ? colors.hero : part.role === "heroAccent" ? colors.text : colors[part.role]
   x: part ? part.x - inkCenterX : 0
   y: part ? part.y - inkCenterY : 0
   transform: [
     Scale {
       origin.x: glyph.inkCenterX
       origin.y: glyph.inkCenterY
-      xScale: glyph.fit * (glyph.part ? glyph.part.scaleX : 1)
-      yScale: glyph.fit
+      xScale: glyph.fitX * (glyph.part ? glyph.part.scaleX : 1)
+      yScale: glyph.fitY
     },
     Rotation {
       origin.x: glyph.inkCenterX

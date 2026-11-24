@@ -2,10 +2,12 @@ import QtQuick
 import "../../logic/audio.mjs" as AudioLogic
 import "../../logic/backdrop.mjs" as Backdrop
 import "../../logic/boss.mjs" as Boss
+import "../../logic/bossFigure.mjs" as BossFigure
 import "../../logic/chunks.mjs" as Chunks
 import "../../logic/clock.mjs" as Clock
 import "../../logic/effects.mjs" as Effects
 import "../../logic/enemies.mjs" as Enemies
+import "../../logic/enemyFigure.mjs" as EnemyFigure
 import "../../logic/frameRate.mjs" as FrameRate
 import "../../logic/heroFigure.mjs" as HeroFigure
 import "../../logic/generator.mjs" as Generator
@@ -50,6 +52,11 @@ QtObject {
       const arena = World.createWorld(Boss.arenaLevel(0x7f3a91c2))
       for (let i = 0; i < 600; i++) World.stepWorld(arena, input, 1 / 60)
       Boss.phaseOrder(arena.level.seed, 10)
+      const crowd = World.createWorld(generated)
+      const animator = EnemyFigure.createEnemyAnimator(crowd.enemies)
+      EnemyFigure.stepEnemyAnimator(animator, crowd.enemies, 1 / 60, [])
+      for (const enemy of crowd.enemies) EnemyFigure.deathFigure(EnemyFigure.enemyFigure(enemy, 1, true) && enemy, 1, 0.3)
+      BossFigure.faceLayers("angry", 1)
       Run.levelSummary(run)
       HighScores.insertScore(HighScores.parseScores("[]"), HighScores.scoreEntry(run, "2026-11-23"))
       Menu.mainMenuItems(run)

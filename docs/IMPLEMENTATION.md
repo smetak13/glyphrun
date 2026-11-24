@@ -223,28 +223,29 @@ Notes: `logic/heroFigure.mjs` turns the hero's state into a pose and the pose in
 
 ## 15. Rich ASCII: enemies
 
-- Status: todo
+- Status: done
 
 Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual, as task 14.
 
-Lively, animated enemies (all eleven) and the boss. Settled while shaping task 14:
+Lively, animated enemies (all eleven) and the boss. Shaped in a grilling session:
 
-- An HTML prototype first, `docs/prototype/enemies.html`, iterated with the user, then the game.
-- A drawing may be up to about one tile wide; the parts that hurt (spikes, the spinlock arm, pointer shots, the cron column, the leak puddle, the daemon's head) are drawn exactly to their hitboxes.
-- Two colours per character; hazards stay in the red family. No Nerd Font icons on characters.
-- Lively means movement frames, facing and death animations, and tells only where a warning already exists: the pointer's blink and the boss's falling-spike shadows, faint stack-trace bars and spawn shadows. The cron vent, the pipe daemon and the hang keep having no warning. No cosmetic reactions to the hero.
-- The boss's face, its attacks and the core follow the new look.
-- Animation follows the hero's model: a pure logic module computes the parts from the game state and time, and QML draws them.
+- An HTML prototype first, `docs/prototype/enemies.html`, iterated with the user, then the game. It has a gallery (each enemy animated beside today's look, cycling through its states, with its death), a strip where the steerable hero from `hero.html` walks past a few enemies at game scale, and the boss in its own section. The first round had two variants each for the bug and the zombie; the user chose A for both (the bug with a head, eye and antenna; the zombie with outstretched arms and `×` eyes). It stays as the enemies' visual target.
+- Each enemy keeps its signature glyph (`ж`, `Z`, `◎`, `▼`, `&`, `%`, and the trap glyphs) as its body or head and is built around it.
+- Creatures (bug, zombie, ping, hang, fork bomb, the leak's source) get faces with eyes in the foreground colour; traps (spikes, cron vent, pipe, pointer, spinlock) get mechanical details in a second red and no faces. Two colours per character; hazards stay in the red family. Only glyphs that JetBrainsMono Nerd Font has, and no Nerd Font icons.
+- Creatures may be drawn up to about one tile wide and a few pixels taller than their hitbox, feet on its bottom. The parts that hurt (spikes, the spinlock arm, pointer shots, the cron column, the leak puddle, the daemon's head) are drawn exactly to their hitboxes.
+- Creatures blink and breathe all the time; traps have one subtle detail at most (the pivot turning, a faint shimmer), so hazards stay easy to read. Walking creatures (bug, zombie, fork bombs) face the way they move, the pointer faces left, the ping and the hang face the viewer. No cosmetic reactions to the hero.
+- Tells only where a warning already exists: the pointer's blink and the boss's falling-spike shadows, faint stack-trace bars and spawn shadows. The idle loops of the cron vent, the pipe daemon and the hang run on their own clock, never in step with their cycle, so nothing hints at the next fire, rise or drop; the hang does not twitch before it drops.
+- Deaths are cosmetic and last about 0.3–0.5 s: a squash and pop by default; the zombie fades upward, the big fork bomb visibly tears in two and the leak's puddle dries away.
+- **Hacker style**, chosen after the first round looked too infantile; shapes and animations stay as they were. Eyes are thin angled slits `▀` that glare inwards, with a blink that collapses them to `▁`; startled eyes (a hang falling, a bug dropping in the boss fight) are solid blocks. Sharp details instead of round ones: the bug's head `◆` and antenna `╱`, the ping's landing rings `⟨ ⟩`, the zombie's `░▒` dither trail, the leak's pupils `▪`. Deaths scramble the parts into `▓▒░#%&$!?` as they scatter, with hex fragments instead of confetti. Every few seconds a creature takes a glitch tick (a pixel's jump with a cyan ghost of its body), each on its own clock and only with full effects. Glow stays tight.
+- The boss's face is redrawn richer (`▓▒░` and half-blocks), still framed like a panic screen, animated, with its angry, dumping and dead states; it never tracks the hero. Its attacks, the core and the patch follow the new look.
+- Animation follows the hero's model: a pure logic module computes each enemy's glyph parts (about 5 at most) from the game state and time, and QML draws them. It never feeds back into the game.
+- Performance: the animations stay on with reduced effects if the frame times measured in a busy level, estimated for the Intel HD 620 as in `docs/spikes/rendering.md`, stay in budget; otherwise reduced effects show enemies in a still pose and deaths as an instant pop.
 
-Open questions for the grilling session, with the recommendations from the first round:
+Tests: every enemy has the same number of parts in every state, animating never changes an enemy, mirroring by facing, creatures' eyes in the foreground colour glaring inwards, traps all red, spikes, the cron column, the daemon's head and pointer shots drawn to their hitboxes, the puddle spanning its frame, spinlock links at their positions and hidden when buried, the idle loops of the hang, cron vent and pipe ignoring their timers, the pointer swelling only while it warns, the glitch tick only with full effects and only on creatures, the faint fork ghosts, deaths recorded on a kill and gone after their time or when the enemy comes back, boss bug deaths and the bugs cleared after a core window, the squash then scramble, the zombie rising, the fork tearing, the puddle drying, the hex sparks, drawing only near the screen; the boss face's size in every state, its states, its layers lining up without overlap and together drawing the face, the pupils in the sockets, the glitch row, the hex in the dumping frame, the drop shadow growing, the stack trace's scrambled last character and the core's rising bits.
 
-1. Keep each signature glyph (`ж`, `Z`, `◎`, `▼`, `&`, `%`) as the body and build around it, or new multi-glyph creatures? Recommended: keep the glyph.
-2. Faces on creatures (bug, zombie, ping, hang, fork bomb, the leak's source) and mechanical animation on traps? Recommended: yes.
-3. Accent colour: the foreground for eyes, another red for mechanical details? Recommended: yes.
-4. Death animations: squash and pop by default, with the zombie fading upward, the fork bomb's split shown and the leak's puddle drying away? Recommended: yes.
-5. One design per enemy, two variants only where unsure (bug, zombie)? Recommended: yes.
-6. The boss in the same prototype, as its own section? Recommended: yes.
-7. Prototype form: a gallery with today's look beside each enemy, plus a short strip where the steerable hero walks past a few of them? Recommended: both.
+Notes: `logic/enemyFigure.mjs` turns each enemy into glyph parts in the hero's part format; `ui/FigurePart.qml` now also fits a glyph to a box (width and height) and takes any palette role, and `ui/EnemyFigure.qml` holds an enemy's parts with its squash, pivoted sway and rise. An enemy animator, stepped once per frame beside the hero's, keeps a snapshot of each killed enemy (boss bugs included, although the boss drops them) for its death. The cron column, the puddle and the pointer shots are parts too. `logic/bossFigure.mjs` builds the boss face as layers of text (red, shade, eyes and a glitched row) that `ui/Boss.qml` stacks. Enemies more than 12 tiles off screen (a pointer: a screen) are neither animated nor drawn.
+
+Performance, measured offscreen on this machine with `GameView.sync()` over 600 frames on the busiest screen of two level-5 runs (8–9 enemies on screen): 0.55–0.64 ms per frame against 0.27–0.32 ms before the task, about 1.5 ms on the i5-7200U with the spike's 2.5× CPU factor; 7% fewer items are drawn than before, since far enemies are now hidden. Animating every enemy of the level, as the first version did, cost 6 ms, hence the culling. The animations therefore stay on with reduced effects.
 
 ## 16. Rich ASCII: level themes
 

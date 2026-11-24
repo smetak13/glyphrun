@@ -7,6 +7,7 @@ import "../logic/backdrop.mjs" as BackdropLogic
 import "../logic/effects.mjs" as Effects
 import "../logic/physics.mjs" as Physics
 import "../logic/heroFigure.mjs" as HeroFigureLogic
+import "../logic/enemyFigure.mjs" as EnemyFigureLogic
 
 Item {
   id: view
@@ -14,6 +15,7 @@ Item {
   property var run
   property var world
   property var heroAnimator
+  property var enemyAnimator
   property int heroDirection: 0
   property bool paused: false
   property bool menuOpen: false
@@ -145,8 +147,12 @@ Item {
       item.visible = !world.bits[i].collected
       item.y = item.restY + Math.sin(world.time * 3 + item.x) * 3
     }
-    for (let i = 0; i < enemies.count; i++) enemies.itemAt(i).sync(world.enemies[i], world.time)
-    boss.sync(world.boss, world.time)
+    for (let i = 0; i < enemies.count; i++) {
+      const item = enemies.itemAt(i)
+      if (EnemyFigureLogic.drawnNear(world.enemies[i], cameraX)) item.sync(world.enemies[i], enemyAnimator, fullEffects)
+      else item.visible = false
+    }
+    boss.sync(world.boss, world.time, enemyAnimator, fullEffects)
     checkpointLit = world.checkpointReached
     finished = world.finished && !run.won
     over = run.over

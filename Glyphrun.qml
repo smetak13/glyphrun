@@ -17,6 +17,7 @@ import "logic/story.mjs" as Story
 import "logic/boss.mjs" as Boss
 import "logic/validator.mjs" as Validator
 import "logic/heroFigure.mjs" as HeroFigure
+import "logic/enemyFigure.mjs" as EnemyFigureLogic
 
 Item {
   id: root
@@ -29,6 +30,7 @@ Item {
   property var run: null
   property var world: null
   property var heroAnimator: null
+  property var enemyAnimator: null
   property var clock: Clock.createClock()
   property var frameTimer: Clock.createFrameTimer()
   property var effects: Effects.createEffects()
@@ -129,6 +131,7 @@ Item {
   function showWorld() {
     world = run.world
     heroAnimator = HeroFigure.createHeroAnimator(world.hero)
+    enemyAnimator = EnemyFigureLogic.createEnemyAnimator(world.enemies)
     levelNumber = run.levelNumber
     clock = Clock.createClock()
     summaryTime = 0
@@ -142,6 +145,7 @@ Item {
     const next = Run.createRun(seed, Validator.playableLevel(seed, 1))
     world = next.world
     heroAnimator = HeroFigure.createHeroAnimator(world.hero)
+    enemyAnimator = EnemyFigureLogic.createEnemyAnimator(world.enemies)
     run = next
     rank = 0
     timeRank = 0
@@ -455,6 +459,7 @@ Item {
     if (waiting) jumpPressed = false
     playCues()
     HeroFigure.stepHeroAnimator(heroAnimator, world.hero, heroDirection(), frameTime)
+    EnemyFigureLogic.stepEnemyAnimator(enemyAnimator, world.enemies, frameTime, world.boss ? world.boss.bugs : [])
     Effects.stepEffects(effects, frameTime)
     stageEnded = run.over || world.finished
     if (run.won) {
@@ -542,6 +547,7 @@ Item {
           run: root.run
           world: root.world
           heroAnimator: root.heroAnimator
+          enemyAnimator: root.enemyAnimator
           heroDirection: root.heroDirection()
           paused: root.paused
           menuOpen: root.menuOpen
