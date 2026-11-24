@@ -12,7 +12,7 @@ Item {
     bug: { text: "ж", size: 26, role: "hostile", drop: 2 },
     zombie: { text: "Z", size: 26, role: "hostileAlt2", drop: 2 },
     spikes: { text: "^", size: 20, role: "hostile", drop: 8 },
-    ping: { text: "o", size: 26, role: "hostileAlt", drop: 2 },
+    ping: { text: "◎", size: 26, role: "hostileAlt", drop: 2 },
     hang: { text: "▼", size: 22, role: "hostileAlt", drop: 2 },
     cron: { text: "[*]", size: 16, role: "hostile", drop: 4 },
     pipe: { text: "}<", size: 36, role: "hostile", drop: 4 },

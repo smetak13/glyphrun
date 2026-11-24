@@ -141,7 +141,7 @@ Eleven in the MVP. Basic ones appear from level 1; advanced ones join from level
 | 1 | `ж` | bug | Walks back and forth on the ground. | Stomp from above. |
 | 2 | `Z` | zombie process | Floats slowly back and forth over a short stretch, bobbing, labelled `<defunct>`. | Stomp from above. |
 | 3 | `^^^` | kernel spikes | Static spikes on the ground or on a platform. | No. |
-| 4 | `o` | ping | Hops in place at a fixed rhythm. Pass under it while it is up, or jump over it while it is down. | Stomp from above, on the ground or mid-hop. |
+| 4 | `◎` | ping | Hops in place at a fixed rhythm. Pass under it while it is up, or jump over it while it is down. | Stomp from above, on the ground or mid-hop. |
 | 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen, as high above its own ground as it would be on the base ground, but never in the top two rows. Drops when the hero comes within about five tiles, timed to land on a hero running at full speed; braking when it starts to drop avoids it. It falls through platforms and lands only on the ground or a solid block, so a platform is no shelter. Lies there for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
 
 ### 6.2 Advanced
