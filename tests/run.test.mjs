@@ -12,16 +12,20 @@ import {
   takeCues,
   DEATH_SECONDS,
   INVULNERABLE_SECONDS,
+  BITS_PER_LIFE,
   LEVEL_COUNT,
   LIVES,
+  LIVES_FLASH_SECONDS,
+  MAX_LIVES,
   POPUP_SECONDS,
   TOAST_SECONDS,
 } from "../logic/run.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { TILE } from "../logic/screen.mjs";
-import { BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, LIFE_BONUS_POINTS, PAR_SECONDS, TIME_BONUS_PER_SECOND } from "../logic/score.mjs";
+import { BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, FULL_LIVES_POINTS, LIFE_BONUS_POINTS, SUDO_POINTS, TIME_BONUS_PER_SECOND } from "../logic/score.mjs";
 import { arenaLevel, coreBox } from "../logic/boss.mjs";
+import { DIFFICULTY } from "../logic/generator.mjs";
 
 const IDLE = { direction: 0, jumpHeld: false, jumpPressed: false };
 const RIGHT = { direction: 1, jumpHeld: false, jumpPressed: false };
@@ -39,6 +43,14 @@ const PIT_AFTER_CHECKPOINT = levelFrom([".@C..........", "#####...#####"]);
 const BITS = levelFrom([".@.0.1......", "############"]);
 const SUDO = levelFrom([".@.S........", "############"]);
 const EXIT = levelFrom([".@...X......", "############"]);
+
+function bitRow(count, sudo) {
+  return levelFrom([".@" + (sudo ? "S" : "") + "0".repeat(count) + "...", "#".repeat(count + (sudo ? 6 : 5))]);
+}
+
+function collectAll(run) {
+  stepUntil(run, RIGHT, r => r.world.bits.every(bit => bit.collected));
+}
 
 function steps(run, input, seconds) {
   for (let i = 0; i < Math.round(seconds / STEP_SECONDS); i++) stepRun(run, input, STEP_SECONDS);
@@ -232,12 +244,13 @@ test("a small fork bomb scores 50 and a memory leak 200", () => {
   assert.deepEqual(run.popups.map(p => p.note), ["wait()", "free()"]);
 });
 
-test("reaching the exit adds the time bonus for every whole second under par", () => {
-  const run = createRun(1, EXIT);
+test("reaching the exit adds the time bonus for every whole second under the level's target time", () => {
+  const run = createRun(1, FLAT);
+  nextLevel(run, EXIT);
 
   stepUntil(run, RIGHT, r => r.world.finished);
 
-  const expected = Math.floor(PAR_SECONDS - run.world.time) * TIME_BONUS_PER_SECOND;
+  const expected = Math.floor(DIFFICULTY[1].seconds - run.world.time) * TIME_BONUS_PER_SECOND;
   assert.deepEqual([run.timeBonus, run.score], [expected, expected]);
 });
 
@@ -286,10 +299,12 @@ function stompCore(run) {
 
 test("stomping the boss's core scores and says how many cores were dumped", () => {
   const run = bossRun();
+  stepUntil(run, IDLE, r => r.world.boss.state === "core");
+  const before = run.score;
 
   stompCore(run);
 
-  assert.deepEqual([run.score, run.toast.text], [BOSS_HIT_POINTS, "core dumped (1/3)"]);
+  assert.deepEqual([run.score - before, run.toast.text], [BOSS_HIT_POINTS, "core dumped (1/3)"]);
 });
 
 test("the third hit defeats the boss, says the kernel is rebooting and finishes the stage without a time bonus", () => {
@@ -303,7 +318,7 @@ test("the third hit defeats the boss, says the kernel is rebooting and finishes 
   stepUntil(run, IDLE, r => r.world.finished);
 
   assert.equal(toast, "kernel: rebooting…");
-  assert.equal(run.score, 3 * BOSS_HIT_POINTS + BOSS_DEFEATED_POINTS + LIVES * LIFE_BONUS_POINTS);
+  assert.equal(run.score, SUDO_POINTS + 3 * BOSS_HIT_POINTS + BOSS_DEFEATED_POINTS + LIVES * LIFE_BONUS_POINTS);
   assert.equal(run.world.finished, true);
 });
 
@@ -460,7 +475,7 @@ test("the boss fight cues each phase, each core dump, each hit, its defeat and t
 
   const names = cueNames(run).filter(name => name !== "land" && name !== "jump");
   assert.deepEqual(names, [
-    "boss-warning", "core-dump", "boss-hit",
+    "boss-warning", "sudo", "core-dump", "boss-hit",
     "boss-warning", "core-dump", "boss-hit",
     "boss-warning", "core-dump", "boss-hit",
     "boss-defeat", "victory",
@@ -497,4 +512,67 @@ test("a run that ends in game over gets no life bonus", () => {
   steps(run, IDLE, DEATH_SECONDS + 0.1);
 
   assert.deepEqual([run.over, run.lifeBonus, run.score], [true, 0, 0]);
+});
+
+test("every hundred bits collected over the run give a life, with its toast, cue and a flash of the lives", () => {
+  const run = createRun(1, bitRow(BITS_PER_LIFE - 1));
+  collectAll(run);
+  const before = run.lives;
+  takeCues(run);
+  nextLevel(run, bitRow(BITS_PER_LIFE + 1));
+
+  collectAll(run);
+
+  assert.deepEqual([before, run.lives, run.toast.text, run.livesFlash > 0], [LIVES, LIVES + 2, "fork(): +1 life", true]);
+  assert.equal(takeCues(run).filter(cue => cue.name === "one-up").length, 2);
+});
+
+test("the flash of the lives wears off", () => {
+  const run = createRun(1, bitRow(BITS_PER_LIFE));
+  collectAll(run);
+
+  steps(run, IDLE, LIVES_FLASH_SECONDS + 0.1);
+
+  assert.equal(run.livesFlash, 0);
+});
+
+test("the sudo bit does not count towards a life", () => {
+  const run = createRun(1, bitRow(BITS_PER_LIFE - 1, true));
+
+  collectAll(run);
+
+  assert.equal(run.lives, LIVES);
+});
+
+test("at five lives a hundred bits score 1,000 instead of a life", () => {
+  const run = createRun(1, bitRow(BITS_PER_LIFE));
+  run.lives = MAX_LIVES;
+
+  collectAll(run);
+
+  assert.deepEqual([run.lives, run.score], [MAX_LIVES, BITS_PER_LIFE * 10 + FULL_LIVES_POINTS]);
+});
+
+function patchRun() {
+  const run = bossRun();
+  stepUntil(run, IDLE, r => r.world.boss.patch !== null);
+  run.world.hero.x = run.world.boss.patch.x;
+  return run;
+}
+
+test("the boss's patch grows a small hero and says the hotfix is applied", () => {
+  const run = patchRun();
+
+  stepRun(run, IDLE, STEP_SECONDS);
+
+  assert.deepEqual([run.world.hero.big, run.score, run.toast.text], [true, SUDO_POINTS, "kernel: hotfix applied"]);
+});
+
+test("the boss's patch while already big scores as already root", () => {
+  const run = patchRun();
+  run.world.hero.big = true;
+
+  stepRun(run, IDLE, STEP_SECONDS);
+
+  assert.deepEqual([run.world.hero.big, run.score, run.toast.text], [true, 500, "already root"]);
 });

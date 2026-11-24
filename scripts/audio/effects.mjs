@@ -41,6 +41,11 @@ const EFFECTS = {
     notes(buffer, CHIP_THIN, [72, 76, 79, 84, 88, 91, 96], { start: 0.02, step: 0.045, length: 0.04 });
     renderTone(buffer, { start: 0.32, length: 0.25, midi: 84, voice: CHIP_BELL });
   },
+  "one-up"(buffer) {
+    notes(buffer, CHIP, [72, 76, 79, 84, 79, 84, 88], { step: 0.055, length: 0.05 });
+    notes(buffer, CHIP_THIN, [84, 88, 91, 96], { start: 0.03, step: 0.11, length: 0.05, pan: 0.2 });
+    renderTone(buffer, { start: 0.4, length: 0.35, midi: 91, voice: CHIP_BELL });
+  },
   "already-root"(buffer) {
     notes(buffer, CHIP_BELL, [88, 91, 96], { step: 0.06, length: 0.1 });
     renderTone(buffer, { start: 0.18, length: 0.2, midi: 100, voice: CHIP_BELL });

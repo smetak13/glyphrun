@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CHUNKS } from "../logic/chunks.mjs";
-import { ADVANCED_KINDS, BASIC_KINDS, HANG_ROW } from "../logic/generator.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, HANG_ROW, chunkKinds, slotKinds } from "../logic/generator.mjs";
 import { SCREEN_ROWS, TILE } from "../logic/screen.mjs";
 import { computeEnvelope } from "../logic/physics.mjs";
 
@@ -25,13 +25,25 @@ test("every chunk fits under the hang's thread and stands on ground or a gap", (
   }
 });
 
-test("gap columns are empty above the ground and do not touch the chunk's edges", () => {
+test("above a gap there are only platforms, blocks, enemy slots and bits, and gaps do not touch the chunk's edges", () => {
   for (const chunk of CHUNKS) {
     const bottom = chunk.map[chunk.map.length - 1];
     for (let col = 0; col < bottom.length; col++) {
       if (bottom[col] !== "G") continue;
       assert.ok(col > 0 && col < bottom.length - 1, chunk.name);
-      for (const line of chunk.map.slice(0, -GROUND_ROWS)) assert.equal(line[col], ".", chunk.name + " column " + col);
+      for (const line of chunk.map.slice(0, -GROUND_ROWS)) assert.ok(".=BE*+".includes(line[col]), chunk.name + " column " + col);
+    }
+  }
+});
+
+test("a gap is never drawn narrower than its map, and slots above it stay inside it", () => {
+  for (const chunk of CHUNKS.filter(candidate => candidate.gap)) {
+    const bottom = chunk.map[chunk.map.length - 1];
+    for (const run of bottom.match(/G+/g)) assert.ok(chunk.gap[0] >= run.length, chunk.name);
+    for (const line of chunk.map) {
+      for (let col = 1; col < line.length; col++) {
+        if (line[col] === "E" && line[col - 1] === "E") assert.equal(bottom[col] === "G", bottom[col - 1] === "G", chunk.name);
+      }
     }
   }
 });
@@ -85,16 +97,24 @@ test("rest, start, checkpoint and exit chunks hold no enemies or gaps", () => {
 
 test("chunk enemy kinds are basic or advanced kinds", () => {
   for (const chunk of CHUNKS) {
-    for (const kind of chunk.kinds || []) assert.ok(BASIC_KINDS.includes(kind) || ADVANCED_KINDS.includes(kind), chunk.name);
+    for (const kind of chunkKinds(chunk)) assert.ok(BASIC_KINDS.includes(kind) || ADVANCED_KINDS.includes(kind), chunk.name);
+  }
+});
+
+test("a chunk naming kinds per slot names them for every slot and no kinds for the whole chunk", () => {
+  for (const chunk of CHUNKS.filter(candidate => candidate.slotKinds)) {
+    assert.equal(chunk.slotKinds.length, chunk.map.join("|").match(/E+/g).length, chunk.name);
+    assert.equal(chunk.kinds, undefined, chunk.name);
   }
 });
 
 test("a lone full memory leak is wider than any jump, and smaller ones come only as a row of three placed together", () => {
   const maxGap = computeEnvelope().maxGap;
 
-  for (const chunk of CHUNKS.filter(candidate => candidate.kinds && candidate.kinds.includes("leak"))) {
-    const runs = chunk.map.join("|").match(/E+/g);
-    const small = runs.filter(run => (run.length - 1) * TILE <= maxGap);
+  for (const chunk of CHUNKS) {
+    const runs = chunk.map.join("|").match(/E+/g) || [];
+    const kinds = slotKinds(chunk);
+    const small = runs.filter((run, i) => kinds[i].includes("leak") && (run.length - 1) * TILE <= maxGap);
     if (small.length > 0) assert.ok(chunk.together && runs.length >= 3, chunk.name);
   }
 });

@@ -29,6 +29,7 @@ Music and sound effects moved into the MVP (`docs/IMPLEMENTATION.md`, task 10). 
   - **OOM Killer**: an arena boss that hunts the biggest process, more aggressive while the hero is big (`@@`).
 - More enemies and traps, especially advanced ones. Walking enemies that fall off ledges as an advanced trait.
 - Dash as a power-up.
+- Terrain beyond the existing tiles: moving platforms, crumbling platforms and springs.
 
 ## Controls and settings
 

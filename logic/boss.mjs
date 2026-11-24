@@ -1,7 +1,7 @@
 import { TILE, SCREEN_COLS, SCREEN_ROWS } from "./screen.mjs";
 import { parseLevel } from "./level.mjs";
-import { HERO_WIDTH, heroHeight } from "./physics.mjs";
-import { createEnemy, stepEnemies, touchEnemies, STOMP_BOUNCE_VELOCITY, STOMP_TOLERANCE } from "./enemies.mjs";
+import { HERO_WIDTH, RUN_SPEED, heroHeight } from "./physics.mjs";
+import { bounceOff, createEnemy, stepEnemies, touchEnemies, STOMP_TOLERANCE } from "./enemies.mjs";
 import { subStream, pick, randomInt } from "./random.mjs";
 
 export const PHASES = ["spikes+trace", "spikes+spawn", "trace+spawn"];
@@ -30,6 +30,10 @@ export const MAX_TRACES = 8;
 export const CORE_COLS = [5, 19, 33];
 export const CORE_WIDTH = 2 * TILE;
 export const CORE_HEIGHT = 16;
+export const PATCH_ENTRY_SECONDS = [3, 6];
+export const PATCH_SPEED = RUN_SPEED / 2;
+export const PATCH_WIDTH = 2 * TILE;
+export const PATCH_HEIGHT = 16;
 const ARENA_ROW = SCREEN_ROWS - 4;
 const START_COL = 2;
 const GROUND_ROWS = 3;
@@ -71,6 +75,9 @@ export function createBoss(seed, arena) {
     ground: (arena.row + 1) * TILE,
     row: arena.row,
     random: subStream(seed, "boss-attacks"),
+    patchRandom: subStream(seed, "boss-patch"),
+    patch: null,
+    patches: 0,
     state: "intro",
     timer: INTRO_SECONDS,
     hits: 0,
@@ -88,6 +95,7 @@ export function resumeBoss(boss) {
   if (boss.state !== "intro" && !boss.cleared) boss.attacks--;
   boss.attack = null;
   boss.core = null;
+  boss.patch = null;
   clearHazards(boss);
   boss.state = "intro";
   boss.timer = INTRO_SECONDS;
@@ -111,6 +119,7 @@ function startAttack(boss, events) {
     time: 0,
     traceDirection: boss.random.next() < 0.5 ? -1 : 1,
     aimed: false,
+    patchAt: boss.attacks === 1 ? PATCH_ENTRY_SECONDS[0] + boss.patchRandom.next() * (PATCH_ENTRY_SECONDS[1] - PATCH_ENTRY_SECONDS[0]) : null,
     emitters: phase.split("+").map(pattern => ({ what: EMITTED[pattern], interval: INTERVALS[EMITTED[pattern]], next: 0 })),
   };
   events.push({ type: "bossPhase", phase });
@@ -153,6 +162,10 @@ function runAttack(boss, hero, fast, events) {
       emitter.next += emitter.interval;
     }
   }
+  if (attack.patchAt !== null && attack.time >= attack.patchAt) {
+    attack.patchAt = null;
+    enterPatch(boss, hero);
+  }
   attack.time += fast;
   if (attack.time >= length && boss.drops.length === 0 && boss.traces.length === 0) {
     boss.state = "core";
@@ -160,6 +173,29 @@ function runAttack(boss, hero, fast, events) {
     const col = pick(boss.random, CORE_COLS);
     boss.core = { x: boss.left + col * TILE + CORE_WIDTH / 2, timer: CORE_SECONDS };
     events.push({ type: "coreDump", x: boss.core.x, y: boss.ground - CORE_HEIGHT });
+  }
+}
+
+function enterPatch(boss, hero) {
+  const direction = hero.x < (boss.left + boss.right) / 2 ? -1 : 1;
+  boss.patches++;
+  boss.patch = { x: direction < 0 ? boss.right + PATCH_WIDTH / 2 : boss.left - PATCH_WIDTH / 2, direction, first: boss.patches === 1 };
+}
+
+export function patchBox(boss) {
+  return { left: boss.patch.x - PATCH_WIDTH / 2, right: boss.patch.x + PATCH_WIDTH / 2, top: boss.ground - PATCH_HEIGHT, bottom: boss.ground };
+}
+
+function movePatch(boss, hero, seconds, events) {
+  const patch = boss.patch;
+  if (!patch) return;
+  patch.x += patch.direction * PATCH_SPEED * seconds;
+  const box = patchBox(boss);
+  if (overlaps(heroBox(hero), box)) {
+    boss.patch = null;
+    events.push({ type: "patch", x: patch.x, y: box.top });
+  } else if (patch.direction < 0 ? box.right < boss.left : box.left > boss.right) {
+    boss.patch = null;
   }
 }
 
@@ -253,9 +289,7 @@ function stompsCore(boss, hero, previousBottom) {
 }
 
 function hitCore(boss, hero, events) {
-  hero.vy = -STOMP_BOUNCE_VELOCITY;
-  hero.jumping = true;
-  hero.grounded = false;
+  bounceOff(hero);
   boss.hits++;
   boss.cleared = true;
   events.push({ type: "bossHit", hits: boss.hits, x: boss.core.x, y: boss.ground - CORE_HEIGHT });
@@ -292,6 +326,7 @@ export function stepBoss(boss, level, hero, previousBottom, seconds) {
     if (stompsCore(boss, hero, previousBottom)) hitCore(boss, hero, events);
     else if (boss.core.timer === 0) pause(boss);
   } else if (boss.state !== "done") runTimers(boss, seconds, events);
+  movePatch(boss, hero, seconds, events);
   moveDrops(boss, hero, fast);
   moveTraces(boss, fast);
   return events.concat(stepBugs(boss, level, hero, previousBottom, seconds), hazardHits(boss, hero));

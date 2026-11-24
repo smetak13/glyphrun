@@ -11,6 +11,10 @@ Item {
   readonly property real blinkRate: 8
   readonly property real walkHop: 2
   readonly property real walkHopRate: 8
+  readonly property int sparkleCount: 4
+  readonly property real sparkleGap: 14
+  readonly property real arrowBob: 4
+  readonly property real arrowBobRate: 6
   readonly property string angryFace: [
     "╔══════════════════════╗",
     "║    ▀▄          ▄▀    ║",
@@ -101,9 +105,31 @@ Item {
 
   function syncCore(boss, time) {
     core.visible = boss.core !== null && (boss.core.timer > 1 || blinkOn(time))
+    coreArrow.visible = core.visible
     if (!boss.core) return
     core.x = Math.round(boss.core.x - core.width / 2)
     core.y = Math.round(boss.ground - core.baselineOffset + 2)
+    coreArrow.x = Math.round(boss.core.x - coreArrow.width / 2)
+    coreArrow.y = Math.round(core.y - coreArrow.height + Math.sin(time * arrowBobRate) * arrowBob)
+  }
+
+  function syncPatch(boss, time) {
+    const patchState = boss.patch
+    patch.visible = patchState !== null
+    patchLabel.visible = patchState !== null && patchState.first
+    for (let i = 0; i < sparkleCount; i++) sparkles.itemAt(i).visible = patchState !== null
+    if (!patchState) return
+    patch.x = Math.round(patchState.x - patch.width / 2)
+    patch.y = Math.round(boss.ground - patch.baselineOffset + 2)
+    patchLabel.x = Math.round(patchState.x - patchLabel.width / 2)
+    patchLabel.y = patch.y - patchLabel.height
+    for (let i = 0; i < sparkleCount; i++) {
+      const sparkle = sparkles.itemAt(i)
+      const behind = patch.width / 2 + (i + 0.5) * sparkleGap
+      sparkle.x = Math.round(patchState.x - patchState.direction * behind - sparkle.width / 2)
+      sparkle.y = Math.round(boss.ground - sparkle.height - 4 + Math.sin(time * 9 + i * 2) * 4)
+      sparkle.opacity = (1 - i / sparkleCount) * (blinkOn(time + i * 0.07) ? 0.9 : 0.4)
+    }
   }
 
   function sync(boss, time) {
@@ -122,6 +148,7 @@ Item {
     syncTraces(boss)
     syncBugs(boss, time)
     syncCore(boss, time)
+    syncPatch(boss, time)
   }
 
   Glyph {
@@ -208,6 +235,43 @@ Item {
     visible: false
     text: "[core]"
     size: 16
+    color: bossItem.colors.bit
+  }
+
+  Glyph {
+    id: coreArrow
+    visible: false
+    text: "▼"
+    size: 16
+    color: bossItem.colors.bit
+  }
+
+  Repeater {
+    id: sparkles
+    model: bossItem.sparkleCount
+
+    Glyph {
+      visible: false
+      text: "+"
+      size: 12
+      color: bossItem.colors.bit
+    }
+  }
+
+  Glyph {
+    id: patch
+    visible: false
+    text: "[patch]"
+    size: 15
+    color: bossItem.colors.bit
+  }
+
+  Glyph {
+    id: patchLabel
+    visible: false
+    text: "hotfix"
+    size: 11
+    opacity: 0.5
     color: bossItem.colors.bit
   }
 }

@@ -2,10 +2,14 @@ import { TILE } from "./screen.mjs";
 import { createWorld, respawnHero, stepWorld } from "./world.mjs";
 import { heroHeight } from "./physics.mjs";
 import { BOSS_HITS } from "./boss.mjs";
+import { DIFFICULTY } from "./generator.mjs";
 import { EVENTS, bossHitMessage, hitMessage, killMessage } from "./messages.mjs";
-import { ALREADY_ROOT_POINTS, BIT_POINTS, BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, SUDO_POINTS, killPoints, lifeBonus, timeBonus } from "./score.mjs";
+import { ALREADY_ROOT_POINTS, BIT_POINTS, BOSS_DEFEATED_POINTS, BOSS_HIT_POINTS, FULL_LIVES_POINTS, SUDO_POINTS, killPoints, lifeBonus, timeBonus } from "./score.mjs";
 
 export const LIVES = 3;
+export const MAX_LIVES = 5;
+export const BITS_PER_LIFE = 100;
+export const LIVES_FLASH_SECONDS = 1.2;
 export const LEVEL_COUNT = 5;
 export const INVULNERABLE_SECONDS = 1.5;
 export const DEATH_SECONDS = 1.2;
@@ -17,6 +21,8 @@ export function createRun(seed, level) {
     seed,
     levelNumber: 1,
     lives: LIVES,
+    oneUps: 0,
+    livesFlash: 0,
     score: 0,
     bitsBeforeLevel: 0,
     world: null,
@@ -151,14 +157,9 @@ export function killEnemy(run, source, x, y, small) {
   cue(run, "stomp", x, y);
 }
 
-function collectBit(run, bit) {
-  const x = (bit.col + 0.5) * TILE;
-  const y = bit.row * TILE;
+function grantSudo(run, x, y, message) {
   const hero = run.world.hero;
-  if (!bit.sudo) {
-    addPopup(run, x, y, BIT_POINTS, "", "bit");
-    cue(run, "bit", x, y + TILE / 2);
-  } else if (hero.big) {
+  if (hero.big) {
     cue(run, "already-root", x, y + TILE / 2);
     run.levelPoints.sudoPoints += ALREADY_ROOT_POINTS;
     addPopup(run, x, y, ALREADY_ROOT_POINTS, "", "hero");
@@ -168,8 +169,34 @@ function collectBit(run, bit) {
     cue(run, "sudo", x, y + TILE / 2);
     run.levelPoints.sudoPoints += SUDO_POINTS;
     addPopup(run, x, y, SUDO_POINTS, "", "hero");
-    showToast(run, EVENTS.sudo, "hero");
+    showToast(run, message, "hero");
   }
+}
+
+function earnLives(run) {
+  if (runBits(run) < (run.oneUps + 1) * BITS_PER_LIFE) return;
+  run.oneUps++;
+  heroCue(run, "one-up");
+  if (run.lives < MAX_LIVES) {
+    run.lives++;
+    run.livesFlash = LIVES_FLASH_SECONDS;
+    showToast(run, EVENTS.oneUp, "hero");
+  } else {
+    const hero = run.world.hero;
+    addPopup(run, hero.x, hero.y - heroHeight(hero), FULL_LIVES_POINTS, "", "hero");
+  }
+}
+
+function collectBit(run, bit) {
+  const x = (bit.col + 0.5) * TILE;
+  const y = bit.row * TILE;
+  if (bit.sudo) {
+    grantSudo(run, x, y, EVENTS.sudo);
+    return;
+  }
+  addPopup(run, x, y, BIT_POINTS, "", "bit");
+  cue(run, "bit", x, y + TILE / 2);
+  earnLives(run);
 }
 
 function handleEvent(run, event) {
@@ -180,7 +207,7 @@ function handleEvent(run, event) {
     heroCue(run, "checkpoint");
   } else if (event.type === "exit") {
     heroCue(run, "level-clear");
-    run.timeBonus = timeBonus(run.world.time);
+    run.timeBonus = timeBonus(run.world.time, DIFFICULTY[run.levelNumber - 1].seconds);
     run.score += run.timeBonus;
   } else if (event.type === "pit") {
     loseLife(run, "pit");
@@ -199,6 +226,8 @@ function handleEvent(run, event) {
     addPopup(run, x, y, BOSS_DEFEATED_POINTS, "", "hostile");
     cue(run, "boss-defeat", x, y);
     showToast(run, EVENTS.bossDefeated, "cyan");
+  } else if (event.type === "patch") {
+    grantSudo(run, event.x, event.y, EVENTS.hotfix);
   } else if (event.type === "bossPhase") {
     heroCue(run, "boss-warning");
   } else if (event.type === "coreDump") {
@@ -212,6 +241,7 @@ function handleEvent(run, event) {
 }
 
 function ageMessages(run, seconds) {
+  run.livesFlash = Math.max(run.livesFlash - seconds, 0);
   if (run.toast) {
     run.toast.age += seconds;
     if (run.toast.age >= TOAST_SECONDS) run.toast = null;

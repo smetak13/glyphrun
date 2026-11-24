@@ -34,6 +34,9 @@ Item {
   property bool over: false
   property string hudLeft: ""
   property string hudRight: ""
+  property string hudLives: ""
+  property bool livesGained: false
+  property bool livesFlashing: false
   property string overCause: ""
   readonly property real heroBaselineDrop: 2
   readonly property real bigHeroOffset: 20
@@ -113,7 +116,10 @@ Item {
 
   function syncHud() {
     hudLeft = run.levelNumber > Run.LEVEL_COUNT ? "BOSS" : "LVL " + run.levelNumber + "/" + Run.LEVEL_COUNT
-    hudRight = "bits " + pad(Run.runBits(run), 3) + "   score " + pad(run.score, 5) + "   " + pad(world.time.toFixed(1), 4) + "s   @ x" + run.lives
+    hudRight = "bits " + pad(Run.runBits(run), 3) + "   score " + pad(run.score, 5) + "   " + pad(world.time.toFixed(1), 4) + "s"
+    hudLives = "@ x" + run.lives
+    livesGained = run.livesFlash > 0
+    livesFlashing = livesGained && Math.floor(run.livesFlash * 8) % 2 === 0
   }
 
   function sync() {
@@ -398,12 +404,23 @@ Item {
     }
 
     Glyph {
-      anchors.right: parent.right
-      anchors.rightMargin: 20
+      anchors.right: hudLivesText.left
+      anchors.rightMargin: 14
       y: 17
       text: view.hudRight
       size: 14
       color: view.colors.text
+    }
+
+    Glyph {
+      id: hudLivesText
+      anchors.right: parent.right
+      anchors.rightMargin: 20
+      y: 17
+      text: view.hudLives
+      size: 14
+      scale: view.livesGained ? 1.25 : 1
+      color: view.livesFlashing ? view.colors.hero : view.colors.text
     }
 
     Rectangle {

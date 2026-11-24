@@ -1,6 +1,6 @@
 import { TILE, SCREEN_HEIGHT, SCREEN_WIDTH } from "./screen.mjs";
 import { tileAt } from "./level.mjs";
-import { isSolid, heroHeight, HERO_WIDTH } from "./physics.mjs";
+import { isSolid, heroHeight, COYOTE_TIME, HERO_WIDTH } from "./physics.mjs";
 import { subStream } from "./random.mjs";
 
 export const BUG_SPEED = 48;
@@ -135,7 +135,7 @@ export function resetEnemy(enemy) {
   enemy.downSeconds = enemy.kind === "pipe" ? pipeDownSeconds(enemy) : 0;
   enemy.y = enemy.kind === "pipe" ? pipeY(enemy) : enemy.homeY;
   enemy.previousY = enemy.y;
-  enemy.charge = POINTER_PERIOD - POINTER_FIRST_SHOT_SECONDS;
+  enemy.charge = POINTER_PERIOD - POINTER_FIRST_SHOT_SECONDS - (enemy.kind === "pointer" ? enemy.phase : 0);
   enemy.shots = [];
   enemy.seen = false;
   enemy.grown = 0;
@@ -431,10 +431,13 @@ export function touchEnemies(enemies, hero, previousBottom) {
       events.push({ type: "hit", source: enemy.kind });
     }
   }
-  if (stomped) {
-    hero.vy = -STOMP_BOUNCE_VELOCITY;
-    hero.jumping = true;
-    hero.grounded = false;
-  }
+  if (stomped) bounceOff(hero);
   return events;
+}
+
+export function bounceOff(hero) {
+  hero.vy = -STOMP_BOUNCE_VELOCITY;
+  hero.jumping = true;
+  hero.grounded = false;
+  hero.coyote = COYOTE_TIME;
 }

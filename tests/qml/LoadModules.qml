@@ -39,7 +39,7 @@ QtObject {
       Run.stepRun(run, input, Clock.STEP_SECONDS)
       Run.hitHero(run, Messages.ENEMY_SOURCES[0])
       Run.killEnemy(run, Messages.KILLABLE_SOURCES[0], 0, 0, false)
-      Score.timeBonus(10)
+      Score.timeBonus(10, 60)
       Enemies.pingHeight(1)
       Level.checkpointGlyphs(level.checkpoint, world.checkpointReached)
       const envelope = Physics.computeEnvelope()

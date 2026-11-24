@@ -39,10 +39,11 @@ import {
   PING_HOP_HEIGHT,
   ZOMBIE_BOB,
   ZOMBIE_RANGE,
+  STOMP_BOUNCE_VELOCITY,
 } from "../logic/enemies.mjs";
 import { createWorld, respawnHero, stepWorld } from "../logic/world.mjs";
 import { createRun, stepRun, LIVES } from "../logic/run.mjs";
-import { computeEnvelope, createHero, RUN_SPEED } from "../logic/physics.mjs";
+import { computeEnvelope, createHero, JUMP_VELOCITY, RUN_SPEED } from "../logic/physics.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { TILE } from "../logic/screen.mjs";
@@ -176,6 +177,34 @@ test("a stomped bug dies and the hero bounces", () => {
   assert.deepEqual(kinds(events), ["kill bug"]);
   assert.equal(bug.alive, false);
   assert.ok(world.hero.vy < 0);
+});
+
+function stompOnBug(pressedOnStep) {
+  const world = createWorld(levelFrom(["@.....b.....", "############"]));
+  const bug = world.enemies[0];
+  dropHeroOnto(world, bug);
+  let stompedOnStep = null;
+  let fastestRise = 0;
+  for (let step = 0; step < 60; step++) {
+    stepWorld(world, { direction: 0, jumpHeld: true, jumpPressed: step === pressedOnStep }, STEP_SECONDS);
+    if (!bug.alive && stompedOnStep === null) stompedOnStep = step;
+    if (!bug.alive) fastestRise = Math.max(fastestRise, -world.hero.vy);
+  }
+  return { stompedOnStep, fastestRise };
+}
+
+test("pressing jump just before or just after a stomp jumps off the enemy like off the ground", () => {
+  const stomp = stompOnBug(null).stompedOnStep;
+
+  const before = stompOnBug(stomp - 5).fastestRise;
+  const after = stompOnBug(stomp + 5).fastestRise;
+  const tooLate = stompOnBug(stomp + 30).fastestRise;
+  const heldOnly = stompOnBug(null).fastestRise;
+
+  assert.ok(Math.abs(before - JUMP_VELOCITY) < 30, "before: " + before);
+  assert.ok(Math.abs(after - JUMP_VELOCITY) < 30, "after: " + after);
+  assert.ok(Math.abs(tooLate - STOMP_BOUNCE_VELOCITY) < 1, "too late: " + tooLate);
+  assert.ok(Math.abs(heldOnly - STOMP_BOUNCE_VELOCITY) < 1, "held only: " + heldOnly);
 });
 
 test("touching a bug from the side is a hit", () => {
@@ -651,6 +680,17 @@ test("a dangling pointer blinks before each shot, then fires in its rhythm", () 
   stepOnCamera([pointer], POINTER_LEVEL, POINTER_PERIOD, ON_SCREEN);
 
   assert.deepEqual([before, warning, afterShot, pointer.shots.length], [false, true, [false, 1], 2]);
+});
+
+test("a dangling pointer with a delay fires its first shot that much later, then in its rhythm", () => {
+  const [pointer] = createEnemies([Object.assign({}, POINTER_LEVEL.enemies[0], { phase: 0.8 })]);
+  stepOnCamera([pointer], POINTER_LEVEL, POINTER_FIRST_SHOT_SECONDS + 0.7, ON_SCREEN);
+  const early = pointer.shots.length;
+  stepOnCamera([pointer], POINTER_LEVEL, 0.2, ON_SCREEN);
+  const first = pointer.shots.length;
+  stepOnCamera([pointer], POINTER_LEVEL, POINTER_PERIOD, ON_SCREEN);
+
+  assert.deepEqual([early, first, pointer.shots.length], [0, 1, 2]);
 });
 
 test("a pointer's shot flies left at its speed and hurts the hero it meets", () => {

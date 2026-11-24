@@ -4,7 +4,7 @@ import { createHero, stepHero, heroHeight } from "./physics.mjs";
 import { createEnemies, leakCycleSeconds, stepEnemies, touchEnemies, PING_AIR_SECONDS, PING_GROUND_SECONDS, SPINLOCK_PERIOD } from "./enemies.mjs";
 import { keepInsideLevel, touchesBit, CAMERA_LEAD } from "./world.mjs";
 import { CHUNKS } from "./chunks.mjs";
-import { DEFAULT_KINDS, DIFFICULTY, MAX_RISE, generateLevel, generateSafeLevel, introductions, kindsUpTo, maxGapTiles } from "./generator.mjs";
+import { DIFFICULTY, chunkKinds, MAX_RISE, generateLevel, generateSafeLevel, introductions, kindsUpTo, maxGapTiles } from "./generator.mjs";
 
 export const MAX_ATTEMPTS = 8;
 
@@ -198,8 +198,7 @@ function chunkAt(level, col) {
 
 function allowedKinds(chunk) {
   if (chunk.intro) return [chunk.intro];
-  const definition = CHUNKS.filter(candidate => candidate.name === chunk.name)[0];
-  return definition.kinds || DEFAULT_KINDS;
+  return chunkKinds(CHUNKS.filter(candidate => candidate.name === chunk.name)[0]);
 }
 
 function restZonesOk(level, levelNumber) {

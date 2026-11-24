@@ -17,6 +17,7 @@ const LOOKS = {
   land: { dust: true },
   bit: { burst: burst(6, ["bit"], ["0", "1"], 90) },
   "already-root": { burst: burst(10, ["hero", "bit"], ["#", "1"], 140) },
+  "one-up": { burst: burst(16, ["hero", "bit"], ["@", "+", "1"], 170), flash: 0.15 },
   sudo: { burst: burst(18, ["hero", "bit"], ["@", "1", "*"], 180), flash: 0.25, glitch: 0.25 },
   stomp: { burst: burst(14, ["hostile", "text"], ["x", "/", "\\", "-", "."], 120), shake: 0.35 },
   hit: { burst: burst(10, ["hero", "hostile"], ["@", "#", "%"], 160), shake: 0.4, glitch: 0.45, flash: 0.15 },

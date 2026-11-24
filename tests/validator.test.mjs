@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_ATTEMPTS, playableLevel, searchPath, validateLevel } from "../logic/validator.mjs";
-import { ADVANCED_KINDS, BASIC_KINDS, DEFAULT_KINDS, generateLevel, generateSafeLevel, spinlockArms, spinlockDoubles } from "../logic/generator.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, HANG_ROW, chunkKinds, generateLevel, hangRow, generateSafeLevel, spinlockArms, spinlockDoubles } from "../logic/generator.mjs";
 import { CHUNKS } from "../logic/chunks.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { createEnemies, stepEnemies } from "../logic/enemies.mjs";
@@ -41,7 +41,7 @@ const INTRO_PING = segment("intro", "intro", [".......o......"], "ping");
 const INTRO_BUG = segment("intro", "intro", [".......b......"], "bug");
 const REST = segment("rest-bits", "rest", ["..0.1.0."]);
 const CHECKPOINT = segment("checkpoint", "checkpoint", ["....C..."]);
-const FLAT_BUG = segment("flat-enemy", "body", [".....b...."]);
+const FLAT_BUG = segment("flat-enemy", "body", [".bbbbbbbb."]);
 const EXIT = segment("exit", "exit", [".......X...."]);
 
 function baseSegments() {
@@ -97,8 +97,16 @@ function passesAtPhase(alone, phase) {
   return searchPath(alone.level, { from: alone.from, goalCol: alone.level.cols - 1, dynamic: true, enemies });
 }
 
+function mirroredVariants(alone) {
+  return [-1, 1].map(flip => {
+    const enemies = alone.level.enemies.map(enemy => (enemy.kind === "spinlock" ? Object.assign({}, enemy, { spin: enemy.spin * flip }) : enemy));
+    return { label: flip < 0 ? " (mirrored)" : "", alone: { level: Object.assign({}, alone.level, { enemies }), from: alone.from } };
+  });
+}
+
 function spinlockVariants(name, alone) {
   if (!alone.level.enemies.some(enemy => enemy.kind === "spinlock")) return [{ label: "", alone }];
+  if (CHUNKS.filter(chunk => chunk.name === name)[0].spinlocks) return mirroredVariants(alone);
   const variants = [];
   for (const arm of spinlockArms(name)) {
     for (const spin of [-1, 1]) {
@@ -121,8 +129,9 @@ function hazardChunks() {
         const alone = chunkAlone(level, chunk);
         if (alone.level.enemies.length === 0) continue;
         const kinds = alone.level.enemies.map(enemy => enemy.kind).sort();
+        const height = kinds.includes("hang") && hangRow(chunk.raise) > HANG_ROW - chunk.raise ? " raised " + chunk.raise : "";
         for (const variant of spinlockVariants(chunk.name, alone)) {
-          found[chunk.name + ": " + kinds.join(", ") + variant.label] = { name: chunk.name, kinds, alone: variant.alone };
+          found[chunk.name + ": " + kinds.join(", ") + height + variant.label] = { name: chunk.name, kinds, alone: variant.alone };
         }
       }
     }
@@ -190,13 +199,13 @@ test("a sudo bit higher than the hero can jump is unreachable", () => {
 });
 
 test("an enemy in a chunk not made for it breaks hazard placement", () => {
-  const level = handMade(replaced(9, segment("hang-walk", "body", [".....b...."])));
+  const level = handMade(replaced(9, segment("hang-walk", "body", [".bbbbbbbb."])));
 
   assert.deepEqual(validateLevel(level, SEED, 1), ["hazard placement"]);
 });
 
 test("an enemy not introduced yet breaks the introductions", () => {
-  const level = handMade(replaced(9, segment("flat-enemy", "body", [".....z...."])));
+  const level = handMade(replaced(9, segment("flat-enemy", "body", [".zbbbbbbb."])));
 
   assert.deepEqual(validateLevel(level, SEED, 1), ["introductions"]);
 });
@@ -269,7 +278,7 @@ test("every hazard chunk with every enemy it can hold has a safe passage at ever
   }
 
   for (const chunk of CHUNKS.filter(candidate => candidate.role === "body" && candidate.map.join("").includes("E"))) {
-    for (const kind of chunk.kinds || DEFAULT_KINDS) assert.ok(covered[chunk.name + " " + kind], chunk.name + " never held " + kind);
+    for (const kind of chunkKinds(chunk)) assert.ok(covered[chunk.name + " " + kind], chunk.name + " never held " + kind);
   }
   for (const kind of BASIC_KINDS.concat(ADVANCED_KINDS)) {
     const own = CHUNKS.filter(chunk => chunk.role === "intro" && chunk.kinds && chunk.kinds.includes(kind));

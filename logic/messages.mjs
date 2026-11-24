@@ -23,6 +23,8 @@ export const EVENTS = {
   nothingToPaste: "no seed in the clipboard",
   seedRejected: "not a seed: 8 hex digits, like 7f3a-91c2",
   bossDefeated: "kernel: rebooting…",
+  oneUp: "fork(): +1 life",
+  hotfix: "kernel: hotfix applied",
   effectsReduced: "under 50 fps · effects set to reduced",
 };
 

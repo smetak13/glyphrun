@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkpointGlyphs, levelGlyphs, levelSections, parseLevel, SECTION_OVERHANG, SECTION_WIDTH } from "../logic/level.mjs";
+import { checkpointGlyphs, levelGlyphs, levelSections, parseLevel, DEPTH_FILL, SECTION_OVERHANG, SECTION_WIDTH } from "../logic/level.mjs";
 import { TEST_LEVEL } from "../logic/testLevel.mjs";
 import { TILE } from "../logic/screen.mjs";
 
@@ -34,6 +34,15 @@ test("the top ground tile is drawn as a surface and the tiles under it as fill",
   const glyphs = levelGlyphs(parseLevel(rows));
 
   assert.deepEqual(glyphs.map(g => [g.role, g.y]), [["ground", 20 * TILE - 2], ["muted", 21 * TILE - 2]]);
+});
+
+test("ground fades with depth under its surface", () => {
+  let rows = blankRows(1);
+  for (let row = 16; row < 22; row++) rows = withRow(rows, row, "#");
+
+  const glyphs = levelGlyphs(parseLevel(rows));
+
+  assert.deepEqual(glyphs.map(g => g.text), ["▀"].concat(DEPTH_FILL, [DEPTH_FILL[2], DEPTH_FILL[2]]));
 });
 
 test("a run of platform tiles is drawn as one bracketed platform", () => {

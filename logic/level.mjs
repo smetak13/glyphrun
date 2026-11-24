@@ -57,8 +57,12 @@ export function tileAt(level, col, row) {
   return level.rows[row][col];
 }
 
-function fillGlyph(col, row) {
-  return (Math.imul(col, 73856093) ^ Math.imul(row, 19349663)) & 4 ? "░" : "▒";
+export const DEPTH_FILL = ["▓", "▒", "░"];
+
+function fillGlyph(level, col, row) {
+  let depth = 1;
+  while (depth < DEPTH_FILL.length && tileAt(level, col, row - depth - 1) === GROUND) depth++;
+  return DEPTH_FILL[depth - 1];
 }
 
 export function levelGlyphs(level) {
@@ -68,7 +72,7 @@ export function levelGlyphs(level) {
     for (let col = 0; col < level.cols; col++) {
       const tile = tileAt(level, col, row);
       if (tile === GROUND) {
-        if (tileAt(level, col, row - 1) === GROUND) add(col * TILE, row * TILE - 2, fillGlyph(col, row), "muted", 26);
+        if (tileAt(level, col, row - 1) === GROUND) add(col * TILE, row * TILE - 2, fillGlyph(level, col, row), "muted", 26);
         else add(col * TILE, row * TILE - 2, "▀", "ground", 26);
       } else if (tile === BLOCK) {
         add(col * TILE, row * TILE - 2, "▓", "block", 26);

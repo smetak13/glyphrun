@@ -18,9 +18,13 @@ import {
   PHASES,
   PAUSE_SECONDS,
   PHASE_SECONDS,
+  PATCH_ENTRY_SECONDS,
+  PATCH_SPEED,
+  PATCH_WIDTH,
+  BOSS_SPEEDS,
   TRACE_LENGTH,
 } from "../logic/boss.mjs";
-import { createHero } from "../logic/physics.mjs";
+import { createHero, stepHero } from "../logic/physics.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { SCREEN_COLS, TILE } from "../logic/screen.mjs";
 
@@ -412,4 +416,113 @@ test("a resumed fight keeps the seed's phase order", () => {
   }
 
   assert.deepEqual(phases, [order[0], order[0], order[1], order[1]]);
+});
+
+function patchEntry(seed) {
+  const f = fight(seed);
+  f.hero.x = -1000;
+  stepUntil(f, boss => boss.patch !== null || boss.state === "core");
+  return { f, time: f.boss.attack ? f.boss.attack.time : null };
+}
+
+test("the patch enters the first phase at a seeded time 3 to 6 seconds in, the same for the same seed", () => {
+  const times = SEEDS.slice(0, 40).map(seed => patchEntry(seed).time);
+
+  assert.ok(times.every(time => time >= PATCH_ENTRY_SECONDS[0] && time <= PATCH_ENTRY_SECONDS[1] + STEP_SECONDS), times.join(" "));
+  assert.ok(new Set(times.map(time => time.toFixed(2))).size > 20);
+  assert.equal(patchEntry(SEEDS[0]).time, times[0]);
+});
+
+test("the patch does not change the boss's attacks", () => {
+  const withPatch = fight();
+  const without = fight();
+  without.boss.patchRandom = { next: () => 0.99 };
+  withPatch.hero.x = without.hero.x = -1000;
+
+  reachCore(withPatch);
+  reachCore(without);
+
+  assert.deepEqual(withPatch.boss.core, without.boss.core);
+});
+
+test("the patch enters from the arena edge away from the hero and moves along the floor at half the hero's speed", () => {
+  for (const heroCol of [3, 36]) {
+    const f = fight();
+    f.hero.x = (heroCol + 0.5) * TILE;
+    f.hero.y = 0;
+    stepUntil(f, boss => boss.patch !== null);
+    const patch = f.boss.patch;
+    const startX = patch.x;
+
+    step(f);
+
+    assert.equal(patch.direction, heroCol < SCREEN_COLS / 2 ? -1 : 1);
+    assert.ok(heroCol < SCREEN_COLS / 2 ? startX > f.boss.right : startX < f.boss.left);
+    assert.ok(Math.abs(Math.abs(patch.x - startX) - PATCH_SPEED * STEP_SECONDS) < 1e-9);
+  }
+});
+
+test("the patch is gone once it has crossed the arena", () => {
+  const f = fight();
+  f.hero.y = 0;
+  stepUntil(f, boss => boss.patch !== null);
+
+  const { seconds } = stepUntil(f, boss => boss.patch === null);
+
+  assert.ok(Math.abs(seconds - (SCREEN_COLS * TILE + PATCH_WIDTH) / PATCH_SPEED) < 0.05);
+});
+
+test("the hero collects the patch by touching it", () => {
+  const f = fight();
+  stepUntil(f, boss => boss.patch !== null);
+  f.hero.x = f.boss.patch.x;
+
+  const events = step(f).filter(event => event.type === "patch");
+
+  assert.equal(events.length, 1);
+  assert.equal(f.boss.patch, null);
+});
+
+test("the patch comes only in the first phase, again each time it repeats after a death, and is marked the first time only", () => {
+  const f = fight();
+  f.hero.y = 0;
+  const seen = [];
+  const watch = boss => {
+    if (boss.patch && seen[seen.length - 1] !== boss.patch) seen.push(boss.patch);
+  };
+  stepUntil(f, boss => (watch(boss), boss.state === "core"));
+  resumeBoss(f.boss);
+  stepUntil(f, boss => (watch(boss), boss.state === "core"));
+  stompCore(f);
+  stepUntil(f, boss => (watch(boss), boss.state === "core"));
+
+  assert.deepEqual(seen.map(patch => patch.first), [true, false]);
+});
+
+test("the big hero can jump every stack trace bar at every speed", () => {
+  for (const hits of [0, 1, 2]) {
+    for (const row of [1, 2]) {
+      for (const direction of [-1, 1]) {
+        let cleared = false;
+        for (let delay = 0; delay < 600 && !cleared; delay += 2) {
+          const f = fight();
+          f.boss.state = "pause";
+          f.boss.timer = 1000;
+          f.boss.hits = hits;
+          f.hero.x = (f.boss.left + f.boss.right) / 2;
+          f.hero.big = true;
+          f.boss.traces.push({ x: direction < 0 ? f.boss.right - TRACE_LENGTH : f.boss.left, direction, row, text: "panic", warning: 0 });
+          let hit = false;
+          for (let i = 0; i < 1200 && !hit && f.boss.traces.length > 0; i++) {
+            const input = { direction: 0, jumpHeld: i >= delay, jumpPressed: i === delay };
+            const previousBottom = f.hero.y;
+            stepHero(f.hero, input, LEVEL, STEP_SECONDS);
+            hit = hitsFrom(step(f, previousBottom), "trace").length > 0;
+          }
+          cleared = !hit;
+        }
+        assert.ok(cleared, "row " + row + ", speed " + BOSS_SPEEDS[hits] + ", from " + (direction < 0 ? "the right" : "the left"));
+      }
+    }
+  }
 });

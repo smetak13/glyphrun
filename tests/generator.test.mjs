@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ADVANCED_KINDS, BASIC_KINDS, DIFFICULTY, DRAFTED_ADVANCED, DRAFTED_BASIC, MAX_RISE, PACE_TILES_PER_SECOND, generateLevel, introductions, maxGapTiles, spinlockArms, spinlockDoubles } from "../logic/generator.mjs";
+import { ADVANCED_KINDS, BASIC_KINDS, DIFFICULTY, HANG_ROW, HANG_TOP_ROW, DRAFTED_ADVANCED, DRAFTED_BASIC, MAX_RISE, PACE_TILES_PER_SECOND, chunkKinds, generateLevel, introductions, maxGapTiles, spinlockArms, spinlockDoubles } from "../logic/generator.mjs";
 import { computeEnvelope } from "../logic/physics.mjs";
 import { CHUNKS } from "../logic/chunks.mjs";
-import { CRON_HEIGHTS, CRON_PERIODS, SPINLOCK_ARMS, SPINLOCK_PERIOD } from "../logic/enemies.mjs";
+import { CRON_HEIGHTS, CRON_PERIODS, SPINLOCK_PERIOD } from "../logic/enemies.mjs";
 import { SCREEN_COLS, SCREEN_ROWS, TILE } from "../logic/screen.mjs";
 
 const LEVELS = [1, 2, 3, 4, 5];
@@ -229,15 +229,28 @@ test("a rest zone comes at least as often as the level asks", () => {
   });
 });
 
-test("two of the hardest chunks never come back to back", () => {
-  eachLevel(level => {
-    for (let i = 1; i < level.chunks.length; i++) assert.ok(!(level.chunks[i].difficulty === 3 && level.chunks[i - 1].difficulty === 3));
+test("no more of the hardest chunks come back to back than the level allows", () => {
+  const streaks = new Set();
+
+  eachLevel((level, seed, number) => {
+    let streak = 0;
+    for (const chunk of level.chunks) {
+      streak = chunk.difficulty === 3 ? streak + 1 : 0;
+      assert.ok(streak <= DIFFICULTY[number - 1].hardStreak);
+      streaks.add(streak);
+    }
   });
+
+  assert.ok(streaks.has(2));
 });
 
-test("the first part of a level holds only the easiest body chunks", () => {
-  eachLevel(level => {
-    for (const chunk of level.chunks) if (chunk.role === "body" && chunk.col < level.cols / 6) assert.equal(chunk.difficulty, 1, chunk.name);
+test("the first part of a level holds only the easiest body chunks, and the hardest part no easy ones", () => {
+  eachLevel((level, seed, number) => {
+    const table = DIFFICULTY[number - 1];
+    for (const chunk of level.chunks.filter(placed => placed.role === "body")) {
+      if (chunk.col < level.cols * table.mediumFrom * 0.8) assert.equal(chunk.difficulty, 1, chunk.name);
+      if (chunk.col > level.cols * table.hardFrom * 1.25) assert.ok(chunk.difficulty > 1, chunk.name);
+    }
   });
 });
 
@@ -278,7 +291,7 @@ test("each spinlock gets its arm, direction, double arm and starting angle from 
       spinlocks.push({ enemy, arms: spinlockArms(chunk.name), doubles: spinlockDoubles(chunk.name, enemy.arm) });
     }
   });
-  const allArms = new Set(CHUNKS.filter(chunk => chunk.kinds && chunk.kinds.includes("spinlock")).flatMap(chunk => chunk.arms).concat(SPINLOCK_ARMS));
+  const allArms = new Set(CHUNKS.filter(chunk => chunkKinds(chunk).includes("spinlock")).flatMap(chunk => spinlockArms(chunk.name)));
 
   assert.ok(spinlocks.every(({ enemy, arms, doubles }) => arms.includes(enemy.arm) && doubles.includes(enemy.double) && Math.abs(enemy.spin) === 1 && enemy.phase >= 0 && enemy.phase < SPINLOCK_PERIOD));
   assert.deepEqual(new Set(spinlocks.map(({ enemy }) => enemy.arm)), allArms);
@@ -323,4 +336,96 @@ test("a chunk whose slots go together is filled whole with one kind or left empt
   });
 
   assert.deepEqual([...counts].sort(), [0, 2, 3]);
+});
+
+test("platforms over a widened pit span all of it, and a spinlock over a pit stays over it", () => {
+  let platformPits = 0;
+  let spinlockPits = 0;
+
+  eachLevel(level => {
+    for (const chunk of level.chunks.filter(placed => placed.name === "route-split")) {
+      for (let col = chunk.col; col < chunk.col + chunk.width; col++) {
+        if (!isPit(level, col)) continue;
+        assert.ok(level.rows.some(line => line[col] === "=" && line[col - 1] === "=" && line[col + 1] === "="), "column " + col);
+        platformPits++;
+      }
+    }
+    for (const chunk of level.chunks.filter(placed => placed.name === "spinlock-pit")) {
+      for (const spinlock of level.enemies.filter(enemy => enemy.kind === "spinlock" && enemy.col >= chunk.col && enemy.col < chunk.col + chunk.width)) {
+        assert.ok(isPit(level, spinlock.col));
+        spinlockPits++;
+      }
+    }
+  });
+
+  assert.ok(platformPits > 0 && spinlockPits > 0);
+});
+
+function enemiesIn(level, placed, kind) {
+  return level.enemies.filter(enemy => enemy.kind === kind && enemy.col >= placed.col && enemy.col < placed.col + placed.width);
+}
+
+test("the pointers of a chunk fire their first shots after the delays the chunk sets", () => {
+  let checked = 0;
+
+  eachLevel(level => {
+    for (const placed of level.chunks) {
+      const delays = CHUNKS.filter(chunk => chunk.name === placed.name)[0].shotDelays;
+      const pointers = enemiesIn(level, placed, "pointer");
+      if (!delays || pointers.length < delays.length) continue;
+      assert.deepEqual(pointers.map(pointer => pointer.phase), delays);
+      checked++;
+    }
+  });
+
+  assert.ok(checked > 0);
+});
+
+test("spinlocks with their own arms keep them, turn their set part of a turn apart and are mirrored together by the seed", () => {
+  const flips = new Set();
+
+  eachLevel(level => {
+    for (const placed of level.chunks) {
+      const specs = CHUNKS.filter(chunk => chunk.name === placed.name)[0].spinlocks;
+      const spinlocks = enemiesIn(level, placed, "spinlock");
+      if (!specs || spinlocks.length === 0) continue;
+      const flip = spinlocks[0].spin / specs[0].spin;
+      spinlocks.forEach((spinlock, i) => {
+        const offset = (spinlock.phase - spinlocks[0].phase + SPINLOCK_PERIOD) % SPINLOCK_PERIOD;
+        assert.deepEqual([spinlock.arm, spinlock.spin], [specs[i].arm, specs[i].spin * flip]);
+        assert.ok(Math.abs(offset - ((specs[i].offset - specs[0].offset + 1) % 1) * SPINLOCK_PERIOD) < 1e-9);
+      });
+      flips.add(flip);
+    }
+  });
+
+  assert.deepEqual([...flips].sort(), [-1, 1]);
+});
+
+test("the sudo bit is never right under a ceiling, where a hero growing big would be stuck", () => {
+  let underCeiling = 0;
+
+  eachLevel(level => {
+    const sudo = level.bits.filter(bit => bit.sudo)[0];
+    assert.ok(!isGround(level.rows[sudo.row - 1][sudo.col]), "sudo at " + sudo.col + "," + sudo.row);
+    underCeiling += level.bits.filter(bit => !bit.sudo && isGround(level.rows[bit.row - 1][bit.col])).length;
+  });
+
+  assert.ok(underCeiling > 0);
+});
+
+test("the ground rises and falls between chunks, and a hang rises with it but stays out of the top rows", () => {
+  const raises = new Set();
+
+  eachLevel((level, seed, number) => {
+    for (const chunk of level.chunks) {
+      assert.ok(chunk.raise >= 0 && chunk.raise <= DIFFICULTY[number - 1].maxRaise);
+      raises.add(chunk.raise);
+      for (const hang of level.enemies.filter(enemy => enemy.kind === "hang" && enemy.col >= chunk.col && enemy.col < chunk.col + chunk.width)) {
+        assert.equal(hang.row, Math.max(HANG_ROW - chunk.raise, HANG_TOP_ROW));
+      }
+    }
+  });
+
+  assert.equal(raises.size, Math.max.apply(null, DIFFICULTY.map(table => table.maxRaise)) + 1);
 });
