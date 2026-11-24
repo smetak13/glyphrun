@@ -28,6 +28,7 @@ Item {
   property var run: null
   property var world: null
   property var clock: Clock.createClock()
+  property var frameTimer: Clock.createFrameTimer()
   property var effects: Effects.createEffects()
   property var frameWatcher: FrameRate.createFrameWatcher()
   property bool autoReduced: false
@@ -384,7 +385,8 @@ Item {
     return true
   }
 
-  function frame(frameTime) {
+  function frame(measuredTime) {
+    const frameTime = Clock.smoothFrame(frameTimer, measuredTime)
     if (screen !== "play") {
       FrameRate.resetFrameWatcher(frameWatcher)
       screenTime += frameTime
@@ -396,7 +398,7 @@ Item {
       FrameRate.resetFrameWatcher(frameWatcher)
       return
     }
-    watchFrameRate(frameTime)
+    watchFrameRate(measuredTime)
     const waiting = run.over || world.finished
     const steps = Clock.stepsFor(clock, frameTime)
     for (let i = 0; i < steps; i++) {
@@ -404,7 +406,7 @@ Item {
       Run.stepRun(run, input, Clock.STEP_SECONDS)
       if (!waiting) jumpPressed = false
     }
-    jumpPressed = false
+    if (waiting) jumpPressed = false
     playCues()
     Effects.stepEffects(effects, frameTime)
     stageEnded = run.over || world.finished
@@ -463,6 +465,7 @@ Item {
     implicitHeight: 540
 
     onVisibleChanged: {
+      root.frameTimer = Clock.createFrameTimer()
       if (visible) return
       root.releaseKeys()
       root.openMenu()
@@ -610,9 +613,13 @@ Item {
       }
     }
 
-    FrameAnimation {
-      running: window.visible
-      onTriggered: root.frame(frameTime)
+    Connections {
+      target: window.visible ? keyCatcher.Window.window : null
+
+      function onAfterAnimating() {
+        root.frame(Clock.measureFrame(root.frameTimer, Date.now()))
+        keyCatcher.Window.window.update()
+      }
     }
   }
 }
