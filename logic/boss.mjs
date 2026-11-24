@@ -1,6 +1,6 @@
 import { TILE, SCREEN_COLS, SCREEN_ROWS } from "./screen.mjs";
 import { parseLevel } from "./level.mjs";
-import { HERO_WIDTH, RUN_SPEED, heroHeight } from "./physics.mjs";
+import { HERO_WIDTH, WALK_SPEED, heroHeight } from "./physics.mjs";
 import { bounceOff, createEnemy, stepEnemies, touchEnemies, STOMP_TOLERANCE } from "./enemies.mjs";
 import { subStream, pick, randomInt } from "./random.mjs";
 
@@ -31,7 +31,7 @@ export const CORE_COLS = [5, 19, 33];
 export const CORE_WIDTH = 2 * TILE;
 export const CORE_HEIGHT = 16;
 export const PATCH_ENTRY_SECONDS = [3, 6];
-export const PATCH_SPEED = RUN_SPEED / 2;
+export const PATCH_SPEED = WALK_SPEED / 2;
 export const PATCH_WIDTH = 2 * TILE;
 export const PATCH_HEIGHT = 16;
 const ARENA_ROW = SCREEN_ROWS - 4;

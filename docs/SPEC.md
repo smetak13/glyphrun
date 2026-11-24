@@ -35,7 +35,8 @@ Plugin id: `smetak13.glyphrun`.
 - **Big / small**: the hero is small as `@` and big as `@@` (two stacked) while it holds sudo.
 - **Basic / advanced**: enemy tiers (section 6).
 - **Draft**: the enemies chosen for a run: 4 of the 5 basic and 4 of the 6 advanced.
-- **Envelope**: the set of jumps the hero can physically make, computed from the physics constants. The generator never asks for more than a fraction of it.
+- **Walk / run**: the hero's two speeds. It walks by default and runs while Shift is held (called sprint in the code, since a run is an attempt).
+- **Envelope**: the set of jumps the hero can physically make at walking speed, computed from the physics constants. The generator never asks for more than a fraction of it.
 - **Validator**: the check that a generated level is completable and meets the quality rules before it is offered.
 
 ## 3. Story and levels
@@ -104,13 +105,14 @@ All texts here are defaults and may be tuned during implementation.
 
 ## 4. Hero and movement
 
-- Run left and right, jump with variable height: releasing jump early cuts the jump short.
+- Walk left and right, jump with variable height: releasing jump early cuts the jump short.
+- **Run**: holding Shift runs at 12 tiles/s instead of walking at 9. Above walking speed the hero speeds up gently, reaching running speed in about 0.5 s; releasing Shift brakes back to walking speed with the normal acceleration. The same rule holds in the air with the air acceleration, so releasing Shift mid-jump shortens the jump. The jump is as high as when walking; momentum carries into the air, so a running jump reaches farther. Running works everywhere, the boss arena included. It is a speedrun option: everything the generator, the envelope and the validator assume is at walking speed, so every level is completable without running.
 - Coyote time: a jump is still accepted for a few frames after walking off a ledge.
 - Jump buffer: a jump pressed a few frames before landing fires on landing.
 - No other abilities in the MVP.
 - Ground and solid blocks stop the hero from every side. Platforms `[===]` are one-way: the hero jumps up through them and lands on top.
 - The hero stands on a ledge as long as any part of it is over the ledge, so the widest gap it can clear is the distance flown plus its own width.
-- Physics constants (gravity, run speed, acceleration, jump velocity, jump cut) live in one module. The envelope (maximum jump height, maximum gap at full speed, maximum gap with a height difference) is computed from them, never written by hand: by simulating a full-speed jump with jump held, taken from the ground without coyote time.
+- Physics constants (gravity, walking and running speed, acceleration, jump velocity, jump cut) live in one module. The envelope (maximum jump height, maximum gap at walking speed, maximum gap with a height difference) is computed from them, never written by hand: by simulating a jump at walking speed with jump held, taken from the ground without coyote time.
 - Physics runs at a fixed timestep, independent of the display frame rate, so the game plays the same at 60 fps and 144 fps and the validator can simulate it exactly.
 
 ## 5. Health, lives and sudo
@@ -142,7 +144,7 @@ Eleven in the MVP. Basic ones appear from level 1; advanced ones join from level
 | 2 | `Z` | zombie process | Floats slowly back and forth over a short stretch, bobbing, labelled `<defunct>`. | Stomp from above. |
 | 3 | `^^^` | kernel spikes | Static spikes on the ground or on a platform. | No. |
 | 4 | `◎` | ping | Hops in place at a fixed rhythm. Pass under it while it is up, or jump over it while it is down. | Stomp from above, on the ground or mid-hop. |
-| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen, as high above its own ground as it would be on the base ground, but never in the top two rows. Drops when the hero comes within about five tiles, timed to land on a hero running at full speed; braking when it starts to drop avoids it. It falls through platforms and lands only on the ground or a solid block, so a platform is no shelter. Lies there for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
+| 5 | `▼` | hang | Hangs from a visible thread `│` under the top of the screen, as high above its own ground as it would be on the base ground, but never in the top two rows. Drops when the hero comes within about five tiles, timed to land on a hero walking at full speed; braking when it starts to drop avoids it. It falls through platforms and lands only on the ground or a solid block, so a platform is no shelter. Lies there for a moment, then slowly winds back up. | Stomp from above, falling, lying or winding up. |
 
 ### 6.2 Advanced
 
@@ -266,7 +268,7 @@ Before a level is offered, the validator checks it:
 - **Static hazards** (spikes, pits) are part of that search.
 - **Dynamic hazards** (enemies, cron, pipes, pointers, leaks) are safe by construction: each chunk that holds one is verified by its own tests to have a safe passage at every phase of the hazard, with every enemy it can hold. The tests run the same search with the enemies moving, from a standing start in front of the chunk, at phases a quarter second apart. During the phase the chunk counts as on screen, so pointers have fired and leaks have grown; a shot already at the hero's start is dropped, since a player would have seen it coming. The runtime validator checks only that such chunks are placed under the conditions they were verified for: every enemy stands in a chunk that may hold its kind, and every pit is within the level's limit.
 - **Quality rules**: the difficulty score, hazards per screen (enemies and pits per 40 columns), is within the level's range (table in 8.3), rest zones are present, the first appearance of each enemy is in a safe introduction chunk and no enemy appears before its level.
-- **No blind jumps**: every landing is visible before the jump. This holds by the geometry rather than by a check: a level is one screen tall, and the camera shows about 25 tiles ahead of the hero even when lagging at full speed, while the longest jump is under 7 tiles.
+- **No blind jumps**: every landing is visible before the jump. This holds by the geometry rather than by a check: a level is one screen tall, and the camera shows about 24 tiles ahead of the hero even when lagging at running speed, while the longest running jump is under 10 tiles.
 
 If a level fails, the generator tries again with the next attempt's sub-stream. Attempts are deterministic, so the same seed always yields the same level. After 8 failed attempts a safe layout for that level is used: the same assembly from the seed, but with only the easiest body chunks without pits. Its difficulty may fall under the range; everything else passes. Tests track the first-attempt pass rate over many seeds; the goal is to make it so high that the validator is only a safety net. `scripts/pass-rate.mjs` reports it.
 
@@ -274,18 +276,21 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 
 - Points for bits, kills, sudo, boss hits, a time bonus per level and a bonus for lives left at victory. Initial values (tunable): bit 10, kill 100, small fork bomb 50, memory leak 200, sudo 250 (500 when already big), boss hit 1,000, boss defeated 5,000, 2,000 for every life left when the boss is beaten (shown on the victory screen; a game over has none left), 1,000 for a hundred bits collected at 5 lives (section 5), time bonus of 20 per whole second under the level's par, its target time (section 8.3), so a fast run earns a bonus.
 - Local top 10: score, seed, level reached (`3/5`, `BOSS` or `WIN`), date. A run is entered when it ends, by game over or victory, if it scored anything; a run abandoned for a new one is not. Equal scores keep the older entry above. From the list a seed can be copied or started directly (←→ chooses play or copy).
+- **Fastest runs**: a second local top 10, of the playing time to Shipped (finishing level 5); the boss is not timed. Playing time leaves out pauses, menus, title cards, summaries and death beats, as for the victory screen. Entries show the time to hundredths (`4:41.32`), the seed and the date; equal times keep the older entry above. A run is entered when level 5 is finished, and the Shipped screen shows a new entry's place (`fastest run #3`). Score is not affected: it rewards thorough play, the time table rewards running.
+- High scores shows both tables as tabs, `score` and `time`. The screen opens on the tab row, where ←→ switches the tab; ↓ enters the list, where ←→ chooses play or copy.
 
 ## 10. Screens, menus and controls
 
-- **Main menu**: Continue (only when a run is in progress), New run, Enter seed, High scores, Settings. There is no quit item: the window is closed like Omatris, from the bar icon or the window manager. Going to the main menu from a run keeps the run for Continue.
+- **Main menu**: Continue (only when a run is in progress), New run, Enter seed, High scores, Controls, Settings. There is no quit item: the window is closed like Omatris, from the bar icon or the window manager. Going to the main menu from a run keeps the run for Continue.
 - **P**: freeze. The game stops in place with `[ PAUSED ]`; P again resumes.
-- **Esc**: in-game menu, pausing the game: Resume, Copy seed, Main menu. There is no restart of a single level: a run is one attempt, and starting over means retrying the seed from level 1.
+- **Esc**: in-game menu, pausing the game: Resume, Controls, Copy seed, Main menu. There is no restart of a single level: a run is one attempt, and starting over means retrying the seed from level 1.
 - **Closing the window** during play hides it and opens the in-game menu, so nothing runs in the background. Opening it again from the bar shows that menu.
 - **Between levels**: the level summary (section 3).
 - **Game over** and **victory**: section 3 and section 5. Both offer Copy seed.
 - **Enter seed**: type a seed in the `xxxx-xxxx` format (the dash is added after four digits; only hex digits are accepted); an incomplete seed is rejected with a message. Ctrl+V (and Super+V, Omarchy's universal paste) pastes a seed from the clipboard; when the clipboard holds one, the screen offers it.
 - **Settings**: Effects (full / reduced), music volume, sound volume (both in steps of 10 %) and mute. ↑↓ choose, ←→ change, Enter changes too.
-- Controls: arrows move; Space or Arrow Up jumps; P freezes; Esc opens the in-game menu. Menus are fully keyboard-driven (arrows, Enter or Space), like Omatris.
+- Controls: arrows move; Space or Arrow Up jumps; Shift (held) runs; P freezes; Esc opens the in-game menu. Menus are fully keyboard-driven (arrows, Enter or Space), like Omatris.
+- **Controls** screen, from the main menu and the in-game menu: a read-only list of the keys above and what they do, with a muted line for menus. Esc or Enter goes back where it came from. Remapping is in `ROADMAP.md`.
 - The run in progress (for Continue) is kept while the plugin is loaded; it is not written to disk.
 
 ## 11. Visuals, sound and theme
@@ -306,7 +311,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 | Hostile enemies and traps | `color1` (red), `color9` and `color13` for variety |
 | Text, HUD | theme foreground |
 
-- Particles: dust on jumps and landings, bursts on bits, sudo, a 1-up, kills, the checkpoint, the exit and boss hits. Screen shake on stomps, hits, deaths and boss hits; a white flash on sudo, a 1-up, hits, deaths, the exit and boss hits; the RGB-split glitch on sudo, hits, deaths and boss hits. A `»` trails the hero while it runs at full speed. The hexdump background is two layers scrolling at 0.3 and 0.6 of the camera's speed.
+- Particles: dust on jumps and landings, bursts on bits, sudo, a 1-up, kills, the checkpoint, the exit and boss hits. Screen shake on stomps, hits, deaths and boss hits; a white flash on sudo, a 1-up, hits, deaths, the exit and boss hits; the RGB-split glitch on sudo, hits, deaths and boss hits. A `»` trails the hero while it runs on the ground faster than walking speed. The hexdump background is two layers scrolling at 0.3 and 0.6 of the camera's speed.
 - The CRT scanlines and vignette are kept very faint, so they never cost readability.
 - The ground is drawn with a surface `▀` on top and fill that fades with depth, `▓`, `▒`, then `░`, so heights and pillars read clearly.
 - **Effects: full / reduced.** Reduced turns off glow, glitch and CRT; particles, shake, flash and the hexdump stay. The game switches to reduced by itself when the frame rate stays under 50 fps, and says so once (`under 50 fps · effects set to reduced`): the frame rate is measured only during play, in windows of 2 s, ignoring single frames over 0.25 s (such as loading a level), and two slow windows in a row switch. It switches at most once while the plugin is loaded; the player can turn full effects back on in Settings.
@@ -333,7 +338,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 
 ## 14. Storage
 
-- High scores and settings (effects, music volume, sound volume, mute) are stored locally in `~/.config/glyphrun.ini` through Qt's `Settings`, as Omatris stores its own.
+- High scores, fastest runs and settings (effects, music volume, sound volume, mute) are stored locally in `~/.config/glyphrun.ini` through Qt's `Settings`, as Omatris stores its own.
 - Nothing is sent anywhere.
 
 ## 15. Tests

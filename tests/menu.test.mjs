@@ -12,8 +12,8 @@ test("Continue is offered only while a run is in progress", () => {
 });
 
 test("the main menu starts with Continue when a run can be continued", () => {
-  assert.deepEqual(mainMenuItems(IN_PROGRESS), ["Continue", "New run", "Enter seed", "High scores", "Settings"]);
-  assert.deepEqual(mainMenuItems(null), ["New run", "Enter seed", "High scores", "Settings"]);
+  assert.deepEqual(mainMenuItems(IN_PROGRESS), ["Continue", "New run", "Enter seed", "High scores", "Controls", "Settings"]);
+  assert.deepEqual(mainMenuItems(null), ["New run", "Enter seed", "High scores", "Controls", "Settings"]);
 });
 
 test("menu selection wraps around at both ends", () => {

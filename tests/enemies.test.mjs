@@ -43,7 +43,7 @@ import {
 } from "../logic/enemies.mjs";
 import { createWorld, respawnHero, stepWorld } from "../logic/world.mjs";
 import { createRun, stepRun, LIVES } from "../logic/run.mjs";
-import { computeEnvelope, createHero, JUMP_VELOCITY, RUN_SPEED } from "../logic/physics.mjs";
+import { computeEnvelope, createHero, JUMP_VELOCITY, WALK_SPEED } from "../logic/physics.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { TILE } from "../logic/screen.mjs";
@@ -377,7 +377,7 @@ const RUNWAY = levelFrom(["@.......................................", "#########
 function runTowardHang(reactionSeconds) {
   const world = createWorld(RUNWAY);
   const hang = world.enemies[0];
-  world.hero.vx = RUN_SPEED;
+  world.hero.vx = WALK_SPEED;
   let fellAt = null;
   for (let i = 0; i < 1200; i++) {
     if (fellAt === null && hang.state === "falling") fellAt = world.time;
@@ -802,7 +802,7 @@ test("a running stomp without holding jump does not land the hero on the small f
   dropHeroOnto(world, fork);
   world.hero.x = fork.x - 4;
   world.hero.y = fork.y - fork.height - 1;
-  world.hero.vx = RUN_SPEED;
+  world.hero.vx = WALK_SPEED;
 
   const events = worldEventsUntil(world, running, e => e.length > 0);
   for (let i = 0; i < 30; i++) for (const event of stepWorld(world, running, STEP_SECONDS)) events.push(event);

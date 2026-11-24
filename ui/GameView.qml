@@ -43,7 +43,7 @@ Item {
   readonly property int popupPoolSize: 8
   readonly property real popupRise: 40
   readonly property real trailGap: 22
-  readonly property real trailSpeed: Physics.RUN_SPEED * 0.9
+  readonly property real trailSpeed: Physics.WALK_SPEED
   readonly property real flashOpacity: 0.9
 
   function stageName() {
@@ -66,7 +66,7 @@ Item {
     heroTop.y = hero.y - bigHeroOffset
     heroTop.visible = hero.visible && world.hero.big
     const direction = world.hero.vx > 0 ? 1 : -1
-    trail.visible = hero.visible && world.hero.grounded && Math.abs(world.hero.vx) >= trailSpeed
+    trail.visible = hero.visible && world.hero.grounded && Math.abs(world.hero.vx) > trailSpeed
     trail.text = direction > 0 ? "»" : "«"
     trail.x = Math.round(world.hero.x - direction * trailGap - trail.width / 2)
     trail.y = Math.round(world.hero.y - trail.height + heroBaselineDrop)

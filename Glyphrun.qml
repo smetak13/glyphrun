@@ -37,6 +37,7 @@ Item {
   property bool rightHeld: false
   property bool jumpHeld: false
   property bool jumpPressed: false
+  property bool sprintHeld: false
   property bool paused: false
   property bool menuOpen: false
   property string screen: "menu"
@@ -50,11 +51,15 @@ Item {
   property string seedError: ""
   property var clipboardSeed: null
   property bool pasteRequested: false
-  property int scoreRow: 0
+  property int scoreTab: 0
+  property int scoreRow: -1
   property int scoreAction: 0
   property int rank: 0
+  property int timeRank: 0
+  property string controlsReturn: "menu"
   property var recordedRun: null
   readonly property var scores: HighScores.parseScores(storage.highScores)
+  readonly property var times: HighScores.parseTimes(storage.fastestRuns)
   readonly property bool fullEffects: storage.effects === "full"
   readonly property var settingsItems: [
     "Effects: " + storage.effects,
@@ -84,7 +89,8 @@ Item {
     else if (key === Qt.Key_Space || key === Qt.Key_Up) {
       if (held && !jumpHeld) jumpPressed = true
       jumpHeld = held
-    } else return false
+    } else if (key === Qt.Key_Shift) sprintHeld = held
+    else return false
     return true
   }
 
@@ -93,6 +99,7 @@ Item {
     rightHeld = false
     jumpHeld = false
     jumpPressed = false
+    sprintHeld = false
   }
 
   function newSeed() {
@@ -129,6 +136,7 @@ Item {
     world = next.world
     run = next
     rank = 0
+    timeRank = 0
     paused = false
     menuOpen = false
     showWorld()
@@ -144,7 +152,10 @@ Item {
     if (run.levelNumber < Run.LEVEL_COUNT) {
       advanceLevel()
       showScreen("title")
-    } else showScreen("shipped")
+    } else {
+      recordTime()
+      showScreen("shipped")
+    }
   }
 
   function startBoss() {
@@ -160,6 +171,26 @@ Item {
     rank = result.rank
     storage.highScores = JSON.stringify(result.scores)
     menuIndex = 0
+  }
+
+  function recordTime() {
+    const result = HighScores.insertTime(times, HighScores.timeEntry(run, Qt.formatDate(new Date(), "yyyy-MM-dd")))
+    timeRank = result.rank
+    storage.fastestRuns = JSON.stringify(result.times)
+  }
+
+  function showControls(returnTo) {
+    controlsReturn = returnTo
+    showScreen("controls")
+  }
+
+  function closeControls() {
+    if (controlsReturn === "menu") {
+      showMainMenu()
+      return
+    }
+    showScreen("play")
+    menuIndex = Menu.PAUSE_ITEMS.indexOf("Controls")
   }
 
   function showNotice(text, milliseconds) {
@@ -220,14 +251,17 @@ Item {
       readClipboard(false)
       showScreen("seed")
     } else if (item === "High scores") {
-      scoreRow = 0
+      scoreTab = 0
+      scoreRow = -1
       scoreAction = 0
       showScreen("scores")
-    } else if (item === "Settings") showScreen("settings")
+    } else if (item === "Controls") showControls("menu")
+    else if (item === "Settings") showScreen("settings")
   }
 
   function activatePause(item) {
     if (item === "Resume") menuOpen = false
+    else if (item === "Controls") showControls("play")
     else if (item === "Copy seed") copySeed(run.seed)
     else if (item === "Main menu") showMainMenu()
   }
@@ -277,17 +311,18 @@ Item {
   }
 
   function scoresKey(key) {
+    const entries = Menu.SCORE_TABS[scoreTab] === "time" ? times : scores
     if (key === Qt.Key_Escape) showMainMenu()
-    else if (scores.length === 0) return
     else if (key === Qt.Key_Up || key === Qt.Key_Down) {
-      scoreRow = Menu.moveIndex(scoreRow, key === Qt.Key_Up ? -1 : 1, scores.length)
+      scoreRow = Menu.moveIndex(scoreRow + 1, key === Qt.Key_Up ? -1 : 1, entries.length + 1) - 1
       audio.play("menu-move")
     } else if (key === Qt.Key_Left || key === Qt.Key_Right) {
-      scoreAction = 1 - scoreAction
+      if (scoreRow < 0) scoreTab = Menu.moveIndex(scoreTab, 1, Menu.SCORE_TABS.length)
+      else scoreAction = 1 - scoreAction
       audio.play("menu-move")
-    } else if (isConfirm(key)) {
+    } else if (isConfirm(key) && scoreRow >= 0) {
       audio.play("menu-select")
-      const seed = scores[scoreRow].seed
+      const seed = entries[scoreRow].seed
       if (Menu.SCORE_ACTIONS[scoreAction] === "play") startRun(seed, true)
       else copySeed(seed)
     }
@@ -354,6 +389,9 @@ Item {
     else if (screen === "seed") seedKey(event)
     else if (screen === "scores") scoresKey(key)
     else if (screen === "settings") settingsKey(key)
+    else if (screen === "controls") {
+      if (key === Qt.Key_Escape || isConfirm(key)) closeControls()
+    }
     else if (screen === "intro") showScreen("title")
     else if (screen === "title") {
       showScreen("play")
@@ -402,7 +440,7 @@ Item {
     const waiting = run.over || world.finished
     const steps = Clock.stepsFor(clock, frameTime)
     for (let i = 0; i < steps; i++) {
-      const input = { direction: (rightHeld ? 1 : 0) - (leftHeld ? 1 : 0), jumpHeld: jumpHeld, jumpPressed: jumpPressed && !waiting }
+      const input = { direction: (rightHeld ? 1 : 0) - (leftHeld ? 1 : 0), jumpHeld: jumpHeld, jumpPressed: jumpPressed && !waiting, sprint: sprintHeld }
       Run.stepRun(run, input, Clock.STEP_SECONDS)
       if (!waiting) jumpPressed = false
     }
@@ -425,6 +463,7 @@ Item {
     location: StandardPaths.writableLocation(StandardPaths.GenericConfigLocation) + "/glyphrun.ini"
     category: "glyphrun"
     property string highScores: "[]"
+    property string fastestRuns: "[]"
     property string effects: "full"
     property real musicVolume: 0.6
     property real soundVolume: 0.8
@@ -534,8 +573,16 @@ Item {
           anchors.fill: parent
           visible: root.screen === "scores"
           scores: root.scores
+          times: root.times
+          tab: root.scoreTab
           row: root.scoreRow
           action: root.scoreAction
+          colors: theme.colors
+        }
+
+        ControlsScreen {
+          anchors.fill: parent
+          visible: root.screen === "controls"
           colors: theme.colors
         }
 
@@ -566,6 +613,7 @@ Item {
           anchors.fill: parent
           visible: root.screen === "shipped"
           time: root.screenTime
+          rank: root.timeRank
           colors: theme.colors
         }
 

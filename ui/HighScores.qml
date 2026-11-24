@@ -7,12 +7,25 @@ Rectangle {
   id: screen
 
   property var scores: []
-  property int row: 0
+  property var times: []
+  property int tab: 0
+  property int row: -1
   property int action: 0
   property var colors
-  readonly property var columns: [32, 72, 180, 310, 400, 540]
+  readonly property bool timeTab: Menu.SCORE_TABS[tab] === "time"
+  readonly property var entries: timeTab ? times : scores
+  readonly property var headers: timeTab ? ["#", "time", "seed", "date"] : ["#", "score", "seed", "level", "date"]
+  readonly property var columns: timeTab ? [32, 72, 200, 330] : [32, 72, 180, 310, 400]
+  readonly property real actionsX: 540
 
   color: colors.background
+
+  function cells(entry, index) {
+    const place = String(index + 1)
+    const seed = Seed.formatSeed(entry.seed)
+    if (timeTab) return [place, HighScores.runTime(entry.seconds), seed, entry.date]
+    return [place, String(entry.score).padStart(5, "0"), seed, HighScores.stageLabel(entry), entry.date]
+  }
 
   Panel {
     anchors.centerIn: parent
@@ -28,8 +41,27 @@ Rectangle {
       color: screen.colors.cyan
     }
 
+    Row {
+      x: 400
+      y: 30
+      spacing: 16
+
+      Repeater {
+        model: Menu.SCORE_TABS
+
+        Glyph {
+          required property string modelData
+          required property int index
+          readonly property bool active: index === screen.tab
+          text: active ? "[" + modelData + "]" : " " + modelData + " "
+          size: 15
+          color: active ? (screen.row < 0 ? screen.colors.hero : screen.colors.text) : screen.colors.muted
+        }
+      }
+    }
+
     Repeater {
-      model: ["#", "score", "seed", "level", "date"]
+      model: screen.headers
 
       Glyph {
         required property string modelData
@@ -45,14 +77,14 @@ Rectangle {
     Glyph {
       x: 32
       y: 110
-      visible: screen.scores.length === 0
-      text: "no scores yet. go ship something."
+      visible: screen.entries.length === 0
+      text: screen.timeTab ? "nothing shipped yet. hold shift and go." : "no scores yet. go ship something."
       size: 14
       color: screen.colors.muted
     }
 
     Repeater {
-      model: screen.scores
+      model: screen.entries
 
       Item {
         id: line
@@ -72,13 +104,7 @@ Rectangle {
         }
 
         Repeater {
-          model: [
-            String(line.index + 1),
-            String(line.modelData.score).padStart(5, "0"),
-            Seed.formatSeed(line.modelData.seed),
-            HighScores.stageLabel(line.modelData),
-            line.modelData.date,
-          ]
+          model: screen.cells(line.modelData, line.index)
 
           Glyph {
             required property string modelData
@@ -92,7 +118,7 @@ Rectangle {
         }
 
         Row {
-          x: screen.columns[5] - 20
+          x: screen.actionsX - 20
           anchors.verticalCenter: parent.verticalCenter
           spacing: 12
           visible: line.selected
@@ -115,7 +141,9 @@ Rectangle {
     Glyph {
       x: 32
       y: 440
-      text: "↑↓ · choose   ←→ · play or copy seed   Enter · select   Esc · back"
+      text: screen.row < 0
+        ? "←→ · score or time   ↓ · choose a run   Esc · back"
+        : "↑↓ · choose   ←→ · play or copy seed   Enter · select   Esc · back"
       size: 12
       color: screen.colors.muted
     }

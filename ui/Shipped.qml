@@ -5,6 +5,7 @@ Rectangle {
   id: screen
 
   property real time: 0
+  property int rank: 0
   property var colors
   readonly property bool typed: time >= Story.SHIPPED_TYPED_SECONDS
 
@@ -18,6 +19,15 @@ Rectangle {
     lineHeight: 24
     size: 16
     color: screen.colors.text
+  }
+
+  Glyph {
+    anchors.horizontalCenter: parent.horizontalCenter
+    y: 436
+    visible: screen.typed && screen.rank > 0
+    text: "fastest run #" + screen.rank
+    size: 14
+    color: screen.colors.hero
   }
 
   Glyph {

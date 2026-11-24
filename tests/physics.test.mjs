@@ -11,7 +11,8 @@ import {
   HERO_WIDTH,
   JUMP_BUFFER_TIME,
   JUMP_VELOCITY,
-  RUN_SPEED,
+  SPRINT_SPEED,
+  WALK_SPEED,
 } from "../logic/physics.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { TILE } from "../logic/screen.mjs";
@@ -75,7 +76,7 @@ function jumpFromLedge(gapTiles, riseTiles) {
   }
   const level = parseLevel(rows);
   const hero = createHero(lip * TILE + HERO_WIDTH / 2 - 0.01, 20 * TILE);
-  hero.vx = RUN_SPEED;
+  hero.vx = WALK_SPEED;
   stepHero(hero, RUN_JUMP, level, STEP);
   runUntil(hero, level, RUN_HOLD, h => h.grounded || h.y > 22 * TILE, 240);
   return hero.grounded && hero.y === far * TILE;
@@ -263,4 +264,64 @@ test("standing and running on the ground report nothing", () => {
   for (let i = 0; i < 60; i++) reports.push(stepHero(hero, RUN, level, STEP));
 
   assert.deepEqual(reports.filter(Boolean), []);
+});
+
+const SPRINT = { direction: 1, jumpHeld: false, jumpPressed: false, sprint: true };
+const FLAT = levelFrom(["........................................", "########################################"]);
+
+function speedAfter(startSpeed, input, seconds) {
+  const hero = standingHero(1, 21);
+  hero.vx = startSpeed;
+  run(hero, FLAT, input, stepsFor(seconds));
+  return hero.vx;
+}
+
+function jumpFrom(speed, sprint, sprintSeconds) {
+  const hero = standingHero(1, 21);
+  hero.vx = speed;
+  const startX = hero.x;
+  let peak = 0;
+  let airborne = 0;
+  stepHero(hero, { direction: 1, jumpHeld: true, jumpPressed: true, sprint }, FLAT, STEP);
+  while (!hero.grounded) {
+    airborne += STEP;
+    const held = sprint && airborne < sprintSeconds;
+    stepHero(hero, { direction: 1, jumpHeld: true, jumpPressed: false, sprint: held }, FLAT, STEP);
+    peak = Math.max(peak, 21 * TILE - hero.y);
+  }
+  return { peak, distance: hero.x - startX };
+}
+
+test("holding run speeds the hero up past walking speed to running speed in about half a second", () => {
+  assert.ok(speedAfter(WALK_SPEED, SPRINT, 0.4) < SPRINT_SPEED);
+  assert.equal(speedAfter(WALK_SPEED, SPRINT, 0.55), SPRINT_SPEED);
+});
+
+test("running from a standstill reaches walking speed as fast as walking does", () => {
+  assert.equal(speedAfter(0, SPRINT, 0.1), speedAfter(0, RUN, 0.1));
+});
+
+test("releasing run brakes back to walking speed", () => {
+  assert.equal(speedAfter(SPRINT_SPEED, RUN, 0.1), WALK_SPEED);
+});
+
+test("a running jump is as high as a walking one but reaches farther", () => {
+  const walking = jumpFrom(WALK_SPEED, false, 0);
+  const running = jumpFrom(SPRINT_SPEED, true, Infinity);
+
+  assert.equal(running.peak, walking.peak);
+  assert.ok(running.distance > walking.distance + TILE);
+});
+
+test("releasing run in the air shortens a running jump", () => {
+  const held = jumpFrom(SPRINT_SPEED, true, Infinity);
+  const released = jumpFrom(SPRINT_SPEED, true, 0.1);
+
+  assert.ok(released.distance < held.distance);
+});
+
+test("the envelope is computed at walking speed, so running jumps clear more than it allows", () => {
+  const running = jumpFrom(SPRINT_SPEED, true, Infinity);
+
+  assert.ok(running.distance + HERO_WIDTH > computeEnvelope().maxGap + TILE);
 });

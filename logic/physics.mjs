@@ -1,7 +1,9 @@
 import { TILE } from "./screen.mjs";
 import { tileAt } from "./level.mjs";
 
-export const RUN_SPEED = 216;
+export const WALK_SPEED = 216;
+export const SPRINT_SPEED = 288;
+export const SPRINT_ACCELERATION = 144;
 export const ACCELERATION = 1800;
 export const AIR_ACCELERATION = 1200;
 export const GRAVITY = 1500;
@@ -94,11 +96,20 @@ function moveY(hero, dy, level) {
   }
 }
 
+function accelerate(hero, input, seconds) {
+  const atWalkSpeed = input.direction !== 0 && hero.vx * input.direction >= WALK_SPEED;
+  if (input.sprint && atWalkSpeed) {
+    hero.vx = approach(hero.vx, input.direction * SPRINT_SPEED, SPRINT_ACCELERATION * seconds);
+    return;
+  }
+  const acceleration = hero.grounded ? ACCELERATION : AIR_ACCELERATION;
+  hero.vx = approach(hero.vx, input.direction * WALK_SPEED, acceleration * seconds);
+}
+
 export function stepHero(hero, input, level, seconds) {
   const wasGrounded = hero.grounded;
   let jumped = false;
-  const acceleration = hero.grounded ? ACCELERATION : AIR_ACCELERATION;
-  hero.vx = approach(hero.vx, input.direction * RUN_SPEED, acceleration * seconds);
+  accelerate(hero, input, seconds);
 
   hero.coyote = hero.grounded ? COYOTE_TIME : Math.max(hero.coyote - seconds, 0);
   hero.buffer = input.jumpPressed ? JUMP_BUFFER_TIME : Math.max(hero.buffer - seconds, 0);
@@ -124,7 +135,7 @@ export function stepHero(hero, input, level, seconds) {
 export function computeEnvelope() {
   const emptyLevel = { cols: 0, rows: [] };
   const hero = createHero(0, 0);
-  hero.vx = RUN_SPEED;
+  hero.vx = WALK_SPEED;
   const path = [];
   let input = { direction: 1, jumpHeld: true, jumpPressed: true };
   do {

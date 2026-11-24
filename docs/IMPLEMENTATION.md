@@ -181,7 +181,24 @@ Third round, for more varied terrain: the ground rolls, each chunk raised by up 
 
 Fourth round: a stomp counts as landing for the jump. Jump pressed just before a stomp or just after it gives a full jump off the enemy (or the boss's core), as off the ground; before, it gave only the weaker stomp bounce.
 
-## 13. Release preparation
+## 13. Run
+
+- Status: done
+
+Holding Shift makes the hero run, as in classic platformers, as a speedrun option. Shaped in a grilling session:
+
+- Walking stays at today's 9 tiles/s; holding Shift (either one) runs at 12 tiles/s. Above walking speed the hero speeds up gently, reaching running speed in about 0.5 s; releasing Shift brakes back to walking speed with the normal acceleration. The same rule holds in the air, with the air acceleration, so releasing Shift mid-jump shortens the jump. Both speeds are tuning values.
+- The jump is as high as before; momentum carries into the air, so a running jump reaches farther.
+- The generator, the envelope, the validator and the safe-passage tests stay at walking speed: every level is proven completable without running. Hangs, pointers, the camera and the time-bonus par are not retuned. Running works everywhere, the boss arena included; the boss's patch stays at half the walking speed.
+- The `»` trail shows only while running above walking speed.
+- **Fastest runs**: High scores gets two tabs, `SCORE` and `TIME`, switched with ←→ on a tab row at the top; ↓ enters the list, which works as before (play or copy a seed). The time table is a top 10 of the playing time to Shipped (finishing level 5), the boss not timed: pauses, menus, cards, summaries and death beats do not count. Entries show the time to hundredths, the seed and the date; on equal times the older entry stays above. The Shipped screen shows a new entry's place (`fastest run #3`). Score is unchanged.
+- **Controls**: a read-only screen in the main menu (Continue, New run, Enter seed, High scores, Controls, Settings) and the in-game menu (Resume, Controls, Copy seed, Main menu): ←→ move, Space or ↑ jump (hold for higher), Shift run (hold), P pause, Esc menu, and a muted line on menus. Esc or Enter goes back. Remapping stays in `ROADMAP.md`.
+
+Tests: the ramp to running speed and the braking back, a running jump as high as a walking one but longer, Shift in the air, the envelope at walking speed, no blind jump at running speed, the time table (entry, order, ties, top ten, storage), the menu items.
+
+Done when: running feels good to the user and adds to the game; otherwise the task is reverted.
+
+## 14. Release preparation
 
 - Status: todo
 

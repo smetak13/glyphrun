@@ -5,7 +5,7 @@ import { ADVANCED_KINDS, BASIC_KINDS, HANG_ROW, chunkKinds, generateLevel, hangR
 import { CHUNKS } from "../logic/chunks.mjs";
 import { parseLevel } from "../logic/level.mjs";
 import { createEnemies, stepEnemies } from "../logic/enemies.mjs";
-import { computeEnvelope, createHero, RUN_SPEED } from "../logic/physics.mjs";
+import { HERO_WIDTH, SPRINT_SPEED, computeEnvelope, createHero, stepHero, WALK_SPEED } from "../logic/physics.mjs";
 import { CAMERA_FOLLOW_RATE, CAMERA_LEAD } from "../logic/world.mjs";
 import { STEP_SECONDS } from "../logic/clock.mjs";
 import { SCREEN_ROWS, SCREEN_WIDTH, TILE } from "../logic/screen.mjs";
@@ -262,9 +262,27 @@ test("the same seed is always offered the same level", () => {
 });
 
 test("every landing is on screen before the jump, even with the camera lagging at full speed", () => {
-  const visibleAhead = SCREEN_WIDTH - CAMERA_LEAD - RUN_SPEED / CAMERA_FOLLOW_RATE;
+  const visibleAhead = SCREEN_WIDTH - CAMERA_LEAD - WALK_SPEED / CAMERA_FOLLOW_RATE;
 
   assert.ok(computeEnvelope().maxGap < visibleAhead);
+});
+
+function runningJumpDistance() {
+  const hero = createHero(0, 0);
+  hero.vx = SPRINT_SPEED;
+  const emptyLevel = { cols: 0, rows: [] };
+  let input = { direction: 1, jumpHeld: true, jumpPressed: true, sprint: true };
+  do {
+    stepHero(hero, input, emptyLevel, STEP_SECONDS);
+    input = { direction: 1, jumpHeld: true, jumpPressed: false, sprint: true };
+  } while (hero.y < 0);
+  return hero.x + HERO_WIDTH;
+}
+
+test("every landing is on screen before the jump even when running with the camera lagging", () => {
+  const visibleAhead = SCREEN_WIDTH - CAMERA_LEAD - SPRINT_SPEED / CAMERA_FOLLOW_RATE;
+
+  assert.ok(runningJumpDistance() < visibleAhead);
 });
 
 test("every hazard chunk with every enemy it can hold has a safe passage at every phase", () => {
