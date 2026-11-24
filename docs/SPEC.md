@@ -130,7 +130,7 @@ All texts here are defaults and may be tuned during implementation.
 - **Checkpoint**: one in the middle of each level, `│▸`, lit when passed (`snapshot saved`).
 - No time limit. Time only feeds the score.
 - Losing the last life shows no toast: after the death beat the game over screen names the cause and the level (`/dev/null: write successful · level 2/5`).
-- When the last life is lost the run is over: the game over screen offers **Retry this seed from level 1**, **New seed**, **Copy seed** and **Main menu**.
+- When the last life is lost the run is over: the game over screen offers **Retry** (the same seed from level 1), **New seed**, **Copy seed** and **Main menu**.
 
 ## 6. Enemies and traps
 
@@ -283,7 +283,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 
 - **Main menu**: Continue (only when a run is in progress), New run, Enter seed, High scores, Controls, Settings. There is no quit item: the window is closed like Omatris, from the bar icon or the window manager. Going to the main menu from a run keeps the run for Continue.
 - **P**: freeze. The game stops in place with `[ PAUSED ]`; P again resumes.
-- **Esc**: in-game menu, pausing the game: Resume, Controls, Copy seed, Main menu. There is no restart of a single level: a run is one attempt, and starting over means retrying the seed from level 1.
+- **Esc**: in-game menu, pausing the game: Resume, Restart, Controls, Copy seed, Main menu. Restart starts the seed over from level 1 with everything fresh, as retrying it after a game over, without a confirmation; the abandoned run is not recorded. There is no restart of a single level: a run is one attempt, and starting over means retrying the seed from level 1.
 - **Closing the window** during play hides it and opens the in-game menu, so nothing runs in the background. Opening it again from the bar shows that menu.
 - **Between levels**: the level summary (section 3).
 - **Game over** and **victory**: section 3 and section 5. Both offer Copy seed.
@@ -319,7 +319,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 
 ### Rich ASCII (planned)
 
-A visual redesign before the release, so the game looks less old school while staying made of text. The details of each part are settled in its own grilling session (`docs/IMPLEMENTATION.md`, tasks 14–17) and written here when it is done. Agreed so far:
+A visual redesign before the release, so the game looks less old school while staying made of text. The details of each part are settled in its own grilling session (`docs/IMPLEMENTATION.md`, tasks 14, 15, 17 and 18) and written here when it is done. Agreed so far:
 
 - The game stays drawn in glyphs of the game's font, coloured from the theme's 16-colour palette, so it still follows every Omarchy theme. No sprites or images.
 - Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change.

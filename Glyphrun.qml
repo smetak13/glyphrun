@@ -273,13 +273,14 @@ Item {
 
   function activatePause(item) {
     if (item === "Resume") menuOpen = false
+    else if (item === "Restart") startRun(run.seed, false)
     else if (item === "Controls") showControls("play")
     else if (item === "Copy seed") copySeed(run.seed)
     else if (item === "Main menu") showMainMenu()
   }
 
   function activateEnd(item) {
-    if (item === "Retry this seed from level 1") startRun(run.seed, false)
+    if (item === "Retry") startRun(run.seed, false)
     else if (item === "New seed" || item === "New run") startRun(newSeed(), true)
     else if (item === "Copy seed") copySeed(run.seed)
     else if (item === "Main menu") showMainMenu()

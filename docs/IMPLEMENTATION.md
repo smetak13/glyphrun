@@ -247,7 +247,15 @@ Notes: `logic/enemyFigure.mjs` turns each enemy into glyph parts in the hero's p
 
 Performance, measured offscreen on this machine with `GameView.sync()` over 600 frames on the busiest screen of two level-5 runs (8–9 enemies on screen): 0.55–0.64 ms per frame against 0.27–0.32 ms before the task, about 1.5 ms on the i5-7200U with the spike's 2.5× CPU factor; 7% fewer items are drawn than before, since far enemies are now hidden. Animating every enemy of the level, as the first version did, cost 6 ms, hence the culling. The animations therefore stay on with reduced effects.
 
-## 16. Rich ASCII: level themes
+## 16. Restart from the in-game menu
+
+- Status: done
+
+The in-game menu gets **Restart**, right under Resume: it starts the current seed over from level 1 with everything fresh (full lives, every enemy and bit back, score and time at zero), exactly as the game over screen's retry, which is renamed from "Retry this seed from level 1" to **Retry**. The labels stay short because what they do is obvious. There is no confirmation. The abandoned run is not recorded in the high scores, as when leaving through Main menu. A restart of a single level still does not exist (SPEC 10).
+
+Tests: the in-game menu's items and order.
+
+## 17. Rich ASCII: level themes
 
 - Status: todo
 
@@ -255,7 +263,7 @@ Before implementing, settle the design in a grilling session and write its decis
 
 Each level's terrain looks like its meaning (for `deploy --prod`, server racks and the like), with many design variants of ground, blocks and platforms, about 30 in total, that only change how a tile is drawn.
 
-## 17. Rich ASCII: backgrounds
+## 18. Rich ASCII: backgrounds
 
 - Status: todo
 
@@ -263,7 +271,7 @@ Before implementing, settle the design in a grilling session and write its decis
 
 Each level gets its own background matching its theme, instead of the shared hexdump.
 
-## 18. Release preparation
+## 19. Release preparation
 
 - Status: todo
 

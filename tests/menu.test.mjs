@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canContinue, mainMenuItems, moveIndex, percent, stepVolume } from "../logic/menu.mjs";
+import { PAUSE_ITEMS, canContinue, mainMenuItems, moveIndex, percent, stepVolume } from "../logic/menu.mjs";
 
 const IN_PROGRESS = { over: false, won: false };
 
@@ -30,4 +30,8 @@ test("volume moves in tenths and stays between silent and full", () => {
 
 test("volume shows as a whole percentage", () => {
   assert.equal(percent(stepVolume(0.2, 1)), "30%");
+});
+
+test("the in-game menu offers Restart right under Resume", () => {
+  assert.deepEqual(PAUSE_ITEMS, ["Resume", "Restart", "Controls", "Copy seed", "Main menu"]);
 });

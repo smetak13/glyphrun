@@ -1,5 +1,5 @@
-export const PAUSE_ITEMS = ["Resume", "Controls", "Copy seed", "Main menu"];
-export const GAME_OVER_ITEMS = ["Retry this seed from level 1", "New seed", "Copy seed", "Main menu"];
+export const PAUSE_ITEMS = ["Resume", "Restart", "Controls", "Copy seed", "Main menu"];
+export const GAME_OVER_ITEMS = ["Retry", "New seed", "Copy seed", "Main menu"];
 export const VICTORY_ITEMS = ["New run", "Copy seed", "Main menu"];
 export const SCORE_ACTIONS = ["play", "copy"];
 export const SCORE_TABS = ["score", "time"];
