@@ -33,6 +33,7 @@ export const SHOT_HEIGHT = 6;
 export const SHOT_RANGE = SCREEN_WIDTH;
 export const SMALL_FORK_SPEED = 84;
 export const SPLIT_GRACE_SECONDS = 0.3;
+export const SPLIT_HARMLESS_SECONDS = 1;
 export const SPLIT_DASH_SPEED = 300;
 export const LEAK_GROW_SPEED = 3 * TILE;
 export const LEAK_FULL_SECONDS = 0.8;
@@ -129,6 +130,7 @@ export function resetEnemy(enemy) {
   enemy.vy = 0;
   enemy.lying = 0;
   enemy.grace = 0;
+  enemy.harmless = 0;
   enemy.ghost = false;
   enemy.timer = enemy.phase;
   enemy.cycle = 0;
@@ -140,6 +142,7 @@ export function resetEnemy(enemy) {
   enemy.seen = false;
   enemy.grown = 0;
   enemy.links = [];
+  enemy.paused = 0;
 }
 
 function box(enemy, x) {
@@ -342,8 +345,14 @@ function forkSpeed(enemy) {
 export function stepEnemies(enemies, level, hero, seconds, cameraX) {
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
+    if (enemy.paused > 0) {
+      enemy.paused = Math.max(enemy.paused - seconds, 0);
+      enemy.previousY = enemy.y;
+      continue;
+    }
     enemy.time += seconds;
     enemy.grace = Math.max(enemy.grace - seconds, 0);
+    enemy.harmless = Math.max(enemy.harmless - seconds, 0);
     enemy.previousY = enemy.y;
     if (enemy.kind === "bug") walk(enemy, level, enemies, BUG_SPEED, seconds);
     else if (enemy.kind === "fork") walk(enemy, level, enemies, forkSpeed(enemy), seconds);
@@ -404,8 +413,33 @@ function split(enemies, fork) {
     child.homeX = fork.x;
     resetEnemy(child);
     child.grace = SPLIT_GRACE_SECONDS;
+    child.harmless = SPLIT_HARMLESS_SECONDS;
     child.ghost = true;
   }
+}
+
+export function defeatEnemy(enemies, enemy) {
+  enemy.alive = false;
+  enemy.paused = 0;
+  if (enemy.kind === "fork" && !enemy.small) split(enemies, enemy);
+  return { type: "kill", source: enemy.kind, small: enemy.small, x: enemy.x, y: enemy.y - enemy.height };
+}
+
+export function standOnPaused(hero, enemies, previousBottom) {
+  if (hero.vy < 0) return false;
+  const left = hero.x - HERO_WIDTH / 2;
+  const right = hero.x + HERO_WIDTH / 2;
+  for (const enemy of enemies) {
+    if (!enemy.alive || !(enemy.paused > 0) || stompable(enemy)) continue;
+    for (const area of harmfulAreas(enemy)) {
+      if (previousBottom > area.top + EDGE || hero.y < area.top || right <= area.left || left >= area.right) continue;
+      hero.y = area.top;
+      hero.vy = 0;
+      hero.grounded = true;
+      return true;
+    }
+  }
+  return false;
 }
 
 export function touchEnemies(enemies, hero, previousBottom) {
@@ -415,7 +449,7 @@ export function touchEnemies(enemies, hero, previousBottom) {
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
     if (enemy.ghost) {
-      if (hero.grounded && !overlaps(heroArea, hitBox(enemy))) enemy.ghost = false;
+      if (enemy.harmless === 0 && hero.grounded && !overlaps(heroArea, hitBox(enemy))) enemy.ghost = false;
       continue;
     }
     const touched = harmfulAreas(enemy).filter(area => overlaps(heroArea, area));
@@ -423,11 +457,9 @@ export function touchEnemies(enemies, hero, previousBottom) {
     const onBody = overlaps(heroArea, hitBox(enemy));
     const fromAbove = previousBottom <= enemy.previousY - enemy.height + STOMP_TOLERANCE;
     if (onBody && fromAbove && stompable(enemy)) {
-      enemy.alive = false;
       stomped = true;
-      events.push({ type: "kill", source: enemy.kind, small: enemy.small, x: enemy.x, y: enemy.y - enemy.height });
-      if (enemy.kind === "fork" && !enemy.small) split(enemies, enemy);
-    } else {
+      events.push(defeatEnemy(enemies, enemy));
+    } else if (!(enemy.paused > 0)) {
       events.push({ type: "hit", source: enemy.kind });
     }
   }

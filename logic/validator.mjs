@@ -65,7 +65,7 @@ function timingKey(enemy) {
   if (enemy.kind === "pointer") return Math.round(enemy.charge / PHASE_BUCKET) + ":" + enemy.shots.map(x => Math.round(x / ENEMY_BUCKET)).join("/");
   if (enemy.kind === "leak") return Math.round((enemy.timer % leakCycleSeconds(enemy.extent)) / PHASE_BUCKET);
   if (enemy.kind === "spinlock") return Math.round(((enemy.time + enemy.phase) % SPINLOCK_PERIOD) / PHASE_BUCKET);
-  return Math.round(enemy.grace / PHASE_BUCKET);
+  return Math.round(enemy.grace / PHASE_BUCKET) + ":" + Math.round(enemy.harmless / PHASE_BUCKET);
 }
 
 function enemyKey(enemy) {

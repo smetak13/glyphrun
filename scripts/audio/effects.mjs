@@ -123,6 +123,29 @@ const EFFECTS = {
     renderTone(buffer, { start: step * 11, length: 1.4, midi: 36, voice: CHIP_BASS });
     renderTone(buffer, { start: step * 11, length: 1.4, midi: 96, voice: CHIP_BELL });
   },
+  "weapon-get"(buffer) {
+    notes(buffer, CHIP, [67, 71, 74, 79, 83, 86, 91], { step: 0.04, length: 0.045 });
+    renderTone(buffer, { start: 0.28, length: 0.12, midi: 86, voice: CHIP_BELL });
+    renderTone(buffer, { start: 0.4, length: 0.35, midi: 91, voice: CHIP_BELL });
+  },
+  "fire-duck"(buffer) {
+    renderSweep(buffer, { start: 0, length: 0.09, fromHz: 520, toHz: 880, duty: 0.25, gain: 0.5, decay: 0.06 });
+    renderSweep(buffer, { start: 0.07, length: 0.06, fromHz: 980, toHz: 700, duty: 0.5, gain: 0.35, decay: 0.04 });
+  },
+  "fire-breakpoint"(buffer) {
+    renderTone(buffer, { start: 0, length: 0.05, midi: 88, voice: CHIP_THIN });
+    renderSweep(buffer, { start: 0.04, length: 0.14, fromHz: 1200, toHz: 1100, shape: "triangle", gain: 0.6, decay: 0.1 });
+  },
+  "fire-claude"(buffer) {
+    notes(buffer, CHIP_BELL, [79, 84, 88], { step: 0.05, length: 0.08 });
+  },
+  "fire-revert"(buffer) {
+    renderSweep(buffer, { start: 0, length: 0.22, fromHz: 300, toHz: 600, duty: 0.125, gain: 0.5, vibrato: { rate: 24, depth: 2 } });
+  },
+  "breakpoint-hit"(buffer) {
+    notes(buffer, CHIP_THIN, [91, 84], { step: 0.06, length: 0.05 });
+    renderNoise(buffer, { start: 0, length: 0.05, gain: 0.25, decay: 0.02, mode: "high", cutoff: 5000 });
+  },
   "menu-move"(buffer) {
     renderSweep(buffer, { start: 0, length: 0.035, fromHz: 1400, toHz: 1400, duty: 0.25, gain: 0.4 });
   },

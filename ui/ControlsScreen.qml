@@ -11,7 +11,7 @@ Rectangle {
   Panel {
     anchors.centerIn: parent
     width: 440
-    height: 380
+    height: 416
     colors: screen.colors
 
     Glyph {
@@ -53,7 +53,7 @@ Rectangle {
 
     Glyph {
       x: 38
-      y: 290
+      y: 326
       text: "menus: arrows · enter or space"
       size: 12
       color: screen.colors.muted
@@ -61,7 +61,7 @@ Rectangle {
 
     Glyph {
       x: 32
-      y: 340
+      y: 376
       text: "Esc · back"
       size: 12
       color: screen.colors.muted

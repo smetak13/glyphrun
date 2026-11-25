@@ -19,6 +19,7 @@ const STROKE = "┃";
 const THICKNESS = 1.9;
 const GLITCH_GLYPHS = "▓▒░#%&$!?";
 const GLITCH_HEIGHT = 7;
+const THROW_ARM = 1.35;
 
 const SIZES = {
   small: { leg: 7, torso: 6, head: 15, arm: 5, width: 1.15 },
@@ -188,16 +189,30 @@ function mirrored(p, facing) {
   return Object.assign({}, p, { x: p.x * facing, rotation: p.rotation * facing });
 }
 
-export function heroParts(pose, big, facing, time, speed) {
-  const size = big ? SIZES.big : SIZES.small;
-  const w = size.width;
+function skeleton(pose, size) {
   const legRise = pose.crouch ? size.leg * Math.cos(Math.abs(pose.legs[0])) : size.leg;
   const torso = size.torso * pose.torsoScale;
   const hip = { x: 0, y: -legRise + pose.bob };
   const shoulder = { x: 0, y: hip.y - torso };
+  const arms = pose.arms.map(angle => limb({ x: 0, y: shoulder.y + 1 }, angle, size.arm));
+  return { torso, hip, shoulder, arms };
+}
+
+export function throwPose(pose) {
+  return Object.assign({}, pose, { arms: [THROW_ARM, pose.arms[1]] });
+}
+
+export function handPoint(pose, big, facing) {
+  const end = skeleton(pose, big ? SIZES.big : SIZES.small).arms[0].end;
+  return { x: end.x * facing, y: end.y };
+}
+
+export function heroParts(pose, big, facing, time, speed) {
+  const size = big ? SIZES.big : SIZES.small;
+  const w = size.width;
+  const { torso, hip, shoulder, arms } = skeleton(pose, size);
   const headY = shoulder.y - size.head * 0.55;
   const legs = pose.legs.map(angle => limb(hip, angle, size.leg));
-  const arms = pose.arms.map(angle => limb({ x: 0, y: shoulder.y + 1 }, angle, size.arm));
   const scarfLength = Math.min(3, 1 + Math.floor(speed / 100));
   const scarfWave = Math.floor(time * 8) % 2;
   const scarf = "~".repeat(scarfLength);

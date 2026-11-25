@@ -1,5 +1,6 @@
 import { TILE } from "./screen.mjs";
-import { createWorld, respawnHero, stepWorld } from "./world.mjs";
+import { createWorld, respawnHero, stepWorld, armWorld } from "./world.mjs";
+import { WEAPONS, HINT_SECONDS, HINT_AFTER_FIRE_SECONDS, weaponFor } from "./weapons.mjs";
 import { heroHeight } from "./physics.mjs";
 import { BOSS_HITS } from "./boss.mjs";
 import { DIFFICULTY } from "./generator.mjs";
@@ -38,6 +39,9 @@ export function createRun(seed, level) {
     toast: null,
     popups: [],
     cues: [],
+    weapon: weaponFor(seed),
+    armed: false,
+    hint: null,
   };
   startLevel(run, level, false);
   return run;
@@ -46,6 +50,9 @@ export function createRun(seed, level) {
 function startLevel(run, level, big) {
   run.world = createWorld(level);
   run.world.hero.big = big;
+  run.armed = big && run.armed;
+  armWorld(run.world, run.armed ? run.weapon : null);
+  run.hint = null;
   run.invulnerable = 0;
   run.dying = 0;
   run.timeBonus = 0;
@@ -118,7 +125,29 @@ function inPlay(run) {
   return !run.over && !run.world.finished && run.dying === 0;
 }
 
+function disarm(run) {
+  run.armed = false;
+  run.hint = null;
+  armWorld(run.world, null);
+}
+
+function arm(run, x, y) {
+  run.armed = true;
+  run.hint = { age: 0 };
+  armWorld(run.world, run.weapon);
+  cue(run, "weapon-get", x, y + TILE / 2);
+  showToast(run, WEAPONS[run.weapon].toast, "hero");
+}
+
+export function armHero(run, weapon) {
+  const hero = run.world.hero;
+  hero.big = true;
+  run.weapon = weapon;
+  arm(run, hero.x, hero.y - heroHeight(hero));
+}
+
 function loseLife(run, source) {
+  disarm(run);
   run.stats.hits++;
   run.stats.deaths++;
   run.lives--;
@@ -139,6 +168,7 @@ export function hitHero(run, source) {
   if (hero.big) {
     run.stats.hits++;
     hero.big = false;
+    disarm(run);
     run.invulnerable = INVULNERABLE_SECONDS;
     heroCue(run, "hit");
     showToast(run, hitMessage(source), "hostile");
@@ -160,10 +190,12 @@ export function killEnemy(run, source, x, y, small) {
 function grantSudo(run, x, y, message) {
   const hero = run.world.hero;
   if (hero.big) {
-    cue(run, "already-root", x, y + TILE / 2);
     run.levelPoints.sudoPoints += ALREADY_ROOT_POINTS;
     addPopup(run, x, y, ALREADY_ROOT_POINTS, "", "hero");
-    showToast(run, EVENTS.alreadyRoot, "hero");
+    if (run.armed) {
+      cue(run, "already-root", x, y + TILE / 2);
+      showToast(run, EVENTS.alreadyRoot, "hero");
+    } else arm(run, x, y);
   } else {
     hero.big = true;
     cue(run, "sudo", x, y + TILE / 2);
@@ -232,6 +264,13 @@ function handleEvent(run, event) {
     heroCue(run, "boss-warning");
   } else if (event.type === "coreDump") {
     cue(run, "core-dump", event.x, event.y);
+  } else if (event.type === "fire") {
+    if (run.hint) run.hint.age = Math.max(run.hint.age, HINT_SECONDS - HINT_AFTER_FIRE_SECONDS);
+    heroCue(run, "fire-" + event.weapon);
+  } else if (event.type === "pause") {
+    cue(run, "breakpoint-hit", event.x, event.y);
+  } else if (event.type === "fizzle") {
+    cue(run, "shot-fizzle", event.x, event.y);
   } else if (event.type === "rebooted") {
     run.won = true;
     run.lifeBonus = lifeBonus(run.lives);
@@ -245,6 +284,10 @@ function ageMessages(run, seconds) {
   if (run.toast) {
     run.toast.age += seconds;
     if (run.toast.age >= TOAST_SECONDS) run.toast = null;
+  }
+  if (run.hint) {
+    run.hint.age += seconds;
+    if (run.hint.age >= HINT_SECONDS) run.hint = null;
   }
   for (const popup of run.popups) popup.age += seconds;
   run.popups = run.popups.filter(popup => popup.age < POPUP_SECONDS);

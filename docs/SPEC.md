@@ -116,7 +116,7 @@ All texts here are defaults and may be tuned during implementation.
 - **Run**: holding Shift runs at 12 tiles/s instead of walking at 9. Above walking speed the hero speeds up gently, reaching running speed in about 0.5 s; releasing Shift brakes back to walking speed with the normal acceleration. The same rule holds in the air with the air acceleration, so releasing Shift mid-jump shortens the jump. The jump is as high as when walking; momentum carries into the air, so a running jump reaches farther. Running works everywhere, the boss arena included. It is a speedrun option: everything the generator, the envelope and the validator assume is at walking speed, so every level is completable without running.
 - Coyote time: a jump is still accepted for a few frames after walking off a ledge.
 - Jump buffer: a jump pressed a few frames before landing fires on landing.
-- No other abilities in the MVP.
+- The only other ability is a weapon, earned with sudo (section 5.1).
 - Ground and solid blocks stop the hero from every side. Platforms `[===]` are one-way: the hero jumps up through them and lands on top.
 - The hero stands on a ledge as long as any part of it is over the ledge, so the widest gap it can clear is the distance flown plus its own width.
 - Physics constants (gravity, walking and running speed, acceleration, jump velocity, jump cut) live in one module. The envelope (maximum jump height, maximum gap at walking speed, maximum gap with a height difference) is computed from them, never written by hand: by simulating a jump at walking speed with jump held, taken from the ground without coyote time.
@@ -131,13 +131,31 @@ All texts here are defaults and may be tuned during implementation.
 - After losing a life the hero respawns at the last checkpoint (level start or the mid-level checkpoint), small, after a short death beat (1.2 s). Bits already collected stay collected.
 - The invulnerability after shrinking lasts 1.5 s. A pit costs a life even while invulnerable.
 - The big hero is about two tiles tall and bumps its head on ceilings that the small one passes under.
-- **sudo**: exactly one bit per level holds it. It looks like every other bit. Collected while small: the hero grows to `@@`. Collected while already big: score bonus only (`already root`). The sudo bit scores as sudo, not as a bit, and is not counted among the bits. The generator always places it on a completable path, possibly in a harder spot.
-- sudo carries over into the next level until the hero is hit or loses a life.
+- **sudo**: exactly one bit per level holds it. It looks like every other bit. Collected while small: the hero grows to `@@`. Collected while already big: the `already root` score bonus, and the seed's weapon if the hero is not armed yet (section 5.1). The sudo bit scores as sudo, not as a bit, and is not counted among the bits. The generator always places it on a completable path, possibly in a harder spot.
+- sudo carries over into the next level until the hero is hit or loses a life; so does the weapon.
 - **1-up**: every 100 bits collected over the run (the sudo bit not counted) give a life, with the toast `fork(): +1 life`, the `one-up` effect and a flash of the lives in the HUD. A run holds at most 5 lives; at 5, the next hundred bits score 1,000 points instead. The 100 is a tuning value: `scripts/pass-rate.mjs` reports the bits per level.
 - **Checkpoint**: one in the middle of each level, `│▸`, lit when passed (`snapshot saved`).
 - No time limit. Time only feeds the score.
 - Losing the last life shows no toast: after the death beat the game over screen names the cause and the level (`/dev/null: write successful · level 2/5`).
 - When the last life is lost the run is over: the game over screen offers **Retry** (the same seed from level 1), **New seed**, **Copy seed** and **Main menu**.
+
+### 5.1 Weapons
+
+`docs/prototype/weapons.html` is the visual and behavioural target.
+
+- **One weapon per seed**, drawn from the seed on its own sub-stream (`weapon`), so it never shifts level generation or styles. It is a surprise: nothing shows it before it is earned.
+- **Getting it**: a sudo bit collected while big and not yet armed gives the `already root` bonus and the weapon, with the `weapon-get` effect and the weapon's toast. The boss's `[patch]` arms a big hero the same way. With one sudo bit per level, the weapon needs sudo carried in from the last level: level 2 at the earliest. A sudo bit collected while armed is `already root` as before.
+- **Hint**: for 4 s after the weapon is earned, a box under the toast in the weapon's colour shows its icon and `rubber duck acquired`, then `press [X] to throw the duck` with a pulsing keycap. Firing once fades it out within 0.6 s. Every pickup shows it.
+- **Losing it**: any hit that shrinks the hero, and any lost life, pits included, takes sudo and the weapon together.
+- **Firing**: X. One press, one shot; holding does not repeat. Ammo is unlimited; each weapon has a cooldown and a limit on its shots on screen. Shots leave 14 px above the hero's feet, so straight shots hit enemies on the ground and anything floating takes a jump. The armed hero holds the weapon's icon in the front hand and throws with a short arm pose; Claude's `✻` floats over the shoulder instead.
+- **What they hit**: shots kill what stomping kills, the memory leak's source included, with the same score, kill message and effects; a fork bomb splits as when stomped. Other traps absorb shots; the breakpoint pauses them. In the boss stage, shots kill the bugs the boss spawns and nothing else: the face, its attacks and the core are untouched. Hits work as before, and the validator proves every level without a weapon.
+
+| Weapon | Pickup toast | Attack | Tuning |
+|---|---|---|---|
+| rubber duck | `apt install rubber-duck` | Thrown low, bounces along the ground about half a tile high, so it hits anything on the ground, and follows it down steps; gone at a wall, a trap, a pit or after 1.4 s. | 280 px/s, bounce 200 px/s, cooldown 0.25 s, 2 on screen. |
+| breakpoint | `gdb: breakpoint 1 set` | A slow dot straight ahead. Whatever it touches, traps included, is paused for 3 s: it stops where it is, cannot hurt, is drawn in cyan with a `‖` above it and blinks in its last 0.6 s. A paused trap is a one-way platform; landing on a paused creature stomps it. Kills nothing itself. | 260 px/s, 9 tiles, cooldown 1 s, 1 on screen. |
+| claude | `claude: how can I help?` | The `✻` thinks for 0.5 s (`Thinking…`), flies to the nearest killable enemy ahead within 7 tiles and 5 up or down, through walls, kills it with a line (`You're absolutely right!`, `Fixed it.`, `I see the issue.`, `Perfect! Bug removed.`) and flies back. Nothing in range: `No issues found.` Ignores traps. | Out 420 px/s, back 480 px/s; 0.4 s after its return, 0.6 s after nothing found. |
+| git revert | `git revert HEAD` | A spinning `↺` flies straight out, slows, and homes back to the hero; it passes through enemies and kills everything it touches, once on each leg. A wall or a trap sends it back early. Thrown again only once caught. | 420 px/s out, slowing by 600 px/s² (about 6 tiles), back at up to 460 px/s, gone after 3 s. |
 
 ## 6. Enemies and traps
 
@@ -160,7 +178,7 @@ Eleven in the MVP. Basic ones appear from level 1; advanced ones join from level
 | 6 | `[*]` | cron job | A vent on the ground fires a column `#####` 5–6 tiles high, higher than any jump, at a fixed rhythm, for 1 s. There is no warning: the player learns each vent's rhythm and passes while it is off. Each vent's rhythm (every 2.4, 3 or 3.6 s), phase and height come from the seed. The vent itself is harmless. | No. |
 | 7 | `║ ║`, `}<` | pipe daemon | A solid pipe two tiles wide and three tall; a daemon rises 1.5 tiles out of its top now and then, stays up for 1 s and sinks back. With the daemon out its top is higher than any jump, so the pipe can only be crossed while it is down. Standing on the pipe while the daemon is up is a hit. The pipe is always visible; the time down is 1.8 s plus a seeded jitter of up to 0.5 s per cycle. | No. |
 | 8 | `*`, `<--` | dangling pointer | An emitter `*`, on the ground or on a block, fires `<--` to the left, towards the arriving hero, across the screen until a wall stops it: in the lowest tile row above the ground (jump it) or in the second (the small hero passes under, the big one must jump). The emitter blinks 0.5 s before each shot and fires every 2.5 s, only while on screen, the first time 1 s after it comes on screen; a chunk may delay a pointer's first shot so that pointers near each other fire out of step. Touching the emitter is a hit. | No. |
-| 9 | `&` | fork bomb | Walks like a bug. Stomped, it splits into two small `&` that run in opposite directions, faster, bouncing off obstacles. For 0.3 s after the split the small ones dash apart faster than the hero runs. Until the hero has landed from the stomp's bounce and stands clear of them, they neither hurt nor die, so one stomp never kills them too. A small one dies to one stomp and does not split. | Stomp; small ones too. |
+| 9 | `&` | fork bomb | Walks like a bug. Stomped, it splits into two small `&` that run in opposite directions, faster, bouncing off obstacles. For 0.3 s after the split the small ones dash apart faster than the hero runs. For at least 1 s after the split, and then until the hero stands on the ground clear of them, they neither hurt nor die and are drawn faint, so neither a stomp nor a shot that splits the fork bomb gets the hero killed by the small ones flying out of it. A small one dies to one stomp and does not split. | Stomp; small ones too. |
 | 10 | `%`, `~~~` | memory leak | A source `%` drips and a puddle `~~~` grows from it towards the arriving hero. From the moment it first comes on screen it repeats a cycle: grows at 3 tiles per second to its maximum extent, stays full for 0.8 s, dries back to the source at 4 tiles per second and stays dry for 0.6 s. Its maximum extent is always drawn as a dotted frame labelled `malloc(n)`, so the player sees how far it will reach. A lone leak is big: 7 tiles, or 10 from level 4, so a full puddle is wider than any jump and the player waits for it to dry back. Smaller leaks (3 tiles) come only as a row of three with 2-tile gaps between them. Touching the puddle is a hit. | Stomp the source: the puddle disappears. |
 | 11 | `(o)`, `·*` | spinlock | A pivot `(o)` on the ground, on a block or floating, with an arm of 3–7 links (`·`, `*` at the tip) turning a full circle every 3 s, passing behind ground and blocks. Some have a double arm, a second one pointing the opposite way. Arm length, direction, double arm and starting angle come from the seed, within what the spinlock's chunk allows: long and double arms only where the chunk leaves room to pass, never tied to a level. A chunk may instead set each of its spinlocks' arm, direction and part of a turn, so that a row of different spinlocks is designed and verified as a whole; the seed then picks only the starting angle and may mirror all their directions. Only the arm hurts; the pivot is solid and can be stood on, though the arm sweeps through it. | No. |
 
@@ -198,8 +216,9 @@ Every event shows a short themed message. When the hero is hit or dies, a toast 
 | Event | Message |
 |---|---|
 | sudo collected | `sudo: privileges granted` |
-| sudo collected while big | `already root` |
-| boss's patch collected | `kernel: hotfix applied` (`already root` while big) |
+| sudo collected while big | the weapon's toast when it arms the hero, otherwise `already root` |
+| boss's patch collected | `kernel: hotfix applied` (`already root` while big; the weapon's toast when it arms the hero) |
+| weapon earned | the weapon's toast (section 5.1) |
 | 1-up | `fork(): +1 life` |
 | checkpoint | `snapshot saved` |
 | boss hit | `core dumped (1/3)`, `(2/3)`, `(3/3)` |
@@ -310,7 +329,7 @@ An offline daily challenge: everyone plays the same seed each day, and players c
 - **Game over** and **victory**: section 3 and section 5. Both offer Copy seed.
 - **Enter seed**: type a seed in the `xxxx-xxxx` format (the dash is added after four digits; only hex digits are accepted); an incomplete seed is rejected with a message. Ctrl+V (and Super+V, Omarchy's universal paste) pastes a seed from the clipboard; when the clipboard holds one, the screen offers it.
 - **Settings**: music volume, sound volume (both in steps of 10 %) and mute. ↑↓ choose, ←→ change, Enter changes too.
-- Controls: arrows move; Space or Arrow Up jumps; Shift (held) runs; P freezes; Esc opens the in-game menu. Menus are fully keyboard-driven (arrows, Enter or Space), like Omatris.
+- Controls: arrows move; Space or Arrow Up jumps; Shift (held) runs; X fires the weapon; P freezes; Esc opens the in-game menu. Menus are fully keyboard-driven (arrows, Enter or Space), like Omatris.
 - **Controls** screen, from the main menu and the in-game menu: a read-only list of the keys above and what they do, with a muted line for menus. Esc or Enter goes back where it came from. Remapping is in `ROADMAP.md`.
 - The run in progress (for Continue) is kept while the plugin is loaded; it is not written to disk.
 
@@ -332,11 +351,11 @@ An offline daily challenge: everyone plays the same seed each day, and players c
 | Hostile enemies and traps | `color1` (red), `color9` and `color13` for variety |
 | Text, HUD | theme foreground |
 
-- Particles: dust on jumps and landings, bursts on bits, sudo, a 1-up, kills, the checkpoint, the exit and boss hits. Screen shake on stomps, hits, deaths and boss hits; a white flash on sudo, a 1-up, hits, deaths, the exit and boss hits; the RGB-split glitch on sudo, hits, deaths and boss hits. A `»` trails the hero while it runs on the ground faster than walking speed. The background is two layers scrolling at 0.3 and 0.6 of the camera's speed.
+- Particles: dust on jumps and landings, bursts on bits, sudo, a weapon earned, a 1-up, kills, a pause by the breakpoint, a shot stopped by a wall or a trap, the checkpoint, the exit and boss hits. Screen shake on stomps, hits, deaths and boss hits; a white flash on sudo, a 1-up, hits, deaths, the exit and boss hits; the RGB-split glitch on sudo, hits, deaths and boss hits. A `»` trails the hero while it runs on the ground faster than walking speed. The background is two layers scrolling at 0.3 and 0.6 of the camera's speed.
 - The CRT scanlines and vignette are kept very faint, so they never cost readability.
 - The ground is drawn with a heavy surface (`▀` or `█`) on top and a fill from the level's terrain style, so heights and pillars read clearly.
 - **Effects: reduced only.** The game always runs with reduced effects: no glow, glitch or CRT; particles, shake, flash and the background stay. The user found that full effects only blurred the picture, so the choice is gone from Settings. The code for full effects (and the switch to reduced under 50 fps) stays for now, unused.
-- HUD: level `LVL 1/5`, seed, bits, score, time, lives. The lives flash and grow for a moment when a 1-up is earned.
+- HUD: level `LVL 1/5`, seed, bits, score, time, the weapon's icon while armed, lives. The lives flash and grow for a moment when a 1-up is earned.
 
 ### Rich ASCII (planned)
 
@@ -358,7 +377,7 @@ A visual redesign before the release, so the game looks less old school while st
 - Music: retro synthwave loops of 32 bars that loop seamlessly. Ten level tracks `level-01`–`level-10` (96–126 BPM, about 60–80 s) and five faster, harder boss tracks `boss-01`–`boss-05` (150–168 BPM, about 45–50 s). Track list and titles: `scripts/audio/tracks.mjs`.
 - Track choice comes from the seed, on its own sub-stream so it never shifts level generation: the ten level tracks are shuffled per seed and level n plays the n-th one, so a run's five levels always have five different tracks and the same seed always has the same music. The boss stage plays one of the five boss tracks, also chosen by the seed.
 - Music starts from the beginning with each level when play begins (not on the title card), pauses with the game (P, the in-game menu, the main menu) and when the window is hidden, and stops when the level is finished, on game over and on victory, where their jingles play. There is no music on menus and story screens.
-- Effects: `jump`, `land`, `bit`, `sudo`, `already-root`, `one-up`, `stomp`, `hit` (shrinking), `death` (a lost life, pits included), `checkpoint`, `level-clear`, `boss-warning` (each boss phase starts), `core-dump`, `boss-hit`, `boss-defeat`, `game-over`, `victory`, and on menus `menu-move`, `menu-select` and `pause` (P and Esc). The game logic only reports these events; the QML plays them. Effects are peak-normalised when generated, so each has its own gain (`logic/audio.mjs`) that brings it to about 2 dB under the level music; the jump, heard all the time, plays 3 dB quieter still.
+- Effects: `jump`, `land`, `bit`, `sudo`, `already-root`, `one-up`, `stomp`, `hit` (shrinking), `death` (a lost life, pits included), `checkpoint`, `level-clear`, `boss-warning` (each boss phase starts), `core-dump`, `boss-hit`, `boss-defeat`, `game-over`, `victory`, `weapon-get`, `fire-duck`, `fire-breakpoint`, `fire-claude`, `fire-revert`, `breakpoint-hit`, and on menus `menu-move`, `menu-select` and `pause` (P and Esc). The game logic only reports these events; the QML plays them. Effects are peak-normalised when generated, so each has its own gain (`logic/audio.mjs`) that brings it to about 2 dB under the level music; the jump, heard all the time, plays 3 dB quieter still.
 
 ## 12. Window and plugin integration
 

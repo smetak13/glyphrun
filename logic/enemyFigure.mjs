@@ -13,6 +13,8 @@ export const PING_RING_SECONDS = 0.45;
 export const COLUMN_ROW_HEIGHT = 12;
 export const PUDDLE_CELL = 6;
 export const DRAW_MARGIN = 12 * TILE;
+export const PAUSE_BLINK_SECONDS = 0.6;
+export const PAUSE_BLINK_RATE = 12;
 
 const MAIN_ROLE = {
   bug: "hostile", zombie: "hostileAlt2", spikes: "hostile", ping: "hostileAlt", hang: "hostileAlt", cron: "hostile",
@@ -283,11 +285,21 @@ export function drawnNear(enemy, cameraX) {
   return enemy.x > cameraX - margin && enemy.x < cameraX + SCREEN_WIDTH + margin;
 }
 
+export function pausedLook(enemy) {
+  if (!(enemy.paused > 0)) return false;
+  return enemy.paused > PAUSE_BLINK_SECONDS || Math.floor(enemy.paused * PAUSE_BLINK_RATE) % 2 === 0;
+}
+
+export function tinted(parts, enemy) {
+  if (!pausedLook(enemy)) return parts;
+  return parts.map(p => Object.assign({}, p, { role: "cyan" }));
+}
+
 export function enemyFigure(enemy, time, effects) {
   const body = BODIES[enemy.kind](enemy, time);
   const facing = facingOf(enemy);
-  const tick = glitching(enemy.kind, time, effects);
-  let parts = body.parts.map(p => mirrored(p, facing));
+  const tick = glitching(enemy.kind, time, effects) && !(enemy.paused > 0);
+  let parts = tinted(body.parts.map(p => mirrored(p, facing)), enemy);
   if (tick) parts = parts.map((p, i) => Object.assign({}, p, { x: p.x + (i % 2 ? 1.5 : -1.5) }));
   if (creature(enemy.kind)) {
     const main = parts.find(p => p.role === mainRole(enemy.kind) && p.height >= 13) || parts[0];

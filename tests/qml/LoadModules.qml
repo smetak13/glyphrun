@@ -29,6 +29,7 @@ import "../../logic/terrain.mjs" as Terrain
 import "../../logic/testLevel.mjs" as TestLevel
 import "../../logic/theme.mjs" as Theme
 import "../../logic/validator.mjs" as Validator
+import "../../logic/weapons.mjs" as Weapons
 import "../../logic/world.mjs" as World
 
 QtObject {
@@ -78,6 +79,15 @@ QtObject {
       Story.victoryScene(9)
       Story.shippedShown(3)
       Story.commitHash(run.seed, 1)
+      for (const weapon of Weapons.WEAPON_IDS) {
+        const armed = World.createWorld(generated)
+        armed.hero.big = true
+        World.armWorld(armed, weapon)
+        for (let i = 0; i < 240; i++) World.stepWorld(armed, { direction: 1, jumpHeld: false, jumpPressed: false, firePressed: i % 30 === 0 }, Clock.STEP_SECONDS)
+        Weapons.weaponGlyphs(armed, { x: armed.hero.x, y: armed.hero.y - 20 }, 1, 1)
+        Weapons.iconGlyphs(weapon, 1)
+        Weapons.weaponFor(run.seed)
+      }
       Random.shuffle(Random.subStream(1, "check"), Chunks.CHUNKS)
       AudioLogic.trackFor(run.seed, 6)
       Backdrop.backdropOffset(style.backdrop.near[0].x, Backdrop.NEAR_PARALLAX)

@@ -314,7 +314,38 @@ Playtesting showed the story was unclear: the intro never said who `@` is, where
 
 Tests: the intro's text, the step line for each level.
 
-## 21. Release preparation
+## 21. Weapons
+
+- Status: done
+
+A weapon for a hero who already holds sudo, shaped with the user from an HTML prototype, `docs/prototype/weapons.html` (the playable strip and the cards are the visual and behavioural target). A fifth weapon, a fan of three pasted snippets, was tried and cut as too easy.
+
+- **One weapon per seed**, drawn from the seed on its own sub-stream, so it never shifts level generation or styles.
+- **Getting it**: a sudo bit collected while big gives the usual `already root` bonus and arms the hero. The boss's `[patch]` arms a big hero the same way. With one sudo bit per level, the weapon needs sudo carried in from the last level: level 2 at the earliest. A sudo bit collected while armed scores only.
+- **Pickup hint**: the weapon's toast, and for 4 s a box under it in the weapon's colour: its icon and `rubber duck acquired`, then `press [X] to throw the duck` with a pulsing keycap. Firing once fades it out within 0.6 s. Every pickup shows it, not only the first.
+- **Losing it**: any hit (the hero shrinks) or lost life, pits included, takes sudo and the weapon together.
+- **Firing**: `X`. One press, one shot; holding does not repeat. Unlimited ammo; each weapon has a cooldown and a limit on its shots on screen. Shots leave 14 px above the feet, so straight shots hit enemies on the ground; reaching anything floating takes a jump. The armed hero holds the weapon's icon in the front hand (Claude's `✻` floats over the shoulder instead) and throws with a short arm pose.
+- **What they hit**: shots kill what stomping kills, the memory leak's source included, with the same score, kill message and effects; a fork bomb splits as when stomped. Traps absorb shots, except for the breakpoint, which pauses them. In the boss stage, shots kill the bugs the boss spawns and do nothing else: the face, its attacks and the core are untouched. Hits work as before, and the validator still proves every level without a weapon.
+
+| Weapon | Pickup toast | Attack | Tuning |
+|---|---|---|---|
+| rubber duck | `apt install rubber-duck` | Thrown low, bounces along the ground about half a tile high, so it hits anything on the ground, and follows it down steps; gone at a wall, a trap, a pit or after 1.4 s. | 280 px/s, bounce 200 px/s, cooldown 0.25 s, 2 on screen. |
+| breakpoint | `gdb: breakpoint 1 set` | A slow dot straight ahead. Whatever it touches, traps included, is paused for 3 s: harmless, a one-way platform, blinking before it thaws. Landing on a paused creature stomps it. Kills nothing itself. | 260 px/s, 9 tiles, cooldown 1 s, 1 on screen. |
+| claude | `claude: how can I help?` | Fire: the `✻` thinks for 0.5 s (`Thinking…`), flies to the nearest killable enemy ahead within 7 tiles (5 up or down), through walls, kills it with a line (`You're absolutely right!`, `Fixed it.`, …) and flies back. Nothing in range: `No issues found.`, 0.6 s cooldown. Ignores traps. | Out 420 px/s, back 480 px/s, cooldown 0.4 s after its return. |
+| git revert | `git revert HEAD` | A spinning `↺` flies straight out, slows, and homes back to the hero; it pierces, killing everything on both legs. A wall or a trap sends it back early. One at a time: thrown again only once caught. | 420 px/s out, 600 px/s² slowdown (about 6 tiles), 460 px/s back, gone after 3 s. |
+
+- **Split fork bombs**: the small ones stay harmless (faint, neither hurting nor dying) for at least 1 s after the split, then until the hero stands on the ground clear of them. Before, a shot left the hero standing, so they turned dangerous at once and dashed into the hero; a stomp on a narrow platform did the same.
+- **HUD**: the weapon's icon beside the lives while armed. The seed's weapon is a surprise: nothing shows it before it is earned.
+- **Controls** screen: `X` fire.
+- **Sounds**: `fire` per weapon and `weapon-get`, generated like the other effects.
+
+Update `docs/SPEC.md` (sections 4, 5, 6.4, 10 and 11) in the same task.
+
+Tests: the same seed gives the same weapon and the same levels as before; arming only from big; losing the weapon on a hit, a lost life and a pit; the hint's timing; each weapon's cooldown, shot limit, range and what it kills, absorbs or pauses; the duck bouncing and dying at walls and pits; the boomerang's return and piercing; Claude's target choice and range; stomping a paused creature and standing on a paused trap; kills scoring as stomps.
+
+Notes: `logic/weapons.mjs` holds the weapons, their shots, Claude's spark and the glyphs they are drawn with; the world steps them after the enemies (`stepArms`), and `enemies.mjs` pauses enemies, lets the hero stand on paused traps and shares `defeatEnemy` between stomps and shots. `ui/WeaponHint.qml` is the hint, `ui/WeaponIcon.qml` the icon in the hint and the HUD. Two values changed from the prototype once the game's hitboxes were in: shots leave at 14 px instead of 18, and the duck bounces at 200 px/s instead of 250, because the higher ones flew over a bug's 14 px hitbox. Spinner frames avoid `✳`, which renders as an emoji. The tests that expected `already root` for every sudo bit while big now expect it while armed.
+
+## 22. Release preparation
 
 - Status: todo
 

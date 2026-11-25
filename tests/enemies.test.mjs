@@ -28,6 +28,7 @@ import {
   SHOT_SPEED,
   SMALL_FORK_SPEED,
   SPLIT_GRACE_SECONDS,
+  SPLIT_HARMLESS_SECONDS,
   SPINLOCK_PERIOD,
   SPINLOCK_SPACING,
   leakCycleSeconds,
@@ -857,7 +858,7 @@ test("a small fork bomb dies to one stomp and does not split", () => {
   const [fork, left] = world.enemies;
   dropHeroOnto(world, fork);
   worldEventsUntil(world, IDLE, e => e.length > 0);
-  steps(world, 60);
+  steps(world, Math.round((SPLIT_HARMLESS_SECONDS + 0.2) / STEP_SECONDS));
   dropHeroOnto(world, left);
   world.hero.vy = 120;
 
@@ -870,15 +871,20 @@ test("a small fork bomb dies to one stomp and does not split", () => {
 test("a big fork bomb scores forked and a small one scores wait() with fewer points", () => {
   const run = createRun(1, FORK_LEVEL);
   const [fork, left] = run.world.enemies;
+  const notes = [];
+  const step = () => {
+    stepRun(run, IDLE, STEP_SECONDS);
+    for (const popup of run.popups) if (popup.age === 0) notes.push(popup.note);
+  };
   dropHeroOnto(run.world, fork);
-  while (fork.alive) stepRun(run, IDLE, STEP_SECONDS);
-  for (let i = 0; i < 60; i++) stepRun(run, IDLE, STEP_SECONDS);
+  while (fork.alive) step();
+  for (let i = 0; i < Math.round((SPLIT_HARMLESS_SECONDS + 0.2) / STEP_SECONDS); i++) step();
   dropHeroOnto(run.world, left);
   run.world.hero.vy = 120;
-  for (let i = 0; i < 60 && left.alive; i++) stepRun(run, IDLE, STEP_SECONDS);
+  for (let i = 0; i < 60 && left.alive; i++) step();
 
   assert.equal(run.score, 150);
-  assert.deepEqual(run.popups.map(p => p.note), ["forked", "wait()"]);
+  assert.deepEqual(notes, ["forked", "wait()"]);
 });
 
 test("after a respawn the small fork bombs return to where they split and the big one stays dead", () => {
@@ -1041,4 +1047,32 @@ test("a spinlock cannot be stomped", () => {
 
 test("a level map places a spinlock on its tile", () => {
   assert.deepEqual(SPINLOCK_LEVEL.enemies.map(e => [e.kind, e.col]), [["spinlock", 10]]);
+});
+
+test("the small fork bombs stay harmless for a while after the split, even while touching the standing hero", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left] = world.enemies;
+  dropHeroOnto(world, fork);
+  worldEventsUntil(world, IDLE, e => e.length > 0);
+
+  const events = [];
+  for (let i = 0; i < Math.round((SPLIT_HARMLESS_SECONDS - 0.05) / STEP_SECONDS); i++) {
+    heroTouchingFromSide(world, left);
+    world.hero.vy = 0;
+    world.hero.grounded = true;
+    for (const event of stepWorld(world, IDLE, STEP_SECONDS)) events.push(event);
+  }
+
+  assert.deepEqual([kinds(events), left.ghost], [[], true]);
+});
+
+test("after the harmless time the small fork bombs hurt again once the hero stands clear", () => {
+  const world = createWorld(FORK_LEVEL);
+  const [fork, left] = world.enemies;
+  dropHeroOnto(world, fork);
+  worldEventsUntil(world, IDLE, e => e.length > 0);
+
+  for (let i = 0; i < Math.round((SPLIT_HARMLESS_SECONDS + 1) / STEP_SECONDS); i++) stepWorld(world, IDLE, STEP_SECONDS);
+
+  assert.equal(left.ghost, false);
 });

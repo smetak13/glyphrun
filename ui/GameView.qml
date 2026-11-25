@@ -10,6 +10,7 @@ import "../logic/effects.mjs" as Effects
 import "../logic/physics.mjs" as Physics
 import "../logic/heroFigure.mjs" as HeroFigureLogic
 import "../logic/enemyFigure.mjs" as EnemyFigureLogic
+import "../logic/weapons.mjs" as Weapons
 
 Item {
   id: view
@@ -47,6 +48,9 @@ Item {
   property bool livesGained: false
   property bool livesFlashing: false
   property string overCause: ""
+  property string hudWeapon: ""
+  property var weaponHand: null
+  readonly property real labelMargin: 6
   readonly property real heroBaselineDrop: 2
   readonly property int popupPoolSize: 8
   readonly property real popupRise: 40
@@ -78,7 +82,8 @@ Item {
   function syncHero() {
     const dying = run.dying > 0
     const state = dying ? "dead" : HeroFigureLogic.heroState(heroAnimator, world.hero, world.level, heroDirection)
-    const pose = HeroFigureLogic.heroPose(state, heroAnimator.time)
+    const thrown = !dying && world.weapon !== null && world.arms.throwAge < Weapons.THROW_SECONDS
+    const pose = thrown ? HeroFigureLogic.throwPose(HeroFigureLogic.heroPose(state, heroAnimator.time)) : HeroFigureLogic.heroPose(state, heroAnimator.time)
     hero.x = Math.round(world.hero.x)
     hero.y = Math.round(world.hero.y)
     hero.parts = heroParts(pose, dying)
@@ -86,11 +91,43 @@ Item {
     hero.stretchX = pose.scaleX
     hero.stretchY = pose.scaleY
     hero.visible = !heroBlinkedOut()
+    const armed = hero.visible && !dying && world.weapon !== null && HeroFigureLogic.shownBig(heroAnimator, world.hero)
+    const hand = armed ? HeroFigureLogic.handPoint(pose, true, heroAnimator.facing) : null
+    weaponHand = hand ? { x: world.hero.x + hand.x * pose.scaleX, y: world.hero.y + hand.y * pose.scaleY } : null
     const direction = world.hero.vx > 0 ? 1 : -1
     trail.visible = hero.visible && !dying && world.hero.grounded && Math.abs(world.hero.vx) > trailSpeed
     trail.text = direction > 0 ? "»" : "«"
     trail.x = Math.round(world.hero.x - direction * trailGap - trail.width / 2)
     trail.y = Math.round(world.hero.y - trail.height + heroBaselineDrop)
+  }
+
+  function syncWeapons() {
+    const glyphs = Weapons.weaponGlyphs(world, weaponHand, heroAnimator.facing, heroAnimator.time)
+    for (let i = 0; i < weaponGlyphs.count; i++) {
+      const item = weaponGlyphs.itemAt(i)
+      const glyph = glyphs[i]
+      item.visible = glyph !== undefined
+      if (!glyph) continue
+      item.text = glyph.text
+      item.size = glyph.size
+      item.color = colors[glyph.role]
+      item.rotation = glyph.rotation
+      item.opacity = glyph.opacity
+      const left = glyph.x - item.width / 2
+      const cameraX = world.cameraX
+      item.x = Math.round(glyph.label ? Math.min(Math.max(left, cameraX + labelMargin), cameraX + Screen.SCREEN_WIDTH - item.width - labelMargin) : left)
+      item.y = Math.round(glyph.y - item.height / 2)
+    }
+  }
+
+  function syncHint() {
+    const hint = run.hint
+    hintBox.visible = hint !== null
+    if (!hint) return
+    hintBox.weaponId = run.weapon
+    hintBox.weapon = Weapons.WEAPONS[run.weapon]
+    hintBox.opacity = Math.min(1, hint.age / 0.25, (Weapons.HINT_SECONDS - hint.age) / 0.5)
+    hintBox.pulse = 0.6 + 0.4 * Math.abs(Math.sin(hint.age * 4))
   }
 
   function syncEffects() {
@@ -139,6 +176,7 @@ Item {
     hudLeft = run.levelNumber > Run.LEVEL_COUNT ? "BOSS" : "LVL " + run.levelNumber + "/" + Run.LEVEL_COUNT
     hudRight = "bits " + pad(Run.runBits(run), 3) + "   score " + pad(run.score, 5) + "   " + pad(world.time.toFixed(1), 4) + "s"
     hudLives = "@ x" + run.lives
+    hudWeapon = world.weapon || ""
     livesGained = run.livesFlash > 0
     livesFlashing = livesGained && Math.floor(run.livesFlash * 8) % 2 === 0
   }
@@ -165,7 +203,9 @@ Item {
     finished = world.finished && !run.won
     over = run.over
     overCause = run.over ? run.cause + " · " + stageName() : ""
+    syncWeapons()
     syncHud()
+    syncHint()
     syncMessages()
     syncEffects()
   }
@@ -343,6 +383,15 @@ Item {
             }
 
             Repeater {
+              id: weaponGlyphs
+              model: Weapons.GLYPH_POOL
+
+              Glyph {
+                visible: false
+              }
+            }
+
+            Repeater {
               id: popups
               model: view.popupPoolSize
 
@@ -427,12 +476,21 @@ Item {
     }
 
     Glyph {
-      anchors.right: hudLivesText.left
+      anchors.right: hudWeaponIcon.left
       anchors.rightMargin: 14
       y: 17
       text: view.hudRight
       size: 14
       color: view.colors.text
+    }
+
+    WeaponIcon {
+      id: hudWeaponIcon
+      anchors.right: hudLivesText.left
+      anchors.rightMargin: view.hudWeapon === "" ? 0 : 14
+      y: 20
+      weapon: view.hudWeapon
+      colors: view.colors
     }
 
     Glyph {
@@ -461,6 +519,15 @@ Item {
         anchors.centerIn: parent
         size: 16
       }
+    }
+
+    WeaponHint {
+      id: hintBox
+      z: 1
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: 108
+      visible: false
+      colors: view.colors
     }
 
     Loader {

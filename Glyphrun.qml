@@ -19,6 +19,7 @@ import "logic/boss.mjs" as Boss
 import "logic/validator.mjs" as Validator
 import "logic/heroFigure.mjs" as HeroFigure
 import "logic/enemyFigure.mjs" as EnemyFigureLogic
+import "logic/weapons.mjs" as Weapons
 
 Item {
   id: root
@@ -43,6 +44,8 @@ Item {
   property bool jumpHeld: false
   property bool jumpPressed: false
   property bool sprintHeld: false
+  property bool fireHeld: false
+  property bool firePressed: false
   property bool paused: false
   property bool menuOpen: false
   property string screen: "menu"
@@ -101,7 +104,10 @@ Item {
       if (held && !jumpHeld) jumpPressed = true
       jumpHeld = held
     } else if (key === Qt.Key_Shift) sprintHeld = held
-    else return false
+    else if (key === Qt.Key_X) {
+      if (held && !fireHeld) firePressed = true
+      fireHeld = held
+    } else return false
     return true
   }
 
@@ -111,6 +117,8 @@ Item {
     jumpHeld = false
     jumpPressed = false
     sprintHeld = false
+    fireHeld = false
+    firePressed = false
   }
 
   function newSeed() {
@@ -505,6 +513,9 @@ Item {
         run.levelNumber = Run.LEVEL_COUNT
         startBoss()
       }
+    } else if (key === Qt.Key_W) {
+      const next = run.armed ? Weapons.WEAPON_IDS[(Weapons.WEAPON_IDS.indexOf(run.weapon) + 1) % Weapons.WEAPON_IDS.length] : run.weapon
+      Run.armHero(run, next)
     } else if (key === Qt.Key_V) {
       showScreen("victory")
     } else return false
@@ -527,11 +538,17 @@ Item {
     const waiting = run.over || world.finished
     const steps = Clock.stepsFor(clock, frameTime)
     for (let i = 0; i < steps; i++) {
-      const input = { direction: heroDirection(), jumpHeld: jumpHeld, jumpPressed: jumpPressed && !waiting, sprint: sprintHeld }
+      const input = { direction: heroDirection(), jumpHeld: jumpHeld, jumpPressed: jumpPressed && !waiting, sprint: sprintHeld, firePressed: firePressed && !waiting }
       Run.stepRun(run, input, Clock.STEP_SECONDS)
-      if (!waiting) jumpPressed = false
+      if (!waiting) {
+        jumpPressed = false
+        firePressed = false
+      }
     }
-    if (waiting) jumpPressed = false
+    if (waiting) {
+      jumpPressed = false
+      firePressed = false
+    }
     playCues()
     HeroFigure.stepHeroAnimator(heroAnimator, world.hero, heroDirection(), frameTime)
     EnemyFigureLogic.stepEnemyAnimator(enemyAnimator, world.enemies, frameTime, world.boss ? world.boss.bugs : [])

@@ -8,6 +8,7 @@ export const CONTROLS = [
   { keys: "←  →", action: "move" },
   { keys: "space  ↑", action: "jump  (hold for higher)" },
   { keys: "shift", action: "run  (hold)" },
+  { keys: "x", action: "fire  (with a weapon)" },
   { keys: "p", action: "pause" },
   { keys: "esc", action: "menu" },
 ];

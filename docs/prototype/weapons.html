@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glyphrun weapons prototype</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;font:14px/1.5 "JetBrainsMono Nerd Font","JetBrains Mono",monospace;background:var(--page);color:var(--ink)}
+main{max-width:1500px;margin:0 auto;padding:18px 22px 40px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:15px;margin:26px 0 8px}
+h3{font-size:14px;margin:0 0 2px}
+.sub,.hint,.muted{color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:12px 0}
+select,button{font:inherit;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+button.on{border-color:var(--acc);color:var(--acc)}
+canvas{display:block;border:1px solid var(--line);border-radius:6px}
+.wrap{overflow-x:auto}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--panel)}
+code{color:var(--acc)}
+ul{margin:4px 0;padding-left:20px}
+li{margin:2px 0}
+.card{display:flex;gap:18px;align-items:flex-start;margin:0 0 22px;flex-wrap:wrap}
+.card .text{flex:1;min-width:380px;max-width:640px}
+.up{color:var(--good)}
+.down{color:var(--bad)}
+table{border-collapse:collapse;margin:6px 0}
+td,th{border:1px solid var(--line);padding:3px 9px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:normal}
+</style>
+</head>
+<body>
+<main>
+<h1>Glyphrun · weapons prototype</h1>
+<div class="sub">Four weapons for a hero who already holds sudo. Each seed has exactly one of them. Enemies are simplified stand-ins (see enemies.html for the real look) and cannot hurt you here.</div>
+
+<h2>Rules</h2>
+<ul>
+  <li><b>One weapon per seed</b>, drawn from the seed on its own random sub-stream, so it never shifts level generation. The same seed always gives the same weapon.</li>
+  <li><b>Getting it</b>: collect a sudo bit while already big. You get the usual <code>already root</code> bonus and the seed's weapon, with its own toast and, for 4 s, a box under it: <code>rubber duck acquired</code> / <code>press [X] to throw the duck</code>. Firing once fades it out early. There is one sudo bit per level, so the hero has to carry sudo in from the previous level: <b>level 2 at the earliest</b>. The boss's <code>[patch]</code> arms a big hero the same way.</li>
+  <li><b>Losing it</b>: any hit shrinks the hero to <code>@</code> and takes sudo and the weapon. A pit or a lost life does too. To get the weapon back you need two sudo bits again. A sudo bit collected while armed gives score only.</li>
+  <li><b>Always big</b>: an armed hero is always <code>@@</code> (44 px tall). Every shot leaves <b>low, 14 px above the feet</b>, so straight shots still hit a bug on the ground. To hit something floating, you jump.</li>
+  <li><b>Fire</b>: <kbd>X</kbd> (proposal). One press, one shot; holding does not repeat. Ammo is unlimited. Each weapon has a cooldown and a limit on how many of its shots can be on screen.</li>
+  <li><b>What dies</b>: shots kill what stomping kills (bug, zombie, ping, hang, fork bomb, which splits just as it does when stomped). Traps (spikes, cron job, pipe daemon, dangling pointer, spinlock) absorb shots. The breakpoint is the exception. A kill scores and shows its message exactly like a stomp.</li>
+  <li><b>Not a shield</b>: hits work as before, and the validator still proves every level without a weapon.</li>
+</ul>
+
+<div class="bar">
+  <label>theme <select id="theme"></select></label>
+  <span class="hint"><kbd>[</kbd> <kbd>]</kbd> switch theme</span>
+  <span>zoom <button data-zoom="1">1×</button><button data-zoom="1.5">1.5×</button><button data-zoom="2">2×</button></span>
+  <span>effects <button id="fx">full</button></span>
+  <span>hitbox <button id="hb">hidden</button></span>
+  <span>aim guide <button id="guide">shown</button></span>
+</div>
+
+<h2>Playable strip</h2>
+<div class="bar" id="weaponButtons"></div>
+<div class="hint">
+  <kbd>←</kbd><kbd>→</kbd> move · <kbd>Space</kbd>/<kbd>↑</kbd> jump · <kbd>Shift</kbd> run · <kbd>X</kbd> fire · <kbd>1</kbd>–<kbd>4</kbd> weapon (stands in for the seed) ·
+  <kbd>B</kbd> collect a sudo bit · <kbd>H</kbd> get hit · <kbd>G</kbd> aim guide · <kbd>R</kbd> reset · the pit takes sudo and the weapon · killed enemies come back after 2.5 s
+</div>
+<div class="wrap"><canvas id="strip"></canvas></div>
+
+<h2>Weapons</h2>
+<div class="hint">Each demo is the same little range: a hang up high, a bug walking, a zombie floating at jump height, a ping. The hero jumps every few seconds and fires whenever the weapon is ready, so you can see what each one reaches and what it misses.</div>
+<div id="cards"></div>
+
+<h2>Side by side</h2>
+<table id="compare"></table>
+
+<h2>Open questions</h2>
+<ul>
+  <li><b>Memory leak source</b>: shootable? It is worth 200 because it is hard to stomp, and most weapons reach it from across the puddle. Options: shootable for the full 200, shootable for 100, or immune to shots.</li>
+  <li><b>Boss</b>: proposal: weapons do nothing to KERNEL PANIC or its attacks, and the core is still stomped. The breakpoint could pause a stack trace bar, but that changes how fair the fight is.</li>
+  <li><b>Fire key</b>: <kbd>X</kbd>? <kbd>Ctrl</kbd> and <kbd>Z</kbd> are the other common choices for the left hand.</li>
+  <li><b>Showing the seed's weapon</b>: a surprise until it is earned, or named on the title card or in the HUD from the start?</li>
+  <li><b>Names</b>: Claude is a trademark. ROADMAP keeps trademarks out of the name, description and tags; inside the game it is only a joke, but <code>pair</code> would avoid it entirely.</li>
+</ul>
+</main>
+
+<script>
+const PALETTES = {"catppuccin":{"background":"#1e1e2e","text":"#cdd6f4","hexdump":"#585b70","muted":"#585b70","ground":"#a6e3a1","platform":"#89b4fa","block":"#f5c2e7","hero":"#f9e2af","bit":"#f9e2af","cyan":"#94e2d5","hostile":"#f38ba8","hostileAlt":"#f38ba8","hostileAlt2":"#f5c2e7"},"catppuccin-latte":{"background":"#eff1f5","text":"#4c4f69","hexdump":"#acb0be","muted":"#acb0be","ground":"#40a02b","platform":"#1e66f5","block":"#ea76cb","hero":"#df8e1d","bit":"#df8e1d","cyan":"#179299","hostile":"#d20f39","hostileAlt":"#d20f39","hostileAlt2":"#ea76cb"},"ethereal":{"background":"#060b1e","text":"#ffcead","hexdump":"#6d7db6","muted":"#6d7db6","ground":"#92a593","platform":"#7d82d9","block":"#c89dc1","hero":"#f7dc9c","bit":"#e9bb4f","cyan":"#a3bfd1","hostile":"#ed5b5a","hostileAlt":"#faaaa9","hostileAlt2":"#ead7e7"},"everforest":{"background":"#2d353b","text":"#d3c6aa","hexdump":"#475258","muted":"#475258","ground":"#a7c080","platform":"#7fbbb3","block":"#d699b6","hero":"#dbbc7f","bit":"#dbbc7f","cyan":"#83c092","hostile":"#e67e80","hostileAlt":"#e67e80","hostileAlt2":"#d699b6"},"flexoki-light":{"background":"#fffcf0","text":"#100f0f","hexdump":"#b7b5ac","muted":"#b7b5ac","ground":"#879a39","platform":"#205ea6","block":"#ce5d97","hero":"#d0a215","bit":"#d0a215","cyan":"#3aa99f","hostile":"#d14d41","hostileAlt":"#d14d41","hostileAlt2":"#ce5d97"},"gruvbox":{"background":"#282828","text":"#d4be98","hexdump":"#665c54","muted":"#665c54","ground":"#a9b665","platform":"#7daea3","block":"#d3869b","hero":"#d8a657","bit":"#d8a657","cyan":"#89b482","hostile":"#ea6962","hostileAlt":"#ea6962","hostileAlt2":"#d3869b"},"hackerman":{"background":"#0b0c16","text":"#ddf7ff","hexdump":"#2d3450","muted":"#2d3450","ground":"#4fe88f","platform":"#829dd4","block":"#86a7df","hero":"#a4ffec","bit":"#50f7d4","cyan":"#7cf8f7","hostile":"#50f872","hostileAlt":"#85ff9d","hostileAlt2":"#cddbf4"},"jade-horse":{"background":"#142620","text":"#dfede5","hexdump":"#64887b","muted":"#64887b","ground":"#8bcbb1","platform":"#96b7d0","block":"#b7a1c8","hero":"#dce1ac","bit":"#c5cc91","cyan":"#86c7c5","hostile":"#d88d91","hostileAlt":"#e6a6aa","hostileAlt2":"#cfbce0"},"kanagawa":{"background":"#1f1f28","text":"#dcd7ba","hexdump":"#54546d","muted":"#54546d","ground":"#76946a","platform":"#7e9cd8","block":"#957fb8","hero":"#e6c384","bit":"#c0a36e","cyan":"#6a9589","hostile":"#c34043","hostileAlt":"#e82424","hostileAlt2":"#938aa9"},"last-horizon":{"background":"#0c0b0c","text":"#fafcfb","hexdump":"#584e51","muted":"#584e51","ground":"#87a9b0","platform":"#b59790","block":"#c4d8e2","hero":"#6b5e73","bit":"#6b5e73","cyan":"#a5a0b6","hostile":"#c38b7b","hostileAlt":"#c38b7b","hostileAlt2":"#c4d8e2"},"lumon":{"background":"#16242d","text":"#d6e2ee","hexdump":"#304860","muted":"#304860","ground":"#5e95bc","platform":"#6fb8e3","block":"#8bc9eb","hero":"#9dcae5","bit":"#6fa4c9","cyan":"#b4e4f6","hostile":"#4d86b0","hostileAlt":"#73a6cb","hostileAlt2":"#b1d8ee"},"lupine":{"background":"#fafafa","text":"#212121","hexdump":"#9e9e9e","muted":"#9e9e9e","ground":"#4a2fd0","platform":"#3264eb","block":"#8a4ad7","hero":"#358fff","bit":"#026fde","cyan":"#0c67de","hostile":"#c900c4","hostileAlt":"#f930fb","hostileAlt2":"#b363ff"},"matte-black":{"background":"#121212","text":"#bebebe","hexdump":"#333333","muted":"#333333","ground":"#ffc107","platform":"#e68e0d","block":"#d35f5f","hero":"#b90a0a","bit":"#b91c1c","cyan":"#bebebe","hostile":"#d35f5f","hostileAlt":"#b91c1c","hostileAlt2":"#b91c1c"},"miasma":{"background":"#222222","text":"#c2c2b0","hexdump":"#666666","muted":"#666666","ground":"#5f875f","platform":"#78824b","block":"#bb7744","hero":"#b36d43","bit":"#b36d43","cyan":"#c9a554","hostile":"#685742","hostileAlt":"#685742","hostileAlt2":"#bb7744"},"nord":{"background":"#2e3440","text":"#d8dee9","hexdump":"#4c566a","muted":"#4c566a","ground":"#a3be8c","platform":"#81a1c1","block":"#b48ead","hero":"#ebcb8b","bit":"#ebcb8b","cyan":"#88c0d0","hostile":"#bf616a","hostileAlt":"#bf616a","hostileAlt2":"#b48ead"},"retro-82":{"background":"#05182e","text":"#f6dcac","hexdump":"#2a6b78","muted":"#2a6b78","ground":"#028391","platform":"#3f8f8a","block":"#3f8f8a","hero":"#e97b3c","bit":"#e97b3c","cyan":"#8cbfb8","hostile":"#f85525","hostileAlt":"#f85525","hostileAlt2":"#3f8f8a"},"ristretto":{"background":"#2c2525","text":"#e6d9db","hexdump":"#72696a","muted":"#72696a","ground":"#adda78","platform":"#f38d70","block":"#a8a9eb","hero":"#fcd675","bit":"#f9cc6c","cyan":"#85dacc","hostile":"#fd6883","hostileAlt":"#ff8297","hostileAlt2":"#bebffd"},"rose-pine":{"background":"#faf4ed","text":"#575279","hexdump":"#cecacd","muted":"#cecacd","ground":"#286983","platform":"#56949f","block":"#907aa9","hero":"#ea9d34","bit":"#ea9d34","cyan":"#d7827e","hostile":"#b4637a","hostileAlt":"#b4637a","hostileAlt2":"#907aa9"},"solitude":{"background":"#101315","text":"#cacccc","hexdump":"#4b4e55","muted":"#4b4e55","ground":"#9fa5a9","platform":"#798186","block":"#aeaeae","hero":"#c9c2b4","bit":"#d9dbdc","cyan":"#707070","hostile":"#565d60","hostileAlt":"#de6145","hostileAlt2":"#9a9a9a"},"starship":{"background":"#1c1c1e","text":"#f5f5f7","hexdump":"#8e8e93","muted":"#8e8e93","ground":"#ff9f0a","platform":"#8fb8de","block":"#ff8fa3","hero":"#ffd8a8","bit":"#ffc27a","cyan":"#a6dcef","hostile":"#ff5f4a","hostileAlt":"#ff8373","hostileAlt2":"#ffb3c1"},"tokyo-night":{"background":"#1a1b26","text":"#a9b1d6","hexdump":"#414868","muted":"#414868","ground":"#9ece6a","platform":"#7aa2f7","block":"#ad8ee6","hero":"#ff9e64","bit":"#e0af68","cyan":"#449dab","hostile":"#f7768e","hostileAlt":"#ff7a93","hostileAlt2":"#bb9af7"},"vantablack":{"background":"#000000","text":"#ffffff","hexdump":"#7a7a7a","muted":"#7a7a7a","ground":"#b6b6b6","platform":"#8d8d8d","block":"#9b9b9b","hero":"#cecece","bit":"#cecece","cyan":"#b0b0b0","hostile":"#a4a4a4","hostileAlt":"#a4a4a4","hostileAlt2":"#9b9b9b"},"white":{"background":"#ffffff","text":"#000000","hexdump":"#808080","muted":"#808080","ground":"#3a3a3a","platform":"#1a1a1a","block":"#2e2e2e","hero":"#4a4a4a","bit":"#4a4a4a","cyan":"#3e3e3e","hostile":"#2a2a2a","hostileAlt":"#2a2a2a","hostileAlt2":"#2e2e2e"},"aamis":{"background":"#0f0f0f","text":"#eadccc","hexdump":"#706a6a","muted":"#706a6a","ground":"#cea37f","platform":"#e2be8a","block":"#ede4c8","hero":"#edb95a","bit":"#f4bb54","cyan":"#e8ab3b","hostile":"#e25d6c","hostileAlt":"#e9838f","hostileAlt2":"#ede4c8"},"apollo":{"background":"#0c0a0a","text":"#e8e4e2","hexdump":"#5c5352","muted":"#5c5352","ground":"#a8b06a","platform":"#7f9fb8","block":"#e0506e","hero":"#ffc26b","bit":"#f2a13d","cyan":"#7fb0a8","hostile":"#e8323c","hostileAlt":"#ff5a5f","hostileAlt2":"#ff7a90"},"firesky":{"background":"#0f0f0f","text":"#e0d8d0","hexdump":"#585553","muted":"#585553","ground":"#1a6b6e","platform":"#2a7a80","block":"#c4753d","hero":"#e6a052","bit":"#e68040","cyan":"#40b8b4","hostile":"#e6441a","hostileAlt":"#e66b40","hostileAlt2":"#e6b375"},"neon-dusk":{"background":"#1a1033","text":"#f2e9ff","hexdump":"#5a4785","muted":"#5a4785","ground":"#72f1b8","platform":"#36a2ff","block":"#ff2a9d","hero":"#ffe45e","bit":"#ffd319","cyan":"#2de2e6","hostile":"#ff3864","hostileAlt":"#ff6b8b","hostileAlt2":"#ff6ec7"}};
+const FONT = '"JetBrainsMono Nerd Font","JetBrains Mono",monospace';
+const TILE = 24;
+const HERO_W = 16, HERO_H = 22, BIG_H = 44;
+const HAND_Y = 14;
+
+let pal = PALETTES["tokyo-night"];
+let zoom = 1.5, fullFx = true, showHitbox = false, showGuide = true;
+
+const metricCache = {};
+const measureCtx = document.createElement("canvas").getContext("2d");
+function metric(ch) {
+  if (metricCache[ch]) return metricCache[ch];
+  measureCtx.font = `700 100px ${FONT}`;
+  const m = measureCtx.measureText(ch);
+  return (metricCache[ch] = {
+    l: m.actualBoundingBoxLeft / 100, r: m.actualBoundingBoxRight / 100,
+    a: m.actualBoundingBoxAscent / 100, d: m.actualBoundingBoxDescent / 100,
+  });
+}
+function fitHeight(ch, h) { const m = metric(ch); return h / (m.a + m.d); }
+function fitWidth(ch, w) { const m = metric(ch); return w / (m.l + m.r); }
+
+function drawOp(ctx, op) {
+  const m = metric(op.ch);
+  ctx.save();
+  ctx.translate(op.x, op.y);
+  if (op.rot) ctx.rotate(op.rot);
+  if (op.sx) ctx.scale(op.sx, 1);
+  ctx.globalAlpha = op.alpha === undefined ? 1 : op.alpha;
+  ctx.font = `700 ${op.size}px ${FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = op.color;
+  if (fullFx && op.glow) { ctx.shadowColor = op.color; ctx.shadowBlur = op.glow * zoom; }
+  ctx.fillText(op.ch, -(m.r - m.l) / 2 * op.size, -(m.d - m.a) / 2 * op.size);
+  ctx.restore();
+}
+function glyph(ctx, ch, x, y, size, color, extra) {
+  drawOp(ctx, Object.assign({ ch, x, y, size, color, glow: 4 }, extra || {}));
+}
+function drawText(ctx, text, x, y, size, color, align, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+  ctx.font = `700 ${size}px ${FONT}`;
+  ctx.textAlign = align || "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+
+function limb(start, angle, length) {
+  const dx = Math.sin(angle), dy = Math.cos(angle);
+  return { mid: { x: start.x + dx * length / 2, y: start.y + dy * length / 2 }, end: { x: start.x + dx * length, y: start.y + dy * length }, rot: -angle };
+}
+function joints(d, pose) {
+  const legRise = pose.crouch ? d.leg * Math.cos(Math.abs(pose.legs[0])) : d.leg;
+  const torso = d.torso * (pose.torsoScale || 1);
+  const hip = { x: 0, y: -legRise + (pose.bob || 0) };
+  const shoulder = { x: 0, y: hip.y - torso };
+  const head = { x: 0, y: shoulder.y - d.head * 0.55 };
+  return { hip, shoulder, head, torso, legs: pose.legs.map(a => limb(hip, a, d.leg)), arms: pose.arms.map(a => limb({ x: 0, y: shoulder.y + 1 }, a, d.arm)) };
+}
+function limbOp(ch, l, length, color, extra) {
+  return Object.assign({ ch, x: l.mid.x, y: l.mid.y, rot: l.rot, size: fitHeight(ch, length + 1), color }, extra || {});
+}
+const DIMS = { small: { leg: 7, torso: 6, head: 15, arm: 5, width: 1.15 }, big: { leg: 15, torso: 13, head: 21, arm: 9, width: 1.4 } };
+function heroOps(J, d, pose, t, big, speed) {
+  const main = pal.hero, acc = pal.text, w = d.width, limbCh = "┃", glow = 5, thick = 1.9;
+  const ops = [];
+  const scarfLen = Math.min(3, 1 + Math.floor(speed / 100));
+  const wave = Math.floor(t * 8) % 2;
+  ops.push({ ch: "~".repeat(scarfLen), x: -(4 + scarfLen * 2.2) * w, y: J.shoulder.y - 1 + wave, size: fitWidth("~".repeat(scarfLen), scarfLen * 4.5 * w), color: acc, glow: 3, alpha: 0.85 });
+  ops.push(limbOp(limbCh, J.legs[1], d.leg, main, { alpha: 0.85, sx: thick }));
+  ops.push(limbOp(limbCh, J.arms[1], d.arm, main, { alpha: 0.55, sx: thick * 0.8 }));
+  ops.push({ ch: limbCh, x: 0, y: (J.hip.y + J.shoulder.y) / 2, size: fitHeight(limbCh, J.torso + 1), sx: thick * 1.2, color: main, glow });
+  ops.push(limbOp(limbCh, J.legs[0], d.leg, main, { glow, sx: thick }));
+  ops.push(limbOp(limbCh, J.arms[0], d.arm, main, { glow, sx: thick }));
+  ops.push({ ch: pose.face, x: 0, y: J.head.y, size: fitHeight("@", d.head), color: main, glow: glow + 1 });
+  if (big) ops.push({ ch: "#", x: 5 * w, y: (J.hip.y + J.shoulder.y) / 2, size: fitHeight("#", 6 * w), color: acc, glow: 3 });
+  return ops;
+}
+const WALK_CYCLE = [{ legs: 0.7, seconds: 0.14 }, { legs: 0.2, seconds: 0.1 }, { legs: -0.7, seconds: 0.14 }, { legs: -0.2, seconds: 0.1 }];
+const RUN_CYCLE = [{ legs: 1.15, seconds: 0.13 }, { legs: 0.3, seconds: 0.06 }, { legs: -1.15, seconds: 0.13 }, { legs: -0.3, seconds: 0.06 }];
+function cycleFrame(t, cycle) {
+  const total = cycle.reduce((sum, f) => sum + f.seconds, 0);
+  let u = t % total;
+  for (let i = 0; i < cycle.length; i++) { if (u < cycle[i].seconds) return i; u -= cycle[i].seconds; }
+  return cycle.length - 1;
+}
+function pose(state, t) {
+  const p = { legs: [0.12, -0.12], arms: [0.15, -0.15], lean: 0, bob: 0, sx: 1, sy: 1, face: t % 3 > 2.86 ? "-" : "@" };
+  if (state === "idle") p.bob = Math.floor(t * 1.5) % 2 ? 0.5 : 0;
+  else if (state === "walk") {
+    const f = cycleFrame(t, WALK_CYCLE), L = WALK_CYCLE[f].legs;
+    p.legs = [L, -L]; p.arms = [0.5 - L * 0.5, 0.5 + L * 0.5]; p.bob = f % 2 ? -0.5 : 0;
+  } else if (state === "run") {
+    const f = cycleFrame(t, RUN_CYCLE), L = RUN_CYCLE[f].legs;
+    p.legs = [L, -L]; p.arms = [1.3 - L * 0.6, 1.3 + L * 0.6]; p.lean = 0.2; p.bob = f % 2 ? -1 : 0;
+  } else if (state === "jump") { p.legs = [0.75, -0.15]; p.arms = [2.6, 2.2]; p.sx = 0.92; p.sy = 1.1; }
+  else if (state === "peak") { p.legs = [0.45, -0.35]; p.arms = [1.7, -1.7]; }
+  else if (state === "fall") { const f = Math.floor(t * 10) % 2; p.legs = [0.2, -0.45]; p.arms = f ? [2.5, -2.3] : [2.3, -2.5]; p.sy = 1.04; }
+  else if (state === "land") { p.legs = [0.6, -0.6]; p.arms = [0.6, -0.6]; p.sx = 1.28; p.sy = 0.72; }
+  else if (state === "skid") { p.legs = [0.75, 0.35]; p.arms = [-0.9, -0.5]; p.lean = -0.3; }
+  return p;
+}
+function drawFigure(ctx, big, state, t, x, y, facing, speed, throwing) {
+  const d = big ? DIMS.big : DIMS.small;
+  const p = pose(state, t);
+  if (throwing) p.arms[0] = 1.35;
+  const J = joints(d, p);
+  const ops = heroOps(J, d, p, t, big, speed);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(p.sx, p.sy);
+  ctx.rotate(p.lean * facing);
+  for (const op of ops) drawOp(ctx, Object.assign({}, op, { x: op.x * facing, rot: (op.rot || 0) * facing }));
+  ctx.restore();
+  const hand = J.arms[0].end;
+  return { x: x + hand.x * facing * p.sx, y: y + hand.y * p.sy };
+}
+
+
+function buildMap(cols, rows, fills) {
+  const m = Array.from({ length: rows }, () => Array(cols).fill("."));
+  for (const f of fills) for (let r = f.r[0]; r <= f.r[1]; r++) for (let c = f.c[0]; c <= f.c[1]; c++) m[r][c] = f.ch;
+  return m.map(r => r.join(""));
+}
+function tileAt(S, c, r) {
+  if (c < 0 || c >= S.cols || r < 0 || r >= S.rows) return ".";
+  return S.map[r][c];
+}
+const solid = ch => ch === "#" || ch === "B";
+function solidAt(S, x, y) { return solid(tileAt(S, Math.floor(x / TILE), Math.floor(y / TILE))); }
+
+
+const KILL_MSG = { bug: "resolved", zombie: "reaped", ping: "pong", hang: "kill -9", fork: "forked", kid: "wait()" };
+
+function spawn(def) {
+  return Object.assign({ dead: false, gone: false, frozen: 0, respawn: 0, fade: 0, t: 0, state: "up" }, def, { def, base: def.y, vx: def.speed || 0, timer: def.timer || 0, angle: def.angle || 0 });
+}
+function mainBox(e) {
+  if (e.kind === "bullet") return { x0: e.x - 15, x1: e.x + 15, y0: e.y - 5, y1: e.y + 5 };
+  if (e.kind === "spin") return { x0: e.x - 13, x1: e.x + 13, y0: e.y - 8, y1: e.y + 8 };
+  return { x0: e.x - e.w / 2, x1: e.x + e.w / 2, y0: e.y - e.h, y1: e.y };
+}
+function boxes(e) {
+  const out = [mainBox(e)];
+  if (e.kind === "spin") for (const arm of spinArms(e)) for (let i = 1; i <= e.links; i++) {
+    const px = e.x + Math.cos(arm) * i * 18, py = e.y + Math.sin(arm) * i * 18;
+    out.push({ x0: px - 4, x1: px + 4, y0: py - 4, y1: py + 4 });
+  }
+  return out;
+}
+function spinArms(e) { return e.double ? [e.angle, e.angle + Math.PI] : [e.angle]; }
+function center(e) { const b = mainBox(e); return { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 }; }
+
+function updateEnemy(S, e, dt) {
+  if (e.dead) {
+    if (e.temp) return;
+    e.respawn -= dt;
+    if (e.respawn <= 0) {
+      for (const k of S.enemies) if (k.parent === e) k.gone = true;
+      Object.assign(e, spawn(e.def), { fade: 0.4 });
+    }
+    return;
+  }
+  if (e.fade > 0) e.fade -= dt;
+  if (e.frozen > 0) { e.frozen -= dt; return; }
+  e.t += dt;
+  if (e.kind === "bug" || e.kind === "fork") {
+    e.x += e.vx * dt;
+    if (e.x < e.min) { e.x = e.min; e.vx = Math.abs(e.vx); }
+    if (e.x > e.max) { e.x = e.max; e.vx = -Math.abs(e.vx); }
+  } else if (e.kind === "kid") {
+    e.dash -= dt;
+    e.x += e.vx * (e.dash > 0 ? 2.4 : 1) * dt;
+    const ahead = e.x + Math.sign(e.vx) * (e.w / 2 + 1);
+    if (solidAt(S, ahead, e.y - 4) || !solidAt(S, ahead, e.y + 4) || ahead < 2 || ahead > S.W - 2) e.vx = -e.vx;
+  } else if (e.kind === "zombie") {
+    e.x += e.vx * dt;
+    if (e.x < e.min) { e.x = e.min; e.vx = Math.abs(e.vx); }
+    if (e.x > e.max) { e.x = e.max; e.vx = -Math.abs(e.vx); }
+    e.y = e.base + Math.sin(e.t * 2.2) * 4;
+  } else if (e.kind === "ping") {
+    const u = (e.t + (e.phase || 0)) % 1.4;
+    e.y = u < 0.6 ? e.base - 44 * 4 * (u / 0.6) * (1 - u / 0.6) : e.base;
+  } else if (e.kind === "hang") {
+    if (e.state === "up") { if (e.drops && Math.abs(S.hero.x - e.x) < 4 * TILE) { e.state = "drop"; e.vy = 0; } }
+    else if (e.state === "drop") { e.vy += 1500 * dt; e.y += e.vy * dt; if (e.y >= e.ground) { e.y = e.ground; e.state = "lie"; e.timer = 1; } }
+    else if (e.state === "lie") { e.timer -= dt; if (e.timer <= 0) e.state = "wind"; }
+    else { e.y -= 50 * dt; if (e.y <= e.base) { e.y = e.base; e.state = "up"; } }
+  } else if (e.kind === "emitter") {
+    e.timer -= dt;
+    if (e.timer <= 0) {
+      e.timer += 2.5;
+      S.enemies.push(spawn({ kind: "bullet", x: e.x - 20, y: e.y - 12, speed: -260, killable: false, temp: true }));
+    }
+  } else if (e.kind === "bullet") {
+    e.x += e.vx * dt;
+    if (solidAt(S, e.x - 15, e.y) || e.x < -40) e.gone = true;
+  } else if (e.kind === "spin") {
+    e.angle += dt * Math.PI * 2 / 3 * e.dir;
+  }
+}
+
+function kill(S, e) {
+  const c = center(e);
+  e.dead = true; e.frozen = 0; e.respawn = S.respawn;
+  if (e.temp) e.gone = true;
+  burst(S, c.x, c.y, pal.hostile, 12);
+  pop(S, c.x, c.y - 14, KILL_MSG[e.kind]);
+  if (e.kind === "fork") for (const s of [-1, 1]) S.enemies.push(spawn({ kind: "kid", x: e.x + s * 6, y: e.y, w: 11, h: 11, speed: s * 110, dash: 0.3, killable: true, temp: true, parent: e }));
+}
+function freeze(S, e) {
+  e.frozen = 3;
+  const c = center(e);
+  burst(S, c.x, c.y, pal.cyan, 8, "‖·");
+  pop(S, c.x, c.y - 14, "paused", pal.cyan);
+}
+
+
+function burst(S, x, y, color, n, chars) {
+  chars = chars || "▓▒░#%&$01";
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = 40 + Math.random() * 110;
+    S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, life: 0.5, max: 0.5, ch: chars[i % chars.length], color });
+  }
+}
+function pop(S, x, y, text, color) { S.pops.push({ x, y, text, life: 1, color: color || pal.muted }); }
+function toast(S, text) { S.toast = { text, life: 2.2 }; }
+const HINT_TIME = 4, HINT_AFTER_FIRE = 0.6;
+function showHint(S) { S.hint = { life: HINT_TIME, max: HINT_TIME }; }
+
+
+const CLAUDE_LINES = ["You're absolutely right!", "Fixed it.", "I see the issue.", "Perfect! Bug removed."];
+const SPINNER = "·✢✳✶✻✽✻✶✳✢";
+
+const WEAPONS = {
+  duck: {
+    key: "1", name: "rubber duck", toast: "apt install rubber-duck", verb: "throw the duck", color: () => pal.bit,
+    cooldown: 0.25, max: 2,
+    fire: h => [{ x: h.x + h.facing * 12, y: h.y - HAND_Y, vx: h.facing * 280, vy: -60, r: 6, life: 1.4 }],
+    step(S, s, dt) {
+      s.vy += 1500 * dt;
+      s.x += s.vx * dt;
+      if (solidAt(S, s.x + Math.sign(s.vx) * s.r, s.y)) { s.gone = "wall"; return; }
+      const prevBottom = s.y + s.r;
+      s.y += s.vy * dt;
+      const bottom = s.y + s.r, r = Math.floor(bottom / TILE), ch = tileAt(S, Math.floor(s.x / TILE), r);
+      if (s.vy > 0 && (solid(ch) || (ch === "=" && prevBottom <= r * TILE + 0.5))) { s.y = r * TILE - s.r; s.vy = -200; }
+      if (s.y > S.H + 20) s.gone = true;
+    },
+    draw(ctx, s) { drawDuck(ctx, s.x, s.y, 1, Math.sign(s.vx) || 1); },
+    icon(ctx, x, y, f) { drawDuck(ctx, x, y, 0.9, f); },
+  },
+  bp: {
+    key: "2", name: "breakpoint", toast: "gdb: breakpoint 1 set", verb: "set a breakpoint", color: () => pal.cyan,
+    cooldown: 1.0, max: 1, freezes: true,
+    fire: h => [{ x: h.x + h.facing * 12, y: h.y - HAND_Y, vx: h.facing * 260, vy: 0, r: 5, life: 0.85 }],
+    step(S, s, dt) { s.x += s.vx * dt; if (solidAt(S, s.x + Math.sign(s.vx) * s.r, s.y)) s.gone = "wall"; },
+    draw(ctx, s) {
+      for (let i = 1; i <= 3; i++) glyph(ctx, "·", s.x - Math.sign(s.vx) * i * 7, s.y, 8, pal.cyan, { alpha: 0.5 - i * 0.12, glow: 0 });
+      glyph(ctx, "◉", s.x, s.y, 12, pal.cyan, { glow: 8 });
+    },
+    icon(ctx, x, y) { glyph(ctx, "◉", x, y, 9, pal.cyan, { glow: 6 }); },
+  },
+  claude: {
+    key: "3", name: "claude", toast: "claude: how can I help?", verb: "ask claude", color: () => pal.block,
+    cooldown: 0.4,
+  },
+  revert: {
+    key: "4", name: "git revert", toast: "git revert HEAD", verb: "git revert", color: () => pal.ground,
+    cooldown: 0.15, max: 1, pierces: true,
+    fire: h => [{ x: h.x + h.facing * 12, y: h.y - HAND_Y, vx: h.facing * 420, vy: 0, r: 7, life: 3, dir: h.facing, back: false, speed: 0 }],
+    step(S, s, dt) {
+      s.spin = (s.spin || 0) + dt * 14 * s.dir;
+      if (!s.back) {
+        s.vx -= s.dir * 600 * dt;
+        s.x += s.vx * dt;
+        if (s.vx * s.dir <= 0 || solidAt(S, s.x + s.dir * s.r, s.y)) turnBack(s);
+        return;
+      }
+      s.speed = Math.min(s.speed + 900 * dt, 460);
+      const dx = S.hero.x - s.x, dy = S.hero.y - HAND_Y - 4 - s.y, d = Math.hypot(dx, dy);
+      if (d < 14) { s.gone = "caught"; return; }
+      s.x += dx / d * s.speed * dt;
+      s.y += dy / d * s.speed * dt;
+    },
+    draw(ctx, s) { glyph(ctx, "↺", s.x, s.y, 16, pal.ground, { rot: s.spin, glow: 7 }); },
+    icon(ctx, x, y) { glyph(ctx, "↺", x, y, 11, pal.ground); },
+  },
+};
+const WEAPON_IDS = Object.keys(WEAPONS);
+
+function turnBack(s) { s.back = true; s.speed = 0; s.hit.clear(); }
+
+function drawDuck(ctx, x, y, k, f) {
+  glyph(ctx, "●", x - f * 1 * k, y + 1 * k, 11 * k, pal.bit, { glow: 5 });
+  glyph(ctx, "●", x + f * 3.5 * k, y - 5 * k, 7 * k, pal.bit, { glow: 3 });
+  glyph(ctx, f > 0 ? "▸" : "◂", x + f * 7.5 * k, y - 4.5 * k, 5 * k, pal.block, { glow: 0 });
+  glyph(ctx, "·", x + f * 4.5 * k, y - 6.5 * k, 5 * k, pal.background, { glow: 0 });
+}
+function drawSpark(ctx, x, y, t, size, thinking) {
+  const ch = thinking ? SPINNER[Math.floor(t * 12) % SPINNER.length] : "✻";
+  glyph(ctx, ch, x, y, size, pal.block, { glow: 8, rot: thinking ? 0 : Math.sin(t * 2) * 0.3 });
+}
+
+function claudeTarget(S) {
+  const h = S.hero, hy = h.y - 22;
+  let best = null, bestD = Infinity;
+  for (const e of S.enemies) {
+    if (e.dead || e.gone || !e.killable || e.fade > 0) continue;
+    const c = center(e), ahead = (c.x - h.x) * h.facing;
+    if (ahead <= 0 || ahead > 7 * TILE || Math.abs(c.y - hy) > 5 * TILE) continue;
+    const d = Math.hypot(c.x - h.x, c.y - hy);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best;
+}
+function claudeFire(S) {
+  const sp = S.spark;
+  if (sp.state !== "idle") return;
+  const target = claudeTarget(S);
+  if (!target) { sp.say = { text: "No issues found.", life: 1.1 }; S.cool = 0.6; return; }
+  Object.assign(sp, { state: "thinking", timer: 0.5, target });
+}
+function sparkHome(S) {
+  const h = S.hero;
+  return { x: h.x - h.facing * 14, y: h.y - 56 + Math.sin(S.t * 3) * 3 };
+}
+function updateSpark(S, dt) {
+  const sp = S.spark, home = sparkHome(S);
+  if (sp.say) { sp.say.life -= dt; if (sp.say.life <= 0) sp.say = null; }
+  const moveTo = (tx, ty, v) => {
+    const dx = tx - sp.x, dy = ty - sp.y, d = Math.hypot(dx, dy);
+    if (d <= v * dt) { sp.x = tx; sp.y = ty; return true; }
+    sp.x += dx / d * v * dt; sp.y += dy / d * v * dt;
+    return false;
+  };
+  if (sp.state === "idle" || sp.state === "thinking") {
+    sp.x += (home.x - sp.x) * Math.min(1, dt * 12);
+    sp.y += (home.y - sp.y) * Math.min(1, dt * 12);
+  }
+  if (sp.state === "thinking") {
+    sp.timer -= dt;
+    if (sp.timer <= 0) sp.state = sp.target.dead ? "back" : "out";
+  } else if (sp.state === "out") {
+    if (sp.target.dead || sp.target.gone) { sp.state = "back"; return; }
+    const c = center(sp.target);
+    if (moveTo(c.x, c.y, 420)) {
+      kill(S, sp.target);
+      sp.say = { text: CLAUDE_LINES[sp.line++ % CLAUDE_LINES.length], life: 1.3 };
+      sp.state = "back";
+    }
+  } else if (sp.state === "back") {
+    if (moveTo(home.x, home.y, 480)) { sp.state = "idle"; S.cool = WEAPONS.claude.cooldown; }
+  }
+  if (sp.state === "out" || sp.state === "back") {
+    sp.trail.push({ x: sp.x, y: sp.y, life: 0.25 });
+  }
+  for (const p of sp.trail) p.life -= dt;
+  sp.trail = sp.trail.filter(p => p.life > 0);
+}
+
+function tryFire(S) {
+  const h = S.hero;
+  if (!h.big || !h.armed || S.cool > 0) return;
+  h.throwAnim = 0.15;
+  if (S.hint) S.hint.life = Math.min(S.hint.life, HINT_AFTER_FIRE);
+  if (S.weapon === "claude") { claudeFire(S); return; }
+  const W = WEAPONS[S.weapon];
+  const fresh = W.fire(h);
+  if (S.shots.length + fresh.length > W.max) return;
+  for (const s of fresh) S.shots.push(Object.assign({ w: S.weapon, hit: new Set(), max: s.life }, s));
+  S.cool = W.cooldown;
+}
+
+function overlaps(s, b) { return s.x + s.r > b.x0 && s.x - s.r < b.x1 && s.y + s.r > b.y0 && s.y - s.r < b.y1; }
+
+function updateShots(S, dt) {
+  for (const s of S.shots) {
+    const W = WEAPONS[s.w];
+    s.life -= dt;
+    if (s.life <= 0) s.gone = true;
+    if (!s.gone) W.step(S, s, dt);
+    if (s.gone === "wall") burst(S, s.x, s.y, W.color(), 5, "·°");
+    if (s.gone === "caught") S.cool = W.cooldown;
+    if (s.gone) continue;
+    for (const e of S.enemies) {
+      if (e.dead || e.gone || e.fade > 0 || s.hit.has(e)) continue;
+      if (!boxes(e).some(b => overlaps(s, b))) continue;
+      if (W.freezes) { freeze(S, e); s.gone = true; break; }
+      if (e.killable) { kill(S, e); if (W.pierces) s.hit.add(e); else { s.gone = true; break; } }
+      else if (W.pierces) { if (!s.back) turnBack(s); }
+      else { burst(S, s.x, s.y, W.color(), 5, "·°"); s.gone = true; break; }
+    }
+  }
+  S.shots = S.shots.filter(s => !s.gone);
+}
+
+
+const P = { WALK: 216, SPRINT: 288, SPRINT_ACC: 144, ACC: 1800, AIR: 1200, G: 1500, FG: 2100, MAXF: 720, JUMP: 560, CUT: 200, COYOTE: 0.1, BUFFER: 0.12 };
+
+function makeScene(cfg) {
+  const S = Object.assign({ rows: cfg.map.length, cols: cfg.map[0].length }, cfg);
+  S.W = S.cols * TILE; S.H = S.rows * TILE;
+  resetScene(S);
+  return S;
+}
+function resetScene(S) {
+  S.t = 0;
+  S.hero = { x: S.start.x, y: S.start.y, vx: 0, vy: 0, big: true, armed: true, grounded: true, jumping: false, coyote: 0, buffer: 0, facing: 1, landed: 1, change: null, throwAnim: 0 };
+  S.enemies = S.defs.map(spawn);
+  S.shots = []; S.parts = []; S.pops = []; S.toast = null; S.hint = null; S.cool = 0;
+  resetSpark(S);
+  if (S.bot) Object.assign(S.bot, { nextJump: 1.2, hold: 0, nextFire: 0.4 });
+}
+function resetSpark(S) {
+  const home = sparkHome(S);
+  S.spark = { state: "idle", x: home.x, y: home.y, say: null, trail: [], line: 0 };
+}
+function setWeapon(S, id) {
+  S.weapon = id;
+  S.shots = [];
+  S.cool = 0;
+  resetSpark(S);
+}
+
+function approach(v, target, d) { return v < target ? Math.min(v + d, target) : Math.max(v - d, target); }
+
+function stepHero(S, dt, input) {
+  const h = S.hero, hh = h.big ? BIG_H : HERO_H;
+  const atWalk = input.dir !== 0 && h.vx * input.dir >= P.WALK;
+  if (input.sprint && atWalk) h.vx = approach(h.vx, input.dir * P.SPRINT, P.SPRINT_ACC * dt);
+  else h.vx = approach(h.vx, input.dir * P.WALK, (h.grounded ? P.ACC : P.AIR) * dt);
+  h.coyote = h.grounded ? P.COYOTE : Math.max(h.coyote - dt, 0);
+  h.buffer = input.pressed ? P.BUFFER : Math.max(h.buffer - dt, 0);
+  if (h.buffer > 0 && h.coyote > 0) { h.vy = -P.JUMP; h.jumping = true; h.buffer = 0; h.coyote = 0; }
+  if (h.jumping && !input.held && h.vy < -P.CUT) h.vy = -P.CUT;
+  if (h.vy >= 0) h.jumping = false;
+  h.vy = Math.min(h.vy + (h.vy < 0 ? P.G : P.FG) * dt, P.MAXF);
+  h.x += h.vx * dt;
+  const rows = [Math.floor((h.y - hh) / TILE), Math.floor((h.y - 1e-6) / TILE)];
+  if (h.vx > 0) {
+    const c = Math.floor((h.x + 8 - 1e-6) / TILE);
+    for (let r = rows[0]; r <= rows[1]; r++) if (solid(tileAt(S, c, r))) { h.x = c * TILE - 8; h.vx = 0; break; }
+  } else if (h.vx < 0) {
+    const c = Math.floor((h.x - 8) / TILE);
+    for (let r = rows[0]; r <= rows[1]; r++) if (solid(tileAt(S, c, r))) { h.x = (c + 1) * TILE + 8; h.vx = 0; break; }
+  }
+  h.x = Math.max(8, Math.min(S.W - 8, h.x));
+  const oldBottom = h.y, wasGrounded = h.grounded;
+  h.y += h.vy * dt;
+  h.grounded = false;
+  const cols = [Math.floor((h.x - 8) / TILE), Math.floor((h.x + 8 - 1e-6) / TILE)];
+  if (h.vy > 0) {
+    const r = Math.floor((h.y - 1e-6) / TILE);
+    for (let c = cols[0]; c <= cols[1]; c++) {
+      const ch = tileAt(S, c, r);
+      if (solid(ch) || (ch === "=" && oldBottom <= r * TILE + 1e-6)) { h.y = r * TILE; h.vy = 0; h.grounded = true; break; }
+    }
+    if (!h.grounded) landOnFrozen(S, h, oldBottom);
+  } else if (h.vy < 0) {
+    const r = Math.floor((h.y - hh) / TILE);
+    for (let c = cols[0]; c <= cols[1]; c++) if (solid(tileAt(S, c, r))) { h.y = (r + 1) * TILE + hh; h.vy = 0; break; }
+  }
+  if (h.grounded && !wasGrounded) h.landed = 0;
+  if (h.y > S.H + 60) fallInPit(S);
+}
+function landOnFrozen(S, h, oldBottom) {
+  for (const e of S.enemies) {
+    if (e.dead || e.gone || e.frozen <= 0 || e.kind === "spin") continue;
+    const b = mainBox(e);
+    if (oldBottom > b.y0 + 1e-6 || h.y < b.y0 || h.x + 8 <= b.x0 || h.x - 8 >= b.x1) continue;
+    if (e.killable) { kill(S, e); h.vy = -420; h.jumping = false; }
+    else { h.y = b.y0; h.vy = 0; h.grounded = true; }
+    return;
+  }
+}
+function fallInPit(S) {
+  const h = S.hero;
+  Object.assign(h, { x: S.start.x, y: S.start.y, vx: 0, vy: 0, big: false, armed: false, change: null });
+  S.shots = [];
+  S.hint = null;
+  resetSpark(S);
+  toast(S, "/dev/null: write successful · sudo and weapon lost");
+}
+
+function hit(S) {
+  const h = S.hero;
+  if (!h.big) { toast(S, "small: this hit would cost a life"); return; }
+  h.big = false; h.armed = false; h.change = { at: S.t, toBig: false };
+  S.shots = [];
+  S.hint = null;
+  resetSpark(S);
+  toast(S, `hit: shrunk · sudo and ${WEAPONS[S.weapon].name} lost`);
+}
+function collectSudo(S) {
+  const h = S.hero;
+  if (!h.big) { h.big = true; h.change = { at: S.t, toBig: true }; toast(S, "sudo: privileges granted"); }
+  else if (!h.armed) { h.armed = true; resetSpark(S); toast(S, `already root · ${WEAPONS[S.weapon].toast}`); showHint(S); }
+  else toast(S, "already root");
+  burst(S, h.x, h.y - 30, pal.bit, 10, "+*·");
+}
+
+function heroState(S, input) {
+  const h = S.hero;
+  if (!h.grounded) return h.vy < -120 ? "jump" : h.vy < 120 ? "peak" : "fall";
+  if (h.landed < 0.12) return "land";
+  if (input.dir !== 0 && Math.sign(h.vx) === -input.dir && Math.abs(h.vx) > 90) return "skid";
+  if (Math.abs(h.vx) > P.WALK + 0.5) return "run";
+  if (Math.abs(h.vx) > 5) return "walk";
+  return "idle";
+}
+
+function botInput(S, dt) {
+  const b = S.bot;
+  b.nextJump -= dt; b.nextFire -= dt; b.hold -= dt;
+  const input = { dir: 0, held: b.hold > 0, pressed: false, sprint: false, fire: false };
+  if (b.nextJump <= 0) { b.nextJump = 2.4; b.hold = 0.16; input.pressed = true; input.held = true; }
+  if (b.nextFire <= 0) { b.nextFire = b.fireEvery; input.fire = true; }
+  return input;
+}
+
+function stepScene(S, dt, input) {
+  S.t += dt;
+  const steps = Math.max(1, Math.min(8, Math.round(dt * 120)));
+  for (let i = 0; i < steps; i++) stepHero(S, 1 / 120, i === 0 ? input : Object.assign({}, input, { pressed: false }));
+  const h = S.hero;
+  h.landed += dt;
+  h.throwAnim -= dt;
+  if (input.dir !== 0) h.facing = input.dir;
+  S.cool = Math.max(0, S.cool - dt);
+  if (input.fire) tryFire(S);
+  for (const e of [...S.enemies]) updateEnemy(S, e, dt);
+  S.enemies = S.enemies.filter(e => !e.gone);
+  updateShots(S, dt);
+  if (h.armed && S.weapon === "claude") updateSpark(S, dt);
+  for (const p of S.parts) { p.life -= dt; p.vy += 300 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+  S.parts = S.parts.filter(p => p.life > 0);
+  for (const p of S.pops) { p.life -= dt; p.y -= 22 * dt; }
+  S.pops = S.pops.filter(p => p.life > 0);
+  if (S.toast) { S.toast.life -= dt; if (S.toast.life <= 0) S.toast = null; }
+  if (S.hint) { S.hint.life -= dt; if (S.hint.life <= 0) S.hint = null; }
+}
+
+
+function tileOp(ch, c, r, height, color, alpha) {
+  const size = fitHeight(ch, height), m = metric(ch);
+  return { ch, x: c * TILE + 12, y: r * TILE + height / 2, size, sx: TILE / ((m.l + m.r) * size), color, alpha, glow: 3 };
+}
+function drawTiles(ctx, S) {
+  for (let r = 0; r < S.rows; r++) for (let c = 0; c < S.cols; c++) {
+    const ch = S.map[r][c];
+    if (ch === "#") {
+      drawOp(ctx, tileOp("▓", c, r, 24, pal.ground, 0.6));
+      if (tileAt(S, c, r - 1) !== "#") drawOp(ctx, tileOp("▀", c, r, 12, pal.ground, 1));
+    }
+    if (ch === "B") drawOp(ctx, tileOp("▓", c, r, 24, pal.block, 1));
+    if (ch === "=") drawOp(ctx, { ch: "=", x: c * TILE + 12, y: r * TILE + 6, size: 22, color: pal.platform, glow: 3 });
+  }
+}
+
+function enemyColor(e) {
+  if (e.frozen <= 0) return pal.hostile;
+  return e.frozen < 0.6 && Math.floor(e.frozen * 12) % 2 ? pal.hostile : pal.cyan;
+}
+function drawEnemy(ctx, S, e) {
+  if (e.dead) return;
+  const col = enemyColor(e), alpha = e.fade > 0 ? 1 - e.fade / 0.4 : 1, o = { alpha };
+  const bob = e.frozen > 0 ? 0 : Math.sin(S.t * 5 + e.x) * 0.6;
+  switch (e.kind) {
+    case "bug": glyph(ctx, "ж", e.x, e.y - 8 + bob, 20, col, o); break;
+    case "fork": glyph(ctx, "&", e.x, e.y - 9 + bob, 20, col, o); break;
+    case "kid": glyph(ctx, "&", e.x, e.y - 5, 12, col, o); break;
+    case "zombie":
+      glyph(ctx, "Z", e.x, e.y - 10, 20, col, o);
+      drawText(ctx, "<defunct>", e.x, e.y - 24, 7, pal.muted, "center", alpha);
+      break;
+    case "ping": glyph(ctx, "◎", e.x, e.y - 8, 18, col, o); break;
+    case "hang":
+      ctx.save(); ctx.strokeStyle = pal.muted; ctx.globalAlpha = 0.7 * alpha; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(e.x, 0); ctx.lineTo(e.x, e.y - 16); ctx.stroke(); ctx.restore();
+      glyph(ctx, "▼", e.x, e.y - 8, 16, col, o);
+      break;
+    case "emitter": {
+      const blink = e.frozen <= 0 && e.timer < 0.5 && Math.floor(e.timer * 12) % 2 === 0;
+      glyph(ctx, "*", e.x, e.y - 8, 18, col, { alpha: blink ? 0.35 : 1 });
+      break;
+    }
+    case "bullet": glyph(ctx, "<--", e.x, e.y, 13, col, { glow: 5 }); break;
+    case "spin":
+      for (const arm of spinArms(e)) for (let i = 1; i <= e.links; i++) {
+        glyph(ctx, i === e.links ? "*" : "·", e.x + Math.cos(arm) * i * 18, e.y + Math.sin(arm) * i * 18, i === e.links ? 14 : 12, col, { glow: 5 });
+      }
+      glyph(ctx, "(o)", e.x, e.y, 13, pal.hostileAlt2);
+      break;
+  }
+  if (e.frozen > 0) {
+    const b = mainBox(e);
+    ctx.save(); ctx.strokeStyle = pal.cyan; ctx.setLineDash([2, 2]); ctx.lineWidth = 1; ctx.globalAlpha = 0.8;
+    ctx.strokeRect(b.x0 - 2, b.y0 - 2, b.x1 - b.x0 + 4, b.y1 - b.y0 + 4); ctx.restore();
+    glyph(ctx, "‖", (b.x0 + b.x1) / 2, b.y0 - 9, 9, pal.cyan, { glow: 4 });
+  }
+  if (showHitbox) for (const b of boxes(e)) dashedBox(ctx, b, pal.muted);
+}
+function dashedBox(ctx, b, color) {
+  ctx.save(); ctx.strokeStyle = color; ctx.setLineDash([2, 2]); ctx.lineWidth = 0.5;
+  ctx.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); ctx.restore();
+}
+
+function guidePoints(S) {
+  const W = WEAPONS[S.weapon], h = S.hero, pts = [];
+  const shots = W.fire(h).map(s => Object.assign({ hit: new Set(), max: s.life }, s));
+  for (const s of shots) {
+    const line = [];
+    for (let t = 0; t < s.max && !s.gone && !s.back; t += 1 / 60) { W.step(S, s, 1 / 60); line.push({ x: s.x, y: s.y }); }
+    pts.push(line);
+  }
+  return pts;
+}
+function drawGuide(ctx, S) {
+  const h = S.hero;
+  if (!h.big || !h.armed) return;
+  const W = WEAPONS[S.weapon], color = W.color();
+  if (S.weapon === "claude") {
+    if (S.spark.state !== "idle") return;
+    const target = claudeTarget(S);
+    ctx.save(); ctx.globalAlpha = 0.35;
+    ctx.fillStyle = color;
+    const x0 = h.facing > 0 ? h.x : h.x - 7 * TILE;
+    ctx.fillRect(x0, h.y - 22 - 5 * TILE, 7 * TILE, 1);
+    ctx.fillRect(x0, h.y - 22 + 5 * TILE, 7 * TILE, 1);
+    ctx.restore();
+    if (target) {
+      const c = center(target);
+      ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = 0.6; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(S.spark.x, S.spark.y); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore();
+      glyph(ctx, "⌖", c.x, c.y, 18, color, { alpha: 0.7, glow: 0 });
+    }
+    return;
+  }
+  for (const line of guidePoints(S)) {
+    line.forEach((p, i) => { if (i % 3 === 0) glyph(ctx, "·", p.x, p.y, 8, color, { alpha: 0.45, glow: 0 }); });
+    if (S.weapon === "revert" && line.length) {
+      const end = line[line.length - 1];
+      glyph(ctx, h.facing > 0 ? "⟲" : "⟳", end.x, end.y - 12, 11, color, { alpha: 0.6, glow: 0 });
+    }
+  }
+}
+
+function drawHero(ctx, S, input) {
+  const h = S.hero;
+  let state = heroState(S, input), big = h.big, visible = true;
+  if (h.change) {
+    const u = S.t - h.change.at;
+    if (u < 0.7) { const flick = Math.floor(u / 0.09) % 2 === 0; big = h.change.toBig ? !flick : flick; }
+    else if (!h.change.toBig && u < 1.6) visible = Math.floor(u * 16) % 2 === 0;
+    else h.change = null;
+  }
+  if (showHitbox) dashedBox(ctx, { x0: h.x - 8, x1: h.x + 8, y0: h.y - (h.big ? BIG_H : HERO_H), y1: h.y }, pal.muted);
+  if (!visible) return;
+  const throwing = h.throwAnim > 0;
+  const hand = drawFigure(ctx, big, state, S.t, h.x, h.y, h.facing, Math.abs(h.vx), throwing);
+  if (big && h.armed && S.weapon !== "claude" && !(S.weapon === "revert" && S.shots.length)) {
+    WEAPONS[S.weapon].icon(ctx, hand.x + h.facing * 3, hand.y, h.facing);
+  }
+  if (state === "run" && h.grounded) drawOp(ctx, { ch: h.facing > 0 ? "»" : "«", x: h.x - h.facing * 22, y: h.y - 8, size: 14, color: pal.hero, alpha: 0.6, glow: 4 });
+  if (big && h.armed && S.cool > 0) {
+    const W = WEAPONS[S.weapon], k = S.cool / W.cooldown;
+    ctx.save(); ctx.fillStyle = W.color(); ctx.globalAlpha = 0.7;
+    ctx.fillRect(h.x - 9, h.y + 3, 18 * (1 - k), 2); ctx.restore();
+  }
+}
+
+function drawSparkLayer(ctx, S) {
+  const h = S.hero, sp = S.spark;
+  if (!h.big || !h.armed || S.weapon !== "claude") return;
+  for (const p of sp.trail) glyph(ctx, "·", p.x, p.y, 9, pal.block, { alpha: p.life / 0.25 * 0.7, glow: 0 });
+  drawSpark(ctx, sp.x, sp.y, S.t, sp.state === "out" || sp.state === "back" ? 15 : 13, sp.state === "thinking");
+  if (sp.state === "thinking") drawText(ctx, "Thinking…", sp.x + 9, sp.y - 8, 8, pal.block, "left", 0.9);
+  if (sp.say) {
+    ctx.font = `700 8px ${FONT}`;
+    const half = ctx.measureText(sp.say.text).width / 2 + 3;
+    const x = Math.max(half, Math.min(S.W - half, sp.x));
+    drawText(ctx, sp.say.text, x, sp.y - 12, 8, pal.text, "center", Math.min(1, sp.say.life / 0.3));
+  }
+}
+
+function drawScene(ctx, S, input, hud) {
+  ctx.fillStyle = pal.background;
+  ctx.fillRect(0, 0, S.W, S.H);
+  drawTiles(ctx, S);
+  if (showGuide) drawGuide(ctx, S);
+  for (const e of S.enemies) drawEnemy(ctx, S, e);
+  for (const s of S.shots) {
+    WEAPONS[s.w].draw(ctx, s);
+    if (showHitbox) dashedBox(ctx, { x0: s.x - s.r, x1: s.x + s.r, y0: s.y - s.r, y1: s.y + s.r }, WEAPONS[s.w].color());
+  }
+  drawHero(ctx, S, input);
+  drawSparkLayer(ctx, S);
+  for (const p of S.parts) glyph(ctx, p.ch, p.x, p.y, 9, p.color, { alpha: p.life / p.max, glow: 3 });
+  for (const p of S.pops) drawText(ctx, p.text, p.x, p.y, 9, p.color, "center", Math.min(1, p.life / 0.4));
+  if (S.toast) {
+    ctx.font = `700 11px ${FONT}`;
+    const w = ctx.measureText(S.toast.text).width + 20;
+    ctx.save(); ctx.globalAlpha = Math.min(1, S.toast.life / 0.3);
+    ctx.fillStyle = pal.background; ctx.fillRect(S.W / 2 - w / 2, 8, w, 20);
+    ctx.strokeStyle = pal.muted; ctx.strokeRect(S.W / 2 - w / 2, 8, w, 20);
+    ctx.restore();
+    drawText(ctx, S.toast.text, S.W / 2, 22, 11, pal.text, "center", Math.min(1, S.toast.life / 0.3));
+  }
+  if (S.hint) drawHint(ctx, S);
+  if (hud) {
+    const h = S.hero, W = WEAPONS[S.weapon];
+    const parts = [h.big ? "sudo ●" : "sudo ○", h.big && h.armed ? `weapon: ${W.name}` : h.big ? "weapon: next sudo bit" : "weapon: needs sudo first"];
+    drawText(ctx, parts.join("   "), 8, 16, 10, h.armed && h.big ? W.color() : pal.muted);
+  }
+}
+
+function drawHint(ctx, S) {
+  const W = WEAPONS[S.weapon], color = W.color(), cx = S.W / 2, top = 40;
+  const fadeIn = Math.min(1, (S.hint.max - S.hint.life) / 0.25);
+  const alpha = Math.min(fadeIn, S.hint.life / 0.5, 1);
+  const title = `${W.name} acquired`, before = "press ", after = ` to ${W.verb}`;
+  ctx.font = `700 15px ${FONT}`;
+  const titleW = ctx.measureText(title).width;
+  ctx.font = `700 12px ${FONT}`;
+  const beforeW = ctx.measureText(before).width, afterW = ctx.measureText(after).width, keyW = 20;
+  const lineW = beforeW + keyW + afterW;
+  const boxW = Math.max(titleW + 34, lineW) + 32, boxH = 56;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = pal.background;
+  ctx.fillRect(cx - boxW / 2, top, boxW, boxH);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cx - boxW / 2 + 0.5, top + 0.5, boxW - 1, boxH - 1);
+  ctx.restore();
+  const iconX = cx - titleW / 2 - 10, titleY = top + 22;
+  ctx.save(); ctx.globalAlpha = alpha;
+  if (S.weapon === "claude") drawSpark(ctx, iconX, titleY - 5, S.t, 14, false);
+  else W.icon(ctx, iconX, titleY - 5, 1);
+  ctx.restore();
+  drawText(ctx, title, cx + 10, titleY, 15, color, "center", alpha);
+  let x = cx - lineW / 2;
+  const y = top + 45;
+  drawText(ctx, before, x, y, 12, pal.text, "left", alpha);
+  x += beforeW;
+  const pulse = 0.6 + 0.4 * Math.abs(Math.sin(S.t * 4));
+  ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = 1.2;
+  ctx.strokeRect(x + 1.5, y - 12, keyW - 3, 16);
+  ctx.restore();
+  drawText(ctx, "X", x + keyW / 2, y, 12, color, "center", alpha * pulse + (1 - pulse) * 0.3);
+  x += keyW;
+  drawText(ctx, after, x, y, 12, pal.text, "left", alpha);
+}
+
+function prepCanvas(cv, W, H) {
+  const dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(W * zoom * dpr)) {
+    cv.width = Math.round(W * zoom * dpr); cv.height = Math.round(H * zoom * dpr);
+    cv.style.width = W * zoom + "px"; cv.style.height = H * zoom + "px";
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(zoom * dpr, 0, 0, zoom * dpr, 0, 0);
+  return ctx;
+}
+
+
+const T = TILE;
+const strip = makeScene({
+  map: buildMap(40, 10, [
+    { r: [8, 9], c: [0, 39], ch: "#" },
+    { r: [8, 9], c: [19, 20], ch: "." },
+    { r: [4, 4], c: [22, 25], ch: "=" },
+    { r: [6, 7], c: [33, 33], ch: "B" },
+  ]),
+  start: { x: 2.5 * T, y: 8 * T },
+  respawn: 2.5,
+  weapon: "duck",
+  defs: [
+    { kind: "bug", x: 9 * T, y: 8 * T, w: 18, h: 16, min: 6.5 * T, max: 12.5 * T, speed: 45, killable: true },
+    { kind: "zombie", x: 15 * T, y: 8 * T - 42, w: 18, h: 20, min: 13.5 * T, max: 17.5 * T, speed: 28, killable: true },
+    { kind: "ping", x: 23.5 * T, y: 8 * T, w: 16, h: 16, killable: true },
+    { kind: "hang", x: 27.5 * T, y: 3 * T, w: 16, h: 16, ground: 8 * T, drops: true, killable: true },
+    { kind: "fork", x: 30 * T, y: 8 * T, w: 18, h: 18, min: 28.5 * T, max: 32 * T, speed: 40, killable: true },
+    { kind: "spin", x: 36.5 * T, y: 4.5 * T, links: 3, dir: 1, killable: false },
+    { kind: "emitter", x: 39.5 * T, y: 8 * T, w: 14, h: 14, timer: 1, killable: false },
+  ],
+});
+
+const keys = {};
+let pressedLatch = false, fireLatch = false;
+
+
+const CARD_TEXT = {
+  duck: {
+    tag: "Explain the bug to the duck. The duck explains it to the bug.",
+    pattern: "Thrown low, bounces along the ground (about half a tile high) and follows it down steps, until a wall, a pit or 1.4 s. The Mario-fireball baseline.",
+    aim: "Aiming is automatic for anything on the ground. What floats is out of reach, even if you jump: the duck drops to the floor anyway.",
+    up: "Fastest rate (0.25 s), two ducks on screen, long range on flat ground.",
+    down: "Only the lowest tile row. Lost in pits; a step up or a block stops it. Zombies and hangs stay your problem.",
+  },
+  bp: {
+    tag: "Execution paused. Take your time.",
+    pattern: "A slow dot flies straight ahead at hand height, up to 9 tiles. Whatever it touches is <b>paused for 3 s</b>: harmless, and a one-way platform to stand on. It blinks before it thaws. Landing on a paused creature stomps it. Thawed, everything goes on where it stopped.",
+    aim: "The only weapon that works on traps: a paused spinlock stops turning, a paused <code>&lt;--</code> hangs in the air as a step (try it at the right end of the strip). In the game the same goes for cron columns, pipe daemons and leak puddles.",
+    up: "Longest range; handles traps; opens routes no other weapon does.",
+    down: "Kills nothing on its own. The slowest shot, one at a time, 1 s cooldown, and 3 s later the problem is back.",
+  },
+  claude: {
+    tag: "An ✻ rides on your shoulder and does the work.",
+    pattern: "Press fire: it thinks for 0.5 s (<code>Thinking…</code>), then flies to the nearest enemy ahead within 7 tiles, at any height and through walls, kills it and flies back. One trip at a time. No enemy in range: <code>No issues found.</code>",
+    aim: "No aiming at all; the guide shows the range and the enemy it would pick. Kill lines: <code>You're absolutely right!</code>, <code>Fixed it.</code>, …",
+    up: "Hits anything killable at any height; no jumping or lining up.",
+    down: "The delay, and it picks the nearest enemy, not the one in your way. The slowest kill rate. Ignores traps completely.",
+  },
+  revert: {
+    tag: "Undo, then undo the undo.",
+    pattern: "A spinning <code>↺</code> flies straight out at hand height, slows down after about 6 tiles and comes back to wherever you are. It passes through enemies, killing everything it touches on both legs. A trap or a wall sends it back early.",
+    aim: "Straight line out, homing on the way back: walk or jump while it returns to sweep a second line.",
+    up: "Pierces and hits twice; catches enemies behind you on the way back.",
+    down: "Only one: you cannot throw again until you catch it (about 1.3 s). A straight line, so you jump to reach anything high.",
+  },
+};
+
+const STATS = {
+  duck: { pattern: "bounce along the ground", range: "long on flat ground", rate: "0.25 s, 2 on screen", height: "lowest row only", special: "follows terrain down" },
+  bp: { pattern: "straight, slow", range: "9 tiles", rate: "1.0 s, 1 on screen", height: "hand height", special: "pauses anything 3 s, traps too; no kill" },
+  claude: { pattern: "homing, through walls", range: "7 tiles ahead", rate: "0.5 s think + trip", height: "any", special: "auto-target nearest" },
+  revert: { pattern: "boomerang", range: "≈ 6 tiles, out and back", rate: "until caught (~1.3 s)", height: "hand height", special: "pierces, hits twice" },
+};
+
+const cardScenes = [];
+function buildCards() {
+  const root = document.getElementById("cards");
+  for (const id of WEAPON_IDS) {
+    const W = WEAPONS[id], tx = CARD_TEXT[id];
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="wrap"><canvas></canvas></div>
+      <div class="text">
+        <h3><span data-color="${id}">${W.key}. ${W.name}</span></h3>
+        <div class="muted">pickup toast <code>${W.toast}</code> · ${tx.tag}</div>
+        <p><b>Attack.</b> ${tx.pattern}</p>
+        <p><b>Aim.</b> ${tx.aim}</p>
+        <div class="up">+ ${tx.up}</div>
+        <div class="down">− ${tx.down}</div>
+      </div>`;
+    root.appendChild(card);
+    const S = makeScene({
+      map: buildMap(16, 8, [{ r: [6, 7], c: [0, 15], ch: "#" }]),
+      start: { x: 1.5 * T, y: 6 * T },
+      respawn: 1.6,
+      weapon: id,
+      bot: { fireEvery: id === "duck" ? 0.6 : 0.4 },
+      defs: [
+        { kind: "hang", x: 5 * T, y: 50, w: 16, h: 16, ground: 6 * T, drops: false, killable: true },
+        { kind: "bug", x: 8 * T, y: 6 * T, w: 18, h: 16, min: 5.5 * T, max: 10.5 * T, speed: 45, killable: true },
+        { kind: "zombie", x: 10 * T, y: 6 * T - 44, w: 18, h: 20, min: 8.5 * T, max: 12.5 * T, speed: 28, killable: true },
+        { kind: "ping", x: 13.5 * T, y: 6 * T, w: 16, h: 16, phase: 0.5, killable: true },
+      ],
+    });
+    cardScenes.push({ S, canvas: card.querySelector("canvas") });
+  }
+  const table = document.getElementById("compare");
+  const cols = [["pattern", "pattern"], ["range", "range"], ["rate", "cooldown"], ["height", "heights it reaches"], ["special", "special"]];
+  table.innerHTML = `<tr><th>weapon</th>${cols.map(c => `<th>${c[1]}</th>`).join("")}</tr>` +
+    WEAPON_IDS.map(id => `<tr><td data-color="${id}">${WEAPONS[id].name}</td>${cols.map(c => `<td>${STATS[id][c[0]]}</td>`).join("")}</tr>`).join("");
+}
+
+function buildWeaponButtons() {
+  const bar = document.getElementById("weaponButtons");
+  for (const id of WEAPON_IDS) {
+    const b = document.createElement("button");
+    b.dataset.weapon = id;
+    b.textContent = `${WEAPONS[id].key} ${WEAPONS[id].name}`;
+    b.addEventListener("click", () => { chooseWeapon(id); b.blur(); });
+    bar.appendChild(b);
+  }
+}
+function chooseWeapon(id) {
+  setWeapon(strip, id);
+  if (strip.hero.big && strip.hero.armed) { toast(strip, WEAPONS[id].toast); showHint(strip); }
+  markButtons();
+}
+
+
+addEventListener("keydown", e => {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(e.key)) e.preventDefault();
+  if (e.repeat) return;
+  if ((e.key === " " || e.key === "ArrowUp") && !keys[" "] && !keys.ArrowUp) pressedLatch = true;
+  keys[e.key] = true;
+  const k = e.key.toLowerCase();
+  if (k === "x") fireLatch = true;
+  if (k === "b") collectSudo(strip);
+  if (k === "h") hit(strip);
+  if (k === "r") resetScene(strip);
+  if (k === "g") { showGuide = !showGuide; markButtons(); }
+  const w = WEAPON_IDS.find(id => WEAPONS[id].key === e.key);
+  if (w) chooseWeapon(w);
+  if (e.key === "[" || e.key === "]") stepTheme(e.key === "]" ? 1 : -1);
+});
+addEventListener("keyup", e => { keys[e.key] = false; });
+addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+
+const themeSelect = document.getElementById("theme");
+const themeNames = Object.keys(PALETTES);
+for (const name of themeNames) themeSelect.add(new Option(name, name));
+function applyTheme(name) {
+  pal = PALETTES[name];
+  themeSelect.value = name;
+  const s = document.body.style;
+  s.setProperty("--page", pal.background);
+  s.setProperty("--panel", pal.background);
+  s.setProperty("--ink", pal.text);
+  s.setProperty("--muted", pal.muted);
+  s.setProperty("--line", pal.muted);
+  s.setProperty("--acc", pal.hero);
+  s.setProperty("--good", pal.ground);
+  s.setProperty("--bad", pal.hostile);
+  document.querySelectorAll("[data-color]").forEach(el => { el.style.color = WEAPONS[el.dataset.color].color(); });
+}
+function stepTheme(step) {
+  const i = themeNames.indexOf(themeSelect.value);
+  applyTheme(themeNames[(i + step + themeNames.length) % themeNames.length]);
+}
+themeSelect.addEventListener("change", () => { applyTheme(themeSelect.value); themeSelect.blur(); });
+
+function markButtons() {
+  document.querySelectorAll("[data-zoom]").forEach(b => b.classList.toggle("on", +b.dataset.zoom === zoom));
+  document.querySelectorAll("[data-weapon]").forEach(b => b.classList.toggle("on", b.dataset.weapon === strip.weapon));
+  document.getElementById("fx").textContent = fullFx ? "full" : "reduced";
+  document.getElementById("hb").textContent = showHitbox ? "shown" : "hidden";
+  document.getElementById("guide").textContent = showGuide ? "shown" : "hidden";
+}
+document.querySelectorAll("[data-zoom]").forEach(b => b.addEventListener("click", () => { zoom = +b.dataset.zoom; markButtons(); b.blur(); }));
+document.getElementById("fx").addEventListener("click", e => { fullFx = !fullFx; markButtons(); e.target.blur(); });
+document.getElementById("hb").addEventListener("click", e => { showHitbox = !showHitbox; markButtons(); e.target.blur(); });
+document.getElementById("guide").addEventListener("click", e => { showGuide = !showGuide; markButtons(); e.target.blur(); });
+
+buildWeaponButtons();
+buildCards();
+applyTheme("tokyo-night");
+markButtons();
+
+const stripCanvas = document.getElementById("strip");
+let last = performance.now();
+function frame(ms) {
+  const dt = Math.min((ms - last) / 1000, 0.1);
+  last = ms;
+  const input = {
+    dir: (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0),
+    held: !!(keys[" "] || keys.ArrowUp),
+    pressed: pressedLatch,
+    sprint: !!keys.Shift,
+    fire: fireLatch,
+  };
+  pressedLatch = false; fireLatch = false;
+  stepScene(strip, dt, input);
+  drawScene(prepCanvas(stripCanvas, strip.W, strip.H), strip, input, true);
+  for (const c of cardScenes) {
+    const bi = botInput(c.S, dt);
+    stepScene(c.S, dt, bi);
+    drawScene(prepCanvas(c.canvas, c.S.W, c.S.H), c.S, bi, false);
+  }
+  requestAnimationFrame(frame);
+}
+document.fonts.load(`700 24px ${FONT}`).then(() => document.fonts.ready).then(() => requestAnimationFrame(frame));
+</script>
+</body>
+</html>

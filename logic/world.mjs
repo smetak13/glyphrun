@@ -1,7 +1,8 @@
 import { TILE, SCREEN_WIDTH, SCREEN_HEIGHT } from "./screen.mjs";
 import { createHero, stepHero, heroHeight, HERO_WIDTH } from "./physics.mjs";
-import { createEnemies, resetEnemy, stepEnemies, touchEnemies } from "./enemies.mjs";
+import { createEnemies, resetEnemy, stepEnemies, touchEnemies, standOnPaused } from "./enemies.mjs";
 import { createBoss, resumeBoss, stepBoss } from "./boss.mjs";
+import { createArms, clearArms, stepArms } from "./weapons.mjs";
 
 export const CAMERA_LEAD = 320;
 export const CAMERA_FOLLOW_RATE = 6;
@@ -19,6 +20,8 @@ export function createWorld(level) {
     checkpointReached: false,
     finished: false,
     time: 0,
+    weapon: null,
+    arms: createArms(),
   };
   placeHero(world, level.start);
   return world;
@@ -46,6 +49,7 @@ export function keepInsideLevel(hero, level) {
 export function respawnHero(world) {
   for (const enemy of world.enemies) resetEnemy(enemy);
   if (world.boss) resumeBoss(world.boss);
+  clearArms(world.arms);
   placeHero(world, world.checkpointReached ? world.level.checkpoint : world.level.start);
 }
 
@@ -54,6 +58,17 @@ function stepArena(world, previousBottom, seconds, events) {
     if (event.type === "rebooted") world.finished = true;
     events.push(event);
   }
+}
+
+export function armWorld(world, weapon) {
+  world.weapon = weapon;
+  clearArms(world.arms);
+}
+
+function weaponTargets(world) {
+  const targets = [{ enemies: world.enemies }];
+  if (world.boss) targets.push({ enemies: world.boss.bugs });
+  return targets;
 }
 
 export function touchesBit(hero, bit) {
@@ -83,10 +98,13 @@ export function stepWorld(world, input, seconds) {
   world.time += seconds;
   const hero = world.hero;
   const previousBottom = hero.y;
-  const movement = stepHero(hero, input, world.level, seconds);
+  const wasGrounded = hero.grounded;
+  let movement = stepHero(hero, input, world.level, seconds);
+  if (standOnPaused(hero, world.enemies, previousBottom) && !wasGrounded) movement = "land";
   if (movement) events.push({ type: movement });
   keepInsideLevel(hero, world.level);
   stepEnemies(world.enemies, world.level, hero, seconds, world.cameraX);
+  for (const event of stepArms(world.arms, world.weapon, hero, world.level, weaponTargets(world), input, seconds, world.time)) events.push(event);
   for (const event of touchEnemies(world.enemies, hero, previousBottom)) events.push(event);
   if (world.boss) stepArena(world, previousBottom, seconds, events);
   collectBits(world, events);

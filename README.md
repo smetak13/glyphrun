@@ -14,7 +14,7 @@ Click the `@` in the bar to open and close the game window.
 
 ## Development
 
-- `scripts/run-dev.sh` runs the game in a temporary Quickshell window, without installing it. Closing the window quits.
+- `scripts/run-dev.sh` runs the game in a temporary Quickshell window, without installing it. Closing the window quits. During play it has dev keys: H hits the hero, K plays a kill, L skips to the next level, B jumps to the boss, V shows the victory screen, and W arms the hero with the seed's weapon, then switches to the next weapon on each press.
 - `scripts/link-dev.sh` symlinks this repository to `~/.config/omarchy/plugins/smetak13.glyphrun`, so the shell loads the working copy. Then enable it with `omarchy plugin enable smetak13.glyphrun`. After changing QML, restart the shell with `omarchy restart shell`.
 - `scripts/check.sh` validates the manifest, runs the tests with `node --test`, and loads every logic module in Qt's QML engine (`qml6`), whose JavaScript is older than Node's.
 - `node scripts/pass-rate.mjs [seeds]` generates every level for many seeds (200 by default) and reports how many pass the validator on the first attempt, after retries or only with the fallback layout, and which rules failed.

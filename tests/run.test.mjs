@@ -197,8 +197,9 @@ test("the sudo bit grows a small hero and scores 250", () => {
   assert.deepEqual([run.world.hero.big, run.score, run.toast.text], [true, 250, "sudo: privileges granted"]);
 });
 
-test("the sudo bit while already big scores 500 and says already root", () => {
+test("the sudo bit while already armed scores 500 and says already root", () => {
   const run = bigRun(SUDO);
+  run.armed = true;
 
   stepUntil(run, RIGHT, r => r.world.bits[0].collected);
 
@@ -415,6 +416,7 @@ test("collecting bits and sudo is cued where they were", () => {
   const bits = createRun(1, BITS);
   const sudo = createRun(1, SUDO);
   const root = bigRun(SUDO);
+  root.armed = true;
 
   stepUntil(bits, RIGHT, r => r.world.bits[0].collected);
   stepUntil(sudo, RIGHT, r => r.world.bits[0].collected);
@@ -568,9 +570,10 @@ test("the boss's patch grows a small hero and says the hotfix is applied", () =>
   assert.deepEqual([run.world.hero.big, run.score, run.toast.text], [true, SUDO_POINTS, "kernel: hotfix applied"]);
 });
 
-test("the boss's patch while already big scores as already root", () => {
+test("the boss's patch while already armed scores as already root", () => {
   const run = patchRun();
   run.world.hero.big = true;
+  run.armed = true;
 
   stepRun(run, IDLE, STEP_SECONDS);
 

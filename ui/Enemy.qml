@@ -15,11 +15,13 @@ Item {
   readonly property real frameHeight: Screen.TILE
   readonly property real extentWidth: enemy.extent * Screen.TILE
   readonly property real labelRise: 30
+  readonly property real pauseMarkRise: 12
+  property real frozenTime: -1
 
   function syncShots(live, time) {
     for (let i = 0; i < shotPoolSize; i++) {
       const shot = live.shots[i]
-      const parts = shot === undefined ? null : EnemyFigureLogic.shotParts(shot, live.homeY - Screen.TILE / 2, time)
+      const parts = shot === undefined ? null : EnemyFigureLogic.tinted(EnemyFigureLogic.shotParts(shot, live.homeY - Screen.TILE / 2, time), live)
       shotParts.itemAt(2 * i).part = parts ? parts[0] : null
       shotParts.itemAt(2 * i + 1).part = parts ? parts[1] : null
     }
@@ -45,7 +47,12 @@ Item {
     const shown = live.alive ? live : death ? death.enemy : null
     visible = shown !== null
     if (!shown) return
-    const time = animator.time
+    if (!(live.paused > 0)) frozenTime = -1
+    else if (frozenTime < 0) frozenTime = animator.time
+    const time = live.paused > 0 ? frozenTime : animator.time
+    pauseMark.visible = live.alive && EnemyFigureLogic.pausedLook(live)
+    pauseMark.x = Math.round(shown.x - pauseMark.width / 2)
+    pauseMark.y = Math.round(shown.y - shown.height - pauseMarkRise - pauseMark.height / 2)
     const shape = live.alive ? EnemyFigureLogic.enemyFigure(live, time, fullEffects) : EnemyFigureLogic.deathFigure(death.enemy, time, death.age)
     figure.shape = shape
     if (live.kind === "pipe") {
@@ -64,13 +71,13 @@ Item {
     syncSparks(shown, death)
     if (live.kind === "cron") {
       column.visible = live.alive && Enemies.cronState(live) === "firing"
-      column.shape = column.visible ? { parts: EnemyFigureLogic.columnParts(live, time), scaleX: 1, scaleY: 1, rotation: 0, pivotY: 0, opacity: 1, rise: 0 } : null
+      column.shape = column.visible ? { parts: EnemyFigureLogic.tinted(EnemyFigureLogic.columnParts(live, time), live), scaleX: 1, scaleY: 1, rotation: 0, pivotY: 0, opacity: 1, rise: 0 } : null
     } else if (live.kind === "pointer") syncShots(live, time)
     else if (live.kind === "leak") {
       const grown = EnemyFigureLogic.puddleShown(shown, death ? death.age : null)
       puddle.width = Math.round(grown)
       puddle.x = Math.round(extentWidth - grown)
-      puddleFigure.shape = { parts: EnemyFigureLogic.puddleParts(live.extent, time), scaleX: 1, scaleY: 1, rotation: 0, pivotY: 0, opacity: death ? 1 - death.age / EnemyFigureLogic.DEATH_SECONDS : 1, rise: 0 }
+      puddleFigure.shape = { parts: EnemyFigureLogic.tinted(EnemyFigureLogic.puddleParts(live.extent, time), live), scaleX: 1, scaleY: 1, rotation: 0, pivotY: 0, opacity: death ? 1 - death.age / EnemyFigureLogic.DEATH_SECONDS : 1, rise: 0 }
     }
   }
 
@@ -171,6 +178,14 @@ Item {
       visible: false
       size: 10
     }
+  }
+
+  Glyph {
+    id: pauseMark
+    visible: false
+    text: "‖"
+    size: 12
+    color: enemyItem.colors.cyan
   }
 
   Glyph {
