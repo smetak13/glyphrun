@@ -44,3 +44,7 @@ export function shuffle(random, items) {
   }
   return copy;
 }
+
+export function hashPoint(x, y, salt) {
+  return mix(Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul((y | 0) + 7919, 0x165667b1) ^ mix(salt | 0)) / 0x100000000;
+}

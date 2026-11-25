@@ -64,9 +64,8 @@ Item {
   property var recordedRun: null
   readonly property var scores: HighScores.parseScores(storage.highScores)
   readonly property var times: HighScores.parseTimes(storage.fastestRuns)
-  readonly property bool fullEffects: storage.effects === "full"
+  readonly property bool fullEffects: false
   readonly property var settingsItems: [
-    "Effects: " + storage.effects,
     "Music volume: " + Menu.percent(storage.musicVolume),
     "Sound volume: " + Menu.percent(storage.soundVolume),
     "Mute: " + (storage.muted ? "on" : "off"),
@@ -342,8 +341,7 @@ Item {
   }
 
   function changeSetting(setting, direction) {
-    if (setting === "effects") storage.effects = storage.effects === "full" ? "reduced" : "full"
-    else if (setting === "music") storage.musicVolume = Menu.stepVolume(storage.musicVolume, direction)
+    if (setting === "music") storage.musicVolume = Menu.stepVolume(storage.musicVolume, direction)
     else if (setting === "sound") storage.soundVolume = Menu.stepVolume(storage.soundVolume, direction)
     else if (setting === "mute") storage.muted = !storage.muted
     audio.play(setting === "sound" ? "bit" : "menu-select")
@@ -479,7 +477,7 @@ Item {
     category: "glyphrun"
     property string highScores: "[]"
     property string fastestRuns: "[]"
-    property string effects: "full"
+    property string effects: "reduced"
     property real musicVolume: 0.6
     property real soundVolume: 0.8
     property bool muted: false

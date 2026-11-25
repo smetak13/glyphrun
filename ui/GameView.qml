@@ -4,6 +4,8 @@ import "../logic/level.mjs" as Level
 import "../logic/run.mjs" as Run
 import "../logic/seed.mjs" as Seed
 import "../logic/backdrop.mjs" as BackdropLogic
+import "../logic/style.mjs" as Style
+import "../logic/cells.mjs" as Cells
 import "../logic/effects.mjs" as Effects
 import "../logic/physics.mjs" as Physics
 import "../logic/heroFigure.mjs" as HeroFigureLogic
@@ -32,8 +34,10 @@ Item {
   readonly property real gameScale: Math.min(width / Screen.SCREEN_WIDTH, height / Screen.SCREEN_HEIGHT)
   readonly property real texelScale: gameScale * pixelRatio
   readonly property size screenTexture: Qt.size(Screen.SCREEN_WIDTH * texelScale, Screen.SCREEN_HEIGHT * texelScale)
-  readonly property var backdrop: BackdropLogic.backdropLayers()
-  readonly property var sections: Level.levelSections(world.level)
+  readonly property var levelStyle: styleOf(world)
+  readonly property var sections: Level.levelSections(world.level, levelStyle.terrain)
+  readonly property real cellScaleX: Cells.CELL_WIDTH / cellAdvance.advanceWidth
+  readonly property real cellScaleY: Cells.CELL_HEIGHT / cellMetrics.height
   property bool checkpointLit: false
   property bool finished: false
   property bool over: false
@@ -49,6 +53,10 @@ Item {
   readonly property real trailGap: 22
   readonly property real trailSpeed: Physics.WALK_SPEED
   readonly property real flashOpacity: 0.9
+
+  function styleOf(shownWorld) {
+    return Style.levelStyle(run.seed, run.levelNumber)
+  }
 
   function stageName() {
     return run.levelNumber > Run.LEVEL_COUNT ? "KERNEL PANIC" : "level " + run.levelNumber + "/" + Run.LEVEL_COUNT
@@ -162,6 +170,19 @@ Item {
     syncEffects()
   }
 
+  FontMetrics {
+    id: cellMetrics
+    font.family: "JetBrainsMono Nerd Font"
+    font.pixelSize: Cells.CELL_FONT_SIZE
+    font.bold: true
+  }
+
+  TextMetrics {
+    id: cellAdvance
+    font: cellMetrics.font
+    text: "█"
+  }
+
   Item {
     id: stage
     width: Screen.SCREEN_WIDTH
@@ -181,23 +202,23 @@ Item {
       id: scene
       anchors.fill: parent
 
-      HexStrip {
+      BackdropStrip {
         id: farStrip
-        glyphs: view.backdrop.far
+        glyphs: view.levelStyle.backdrop.far
         parallax: BackdropLogic.FAR_PARALLAX
-        size: 11
-        color: view.colors.hexdump
-        opacity: 0.12
+        colors: view.colors
+        cellScaleX: view.cellScaleX
+        cellScaleY: view.cellScaleY
         texelScale: view.texelScale
       }
 
-      HexStrip {
+      BackdropStrip {
         id: nearStrip
-        glyphs: view.backdrop.near
+        glyphs: view.levelStyle.backdrop.near
         parallax: BackdropLogic.NEAR_PARALLAX
-        size: 12
-        color: view.colors.hexdump
-        opacity: 0.2
+        colors: view.colors
+        cellScaleX: view.cellScaleX
+        cellScaleY: view.cellScaleY
         texelScale: view.texelScale
       }
 
@@ -231,29 +252,23 @@ Item {
                 textureSize: section.textureSize
 
                 Repeater {
-                  model: section.modelData.glyphs.filter(glyph => glyph.role !== "muted")
+                  model: section.modelData.glyphs.filter(glyph => glyph.glow)
 
-                  Glyph {
-                    required property var modelData
-                    x: modelData.x
-                    y: modelData.y
-                    text: modelData.text
-                    size: modelData.size
-                    color: view.colors[modelData.role]
+                  LayerGlyph {
+                    colors: view.colors
+                    cellScaleX: view.cellScaleX
+                    cellScaleY: view.cellScaleY
                   }
                 }
               }
 
               Repeater {
-                model: section.modelData.glyphs.filter(glyph => glyph.role === "muted")
+                model: section.modelData.glyphs.filter(glyph => !glyph.glow)
 
-                Glyph {
-                  required property var modelData
-                  x: modelData.x
-                  y: modelData.y
-                  text: modelData.text
-                  size: modelData.size
-                  color: view.colors.muted
+                LayerGlyph {
+                  colors: view.colors
+                  cellScaleX: view.cellScaleX
+                  cellScaleY: view.cellScaleY
                 }
               }
             }

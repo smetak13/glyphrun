@@ -10,7 +10,7 @@ export const CONTROLS = [
   { keys: "p", action: "pause" },
   { keys: "esc", action: "menu" },
 ];
-export const SETTINGS = ["effects", "music", "sound", "mute"];
+export const SETTINGS = ["music", "sound", "mute"];
 
 export function canContinue(run) {
   return run !== null && !run.over && !run.won;

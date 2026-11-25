@@ -1,4 +1,7 @@
 import { TILE, SCREEN_ROWS, SCREEN_WIDTH } from "./screen.mjs";
+import { CELL_WIDTH, CELL_FONT_SIZE, mergeCells } from "./cells.mjs";
+import { hashPoint } from "./random.mjs";
+import { DECOR_DROP, blockLook } from "./terrain.mjs";
 
 export const SECTION_WIDTH = SCREEN_WIDTH;
 export const SECTION_OVERHANG = 6 * TILE;
@@ -12,7 +15,6 @@ const EXIT = "X";
 const BITS = "01";
 const SUDO_BIT = "S";
 const SUDO_BIT_TEXT = "1";
-const BOTTOM_ROW = SCREEN_ROWS - 1;
 const SPIKES = "^";
 const PIPE = "H";
 const PUDDLE = "~";
@@ -57,34 +59,39 @@ export function tileAt(level, col, row) {
   return level.rows[row][col];
 }
 
-export const DEPTH_FILL = ["▓", "▒", "░"];
-
-function fillGlyph(level, col, row) {
-  let depth = 1;
-  while (depth < DEPTH_FILL.length && tileAt(level, col, row - depth - 1) === GROUND) depth++;
-  return DEPTH_FILL[depth - 1];
+function depthBelowSurface(level, col, row) {
+  let depth = 0;
+  while (tileAt(level, col, row - depth - 1) === GROUND) depth++;
+  return depth;
 }
 
-export function levelGlyphs(level) {
+export function levelGlyphs(level, terrain) {
   const glyphs = [];
-  const add = (x, y, text, role, size) => glyphs.push({ x, y, text, role, size });
+  const add = (x, y, text, role, size) => glyphs.push({ x, y, text, role, size, opacity: 1, glow: true, cell: false });
+  const addCell = (x, y, look, glow) => glyphs.push({ x, y, text: look.text, role: look.role, size: CELL_FONT_SIZE, opacity: look.opacity, glow, cell: true });
   for (let row = 0; row < SCREEN_ROWS; row++) {
     for (let col = 0; col < level.cols; col++) {
       const tile = tileAt(level, col, row);
       if (tile === GROUND) {
-        if (tileAt(level, col, row - 1) === GROUND) add(col * TILE, row * TILE - 2, fillGlyph(level, col, row), "muted", 26);
-        else add(col * TILE, row * TILE - 2, "▀", "ground", 26);
+        const depth = depthBelowSurface(level, col, row);
+        for (let half = 0; half < 2; half++) {
+          const cellCol = col * 2 + half;
+          const x = col * TILE + half * CELL_WIDTH;
+          addCell(x, row * TILE, depth === 0 ? terrain.surface : terrain.fill(cellCol, row, depth), depth === 0);
+          if (depth === 0 && terrain.decor && tileAt(level, col, row - 1) === "." && hashPoint(cellCol, row, terrain.salt) < terrain.decorRate) {
+            addCell(x, (row - 1) * TILE + DECOR_DROP, terrain.decor, false);
+          }
+        }
       } else if (tile === BLOCK) {
-        add(col * TILE, row * TILE - 2, "▓", "block", 26);
+        const neighbours = { left: tileAt(level, col - 1, row) === BLOCK, right: tileAt(level, col + 1, row) === BLOCK, up: tileAt(level, col, row - 1) === BLOCK, down: tileAt(level, col, row + 1) === BLOCK };
+        for (let half = 0; half < 2; half++) addCell(col * TILE + half * CELL_WIDTH, row * TILE, blockLook(terrain.blocks, half === 0, neighbours), true);
       } else if (tile === PIPE && tileAt(level, col - 1, row) !== PIPE) {
         add(col * TILE, row * TILE, pipeGlyph(level, col, row), "cyan", 20);
       } else if (tile === PLATFORM && tileAt(level, col - 1, row) !== PLATFORM) {
         let length = 1;
         while (tileAt(level, col + length, row) === PLATFORM) length++;
-        add(col * TILE, row * TILE + 2, "[" + "=".repeat(length * 2 - 2) + "]", "platform", 20);
-      }
-      if (row === BOTTOM_ROW && tile !== GROUND && tileAt(level, col - 1, row) === GROUND) {
-        add(col * TILE, row * TILE, "/dev/null", "hostile", 12);
+        const style = terrain.platform;
+        add(col * TILE, row * TILE + 2, style[0] + style[1].repeat(length * 2 - 2) + style[2], "platform", 20);
       }
     }
   }
@@ -117,13 +124,15 @@ function addExit(add, { col, row }) {
   add(x + 30, y + 74, "0", "cyan", 13);
 }
 
-export function levelSections(level) {
+export function levelSections(level, terrain) {
   const sections = [];
   const count = Math.ceil((level.cols * TILE) / SECTION_WIDTH);
-  for (let i = 0; i < count; i++) sections.push({ x: i * SECTION_WIDTH, glyphs: [] });
-  for (const glyph of levelGlyphs(level)) {
+  for (let i = 0; i < count; i++) sections.push({ x: i * SECTION_WIDTH, glyphs: [], cells: [] });
+  for (const glyph of levelGlyphs(level, terrain)) {
     const section = sections[Math.min(Math.floor(glyph.x / SECTION_WIDTH), count - 1)];
-    section.glyphs.push({ x: glyph.x - section.x, y: glyph.y, text: glyph.text, role: glyph.role, size: glyph.size });
+    const placed = { x: glyph.x - section.x, y: glyph.y, text: glyph.text, role: glyph.role, size: glyph.size, opacity: glyph.opacity, glow: glyph.glow, cell: glyph.cell };
+    if (glyph.cell) section.cells.push(placed);
+    else section.glyphs.push(placed);
   }
-  return sections;
+  return sections.map(section => ({ x: section.x, glyphs: mergeCells(section.cells).concat(section.glyphs) }));
 }

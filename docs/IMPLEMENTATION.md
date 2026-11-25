@@ -255,23 +255,30 @@ The in-game menu gets **Restart**, right under Resume: it starts the current see
 
 Tests: the in-game menu's items and order.
 
-## 17. Rich ASCII: level themes
+## 17. Rich ASCII: level styles
 
-- Status: todo
+- Status: done
 
-Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change; everything stays glyphs coloured from the theme palette.
+Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change; everything stays glyphs coloured from the theme palette. It merges the former tasks "level themes" and "backgrounds", because a level's terrain and background are chosen together.
 
-Each level's terrain looks like its meaning (for `deploy --prod`, server racks and the like), with many design variants of ground, blocks and platforms, about 30 in total, that only change how a tile is drawn.
+Shaped with the user from an HTML prototype, `docs/prototype/styles.html` (a contact sheet of seeds, every family with three variants, and a toggle between fully random styles and styles that fit each level's meaning):
 
-## 18. Rich ASCII: backgrounds
+- **Procedural, not pre-made.** There are about 20 terrain families and 20 background families. Each family is a small generator, and the seed fills in its parameters (glyphs, densities, sizes, accent colour, the block style and the platform style), so every family has a wide range of looks.
+- **Fully random, not tied to the level's meaning.** The user chose this over "fit the level meaning"; the story stays on the title cards. Each level, the boss arena included, has one terrain style and one background style throughout, so a level always looks coherent.
+- **Seeded.** Styles come from the seed on their own sub-streams, so the same seed always looks the same, and choosing styles never shifts level generation. Each seed shuffles the terrain families and gives level n the n-th one, and picks the backgrounds the same way, so a run never repeats a terrain or a background.
+- **Pairing by mood.** Families are tagged `nature`, `machine` or `data`; a level's background shares at least one mood with its terrain, so a server rack never stands in a forest.
+- **The background is always faint.** Two parallax layers at 0.3 and 0.6 of the camera's speed, as the hexdump, which becomes one of the families. No background glyph is drawn at more than 0.15 opacity.
+- **The terrain is always visible.** Ground fill, blocks and surfaces are opaque or only slightly transparent (at least 0.7 opacity), and a ground tile never has a hole. Fill bodies are in the muted colour; colour accents (LEDs, vias, crystals, roots) stay sparse, so the ground never competes with platforms and blocks. The surface is a heavy top edge, so the ground's top is always clear.
+- **Pits are plain gaps**, without the `/dev/null` label, which cluttered the screen. The pit's death message stays.
+- **Effects are always reduced**, at the user's request after playing: full effects only blurred the picture. Settings no longer offers the choice; the full-effects code stays, unused, for now.
+- **Nothing decorative looks like a hazard.** Decorations on the ground's surface (grass, antennas, shards) are drawn at 0.3 opacity. Terrain and backgrounds never use the hostile reds, the bit yellow or the hero's colour.
+- **Drawing**: terrain is a grid of two cells per tile (12 × 24 px); each glyph is stretched to fill its cell, so fills join without gaps. Backgrounds use the same cell grid. Unbroken runs of cells in a row with the same colour and opacity are merged into one text item, so the item count stays low. The surface, blocks, platforms and pipes glow; fill, decorations and backgrounds do not.
 
-- Status: todo
+Tests: the same seed and level give the same style, the levels of a run all have different terrains and backgrounds, a background shares a mood with its terrain, every family's glyphs keep to the allowed colours, terrain fill and blocks are at least 0.7 opaque with no blank cells, decorations at 0.3, backgrounds at most 0.15, surfaces with a top edge, cells merged into rows, and the backdrop staying within its width.
 
-Before implementing, settle the design in a grilling session and write its decisions into this task and `docs/SPEC.md` (section 11, Rich ASCII). Purely visual: physics, hitboxes, the generator, the validator and the chunk tests do not change; everything stays glyphs coloured from the theme palette.
+Notes: `logic/terrain.mjs` holds the terrain families, block and platform styles; `logic/backdrop.mjs` the background families (the hexdump is one of them); `logic/style.mjs` picks a level's families from the seed and builds both; `logic/cells.mjs` merges neighbouring cells into rows of text; a row never spans a gap, so it holds no spaces. `ui/LayerGlyph.qml` stretches cell rows to the 12 × 24 grid. The game view measures the cell with `TextMetrics.advanceWidth`, a property: `FontMetrics.advanceWidth()` is a method, so a binding on it ran once before the font size was set and stretched every cell by a third, and `ui/BackdropStrip.qml` (formerly `HexStrip.qml`) draws any background. The prototype shows the first 13 terrain and 12 background families; the game has 20 of each. Every glyph used is checked against JetBrainsMono Nerd Font. Building a level's style and sections takes about 6 ms in Node; a level draws about 1,400 items, backgrounds included, fewer than the one item per ground tile before.
 
-Each level gets its own background matching its theme, instead of the shared hexdump.
-
-## 19. Release preparation
+## 18. Release preparation
 
 - Status: todo
 

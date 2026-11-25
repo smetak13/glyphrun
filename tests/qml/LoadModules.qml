@@ -2,6 +2,7 @@ import QtQuick
 import "../../logic/audio.mjs" as AudioLogic
 import "../../logic/backdrop.mjs" as Backdrop
 import "../../logic/boss.mjs" as Boss
+import "../../logic/cells.mjs" as Cells
 import "../../logic/bossFigure.mjs" as BossFigure
 import "../../logic/chunks.mjs" as Chunks
 import "../../logic/clock.mjs" as Clock
@@ -22,6 +23,8 @@ import "../../logic/score.mjs" as Score
 import "../../logic/screen.mjs" as Screen
 import "../../logic/seed.mjs" as Seed
 import "../../logic/story.mjs" as Story
+import "../../logic/style.mjs" as Style
+import "../../logic/terrain.mjs" as Terrain
 import "../../logic/testLevel.mjs" as TestLevel
 import "../../logic/theme.mjs" as Theme
 import "../../logic/validator.mjs" as Validator
@@ -33,7 +36,8 @@ QtObject {
       const roles = { foreground: "#ffffff", background: "#000000", accent: "#888888", urgent: "#ff0000", muted: "#444444" }
       Theme.gameColors(Theme.buildPalette("red = \"#c34043\"\ncolor2 = \"#76946a\"", roles))
       const level = Level.parseLevel(TestLevel.TEST_LEVEL)
-      Level.levelSections(level)
+      const style = Style.levelStyle(0x7f3a91c2, 1)
+      Level.levelSections(level, style.terrain)
       const world = World.createWorld(level)
       const clock = Clock.createClock()
       const input = { direction: 1, jumpHeld: true, jumpPressed: true }
@@ -47,7 +51,10 @@ QtObject {
       Level.checkpointGlyphs(level.checkpoint, world.checkpointReached)
       const envelope = Physics.computeEnvelope()
       const generated = Generator.generateLevel(Seed.parseSeed("7f3a-91c2"), 2, 0)
-      Level.levelSections(generated)
+      Level.levelSections(generated, style.terrain)
+      for (const family of Terrain.TERRAIN_FAMILIES) Level.levelSections(generated, Terrain.buildTerrain(family, Random.createRandom(3)))
+      for (const family of Backdrop.BACKDROP_FAMILIES) Backdrop.buildBackdrop(family, Random.createRandom(3))
+      Cells.mergeCells([])
       Validator.playableLevel(Seed.parseSeed("7f3a-91c2"), 5)
       const arena = World.createWorld(Boss.arenaLevel(0x7f3a91c2))
       for (let i = 0; i < 600; i++) World.stepWorld(arena, input, 1 / 60)
@@ -68,7 +75,7 @@ QtObject {
       Story.commitHash(run.seed, 1)
       Random.shuffle(Random.subStream(1, "check"), Chunks.CHUNKS)
       AudioLogic.trackFor(run.seed, 6)
-      Backdrop.backdropOffset(Backdrop.backdropLayers().near[0].x, Backdrop.NEAR_PARALLAX)
+      Backdrop.backdropOffset(style.backdrop.near[0].x, Backdrop.NEAR_PARALLAX)
       const effects = Effects.createEffects()
       for (const cue of Run.takeCues(run)) Effects.applyCue(effects, cue)
       Effects.stepEffects(effects, 1 / 60)
