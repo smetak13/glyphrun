@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PAUSE_ITEMS, canContinue, mainMenuItems, moveIndex, percent, stepVolume } from "../logic/menu.mjs";
+import { DAILY_ITEMS, PAUSE_ITEMS, canContinue, mainMenuItems, moveIndex, percent, stepVolume } from "../logic/menu.mjs";
 
 const IN_PROGRESS = { over: false, won: false };
 
@@ -12,8 +12,8 @@ test("Continue is offered only while a run is in progress", () => {
 });
 
 test("the main menu starts with Continue when a run can be continued", () => {
-  assert.deepEqual(mainMenuItems(IN_PROGRESS), ["Continue", "New run", "Enter seed", "High scores", "Controls", "Settings"]);
-  assert.deepEqual(mainMenuItems(null), ["New run", "Enter seed", "High scores", "Controls", "Settings"]);
+  assert.deepEqual(mainMenuItems(IN_PROGRESS), ["Continue", "New run", "Daily seed", "Enter seed", "High scores", "Controls", "Settings"]);
+  assert.deepEqual(mainMenuItems(null), ["New run", "Daily seed", "Enter seed", "High scores", "Controls", "Settings"]);
 });
 
 test("menu selection wraps around at both ends", () => {
@@ -34,4 +34,8 @@ test("volume shows as a whole percentage", () => {
 
 test("the in-game menu offers Restart right under Resume", () => {
   assert.deepEqual(PAUSE_ITEMS, ["Resume", "Restart", "Controls", "Copy seed", "Main menu"]);
+});
+
+test("the daily seed menu offers Play and its high scores", () => {
+  assert.deepEqual(DAILY_ITEMS, ["Play", "High scores"]);
 });

@@ -278,10 +278,25 @@ Tests: the same seed and level give the same style, the levels of a run all have
 
 Notes: `logic/terrain.mjs` holds the terrain families, block and platform styles; `logic/backdrop.mjs` the background families (the hexdump is one of them); `logic/style.mjs` picks a level's families from the seed and builds both; `logic/cells.mjs` merges neighbouring cells into rows of text; a row never spans a gap, so it holds no spaces. `ui/LayerGlyph.qml` stretches cell rows to the 12 × 24 grid. The game view measures the cell with `TextMetrics.advanceWidth`, a property: `FontMetrics.advanceWidth()` is a method, so a binding on it ran once before the font size was set and stretched every cell by a third, and `ui/BackdropStrip.qml` (formerly `HexStrip.qml`) draws any background. The prototype shows the first 13 terrain and 12 background families; the game has 20 of each. Every glyph used is checked against JetBrainsMono Nerd Font. Building a level's style and sections takes about 6 ms in Node; a level draws about 1,400 items, backgrounds included, fewer than the one item per ground tile before.
 
-## 18. Release preparation
+## 18. Daily seed
+
+- Status: done
+
+The offline daily challenge (SPEC 9.1), shaped with the user before the release so that players have a reason to share results from day one. Everyone plays the same seed each UTC day; nothing is sent anywhere, and comparing happens by pasting a one-line result into a GitHub Discussion or a chat.
+
+- **Daily seed** in the main menu, under New run, opens a submenu with Play and High scores. Top left the time left for today's challenge (`6h 52m left`), top right the Nerd Font fire glyph and the current streak.
+- **Play** starts today's attempt. Attempts are unlimited and each one counts as a try; the day's result is the best-scoring ended run (game over included), with its playing time marked `(incomplete)` unless the boss was beaten. A run belongs to the day it started.
+- **High scores** shows one day at a time, today and the six before it, with Share copying the result line.
+- **Streak**: consecutive UTC days with an ended daily run.
+
+Tests: the UTC day and its number, the daily seed, the time left, tries and best results, ties, results of a past day staying frozen, pruning to seven days, the streak, the share line.
+
+## 19. Release preparation
 
 - Status: todo
 
 README with screenshots, controls and install via `omarchy plugin add https://github.com/smetak13/glyphrun.git`, a final pass of `scripts/check.sh`, the plugin description and tags (see `ROADMAP.md`, Publishing), a first tagged release.
+
+Daily seed: set `DAILY_EPOCH` in `logic/daily.mjs` to the release day, so the release day is daily #1. Set it once and never change it afterwards: every daily number and seed depends on it. Open a GitHub Discussion for daily results and link it from the README.
 
 Done when: a clean install from GitHub works on the user's machine.

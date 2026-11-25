@@ -5,6 +5,7 @@ import Quickshell.Io
 import "ui"
 import "logic/audio.mjs" as AudioLogic
 import "logic/clock.mjs" as Clock
+import "logic/daily.mjs" as Daily
 import "logic/effects.mjs" as Effects
 import "logic/frameRate.mjs" as FrameRate
 import "logic/highScores.mjs" as HighScores
@@ -62,6 +63,12 @@ Item {
   property int timeRank: 0
   property string controlsReturn: "menu"
   property var recordedRun: null
+  property string runDay: ""
+  property real now: Date.now()
+  property int dailyDayIndex: 0
+  readonly property string today: Daily.utcDay(now)
+  readonly property var daily: Daily.parseDaily(storage.daily)
+  readonly property var dailyDays: Daily.shownDays(today)
   readonly property var scores: HighScores.parseScores(storage.highScores)
   readonly property var times: HighScores.parseTimes(storage.fastestRuns)
   readonly property bool fullEffects: false
@@ -140,7 +147,9 @@ Item {
     if (gameLoader.item) gameLoader.item.sync()
   }
 
-  function startRun(seed, withIntro) {
+  function startRun(seed, withIntro, day) {
+    runDay = day
+    if (day !== "") storage.daily = JSON.stringify(Daily.startAttempt(daily, day))
     const next = Run.createRun(seed, Validator.playableLevel(seed, 1))
     world = next.world
     heroAnimator = HeroFigure.createHeroAnimator(world.hero)
@@ -178,10 +187,40 @@ Item {
   function recordScore() {
     if (recordedRun === run) return
     recordedRun = run
+    if (runDay !== "") recordDaily()
     const result = HighScores.insertScore(scores, HighScores.scoreEntry(run, Qt.formatDate(new Date(), "yyyy-MM-dd")))
     rank = result.rank
     storage.highScores = JSON.stringify(result.scores)
     menuIndex = 0
+  }
+
+  function recordDaily() {
+    const result = { score: run.score, seconds: Run.runSeconds(run), won: run.won }
+    storage.daily = JSON.stringify(Daily.endAttempt(daily, runDay, result))
+  }
+
+  function restartDay() {
+    return runDay === Daily.utcDay(Date.now()) ? runDay : ""
+  }
+
+  function startDaily() {
+    const day = Daily.utcDay(Date.now())
+    startRun(Daily.dailySeed(day), true, day)
+  }
+
+  function showDaily(index) {
+    now = Date.now()
+    showScreen("daily")
+    menuIndex = index
+  }
+
+  function shareDaily() {
+    const day = dailyDays[dailyDayIndex]
+    const record = Daily.dayRecord(daily, day)
+    if (record.best === null) return
+    audio.play("menu-select")
+    Quickshell.execDetached(["wl-copy", "--", Daily.shareLine(day, record)])
+    showNotice(Messages.EVENTS.resultCopied, 1600)
   }
 
   function recordTime() {
@@ -255,7 +294,8 @@ Item {
 
   function activateMain(item) {
     if (item === "Continue") showScreen("play")
-    else if (item === "New run") startRun(newSeed(), true)
+    else if (item === "New run") startRun(newSeed(), true, "")
+    else if (item === "Daily seed") showDaily(0)
     else if (item === "Enter seed") {
       seedText = ""
       seedError = ""
@@ -272,15 +312,15 @@ Item {
 
   function activatePause(item) {
     if (item === "Resume") menuOpen = false
-    else if (item === "Restart") startRun(run.seed, false)
+    else if (item === "Restart") startRun(run.seed, false, restartDay())
     else if (item === "Controls") showControls("play")
     else if (item === "Copy seed") copySeed(run.seed)
     else if (item === "Main menu") showMainMenu()
   }
 
   function activateEnd(item) {
-    if (item === "Retry") startRun(run.seed, false)
-    else if (item === "New seed" || item === "New run") startRun(newSeed(), true)
+    if (item === "Retry") startRun(run.seed, false, restartDay())
+    else if (item === "New seed" || item === "New run") startRun(newSeed(), true, "")
     else if (item === "Copy seed") copySeed(run.seed)
     else if (item === "Main menu") showMainMenu()
   }
@@ -312,7 +352,7 @@ Item {
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       const seed = Seed.parseSeed(seedText)
       if (seed === null) seedError = Messages.EVENTS.seedRejected
-      else startRun(seed, true)
+      else startRun(seed, true, "")
     } else if (event.key === Qt.Key_Backspace) {
       seedText = seedText.slice(0, -1)
       seedError = ""
@@ -335,9 +375,32 @@ Item {
     } else if (isConfirm(key) && scoreRow >= 0) {
       audio.play("menu-select")
       const seed = entries[scoreRow].seed
-      if (Menu.SCORE_ACTIONS[scoreAction] === "play") startRun(seed, true)
+      if (Menu.SCORE_ACTIONS[scoreAction] === "play") startRun(seed, true, "")
       else copySeed(seed)
     }
+  }
+
+  function activateDaily(item) {
+    if (item === "Play") startDaily()
+    else if (item === "High scores") {
+      dailyDayIndex = 0
+      showScreen("dailyScores")
+    }
+  }
+
+  function dailyKey(key) {
+    if (key === Qt.Key_Escape) showMainMenu()
+    else listKey(key, Menu.DAILY_ITEMS, activateDaily)
+  }
+
+  function dailyScoresKey(key) {
+    if (key === Qt.Key_Escape) showDaily(Menu.DAILY_ITEMS.indexOf("High scores"))
+    else if (key === Qt.Key_Left || key === Qt.Key_Right) {
+      const next = Math.min(Math.max(dailyDayIndex + (key === Qt.Key_Left ? 1 : -1), 0), dailyDays.length - 1)
+      if (next === dailyDayIndex) return
+      dailyDayIndex = next
+      audio.play("menu-move")
+    } else if (isConfirm(key)) shareDaily()
   }
 
   function changeSetting(setting, direction) {
@@ -397,6 +460,8 @@ Item {
     const repeatable = key === Qt.Key_Up || key === Qt.Key_Down || key === Qt.Key_Backspace
     if (event.isAutoRepeat && !repeatable) return true
     if (screen === "menu") listKey(key, mainItems, activateMain)
+    else if (screen === "daily") dailyKey(key)
+    else if (screen === "dailyScores") dailyScoresKey(key)
     else if (screen === "seed") seedKey(event)
     else if (screen === "scores") scoresKey(key)
     else if (screen === "settings") settingsKey(key)
@@ -477,6 +542,7 @@ Item {
     category: "glyphrun"
     property string highScores: "[]"
     property string fastestRuns: "[]"
+    property string daily: ""
     property string effects: "reduced"
     property real musicVolume: 0.6
     property real soundVolume: 0.8
@@ -502,6 +568,13 @@ Item {
 
   Timer {
     id: noticeTimer
+  }
+
+  Timer {
+    interval: 1000
+    repeat: true
+    running: window.visible && (root.screen === "daily" || root.screen === "dailyScores")
+    onTriggered: root.now = Date.now()
   }
 
   Theme {
@@ -572,6 +645,27 @@ Item {
           visible: root.screen === "menu"
           items: root.mainItems
           index: root.menuIndex
+          colors: theme.colors
+        }
+
+        DailyMenu {
+          anchors.fill: parent
+          visible: root.screen === "daily"
+          today: root.today
+          timeLeft: Daily.timeLeft(root.now)
+          streak: Daily.currentStreak(root.daily, root.today)
+          items: Menu.DAILY_ITEMS
+          index: root.menuIndex
+          colors: theme.colors
+        }
+
+        DailyScores {
+          anchors.fill: parent
+          visible: root.screen === "dailyScores"
+          day: root.dailyDays[Math.min(root.dailyDayIndex, root.dailyDays.length - 1)]
+          record: Daily.dayRecord(root.daily, day)
+          hasOlder: root.dailyDayIndex < root.dailyDays.length - 1
+          hasNewer: root.dailyDayIndex > 0
           colors: theme.colors
         }
 

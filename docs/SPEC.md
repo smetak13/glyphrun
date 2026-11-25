@@ -279,9 +279,23 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 - **Fastest runs**: a second local top 10, of the playing time to Shipped (finishing level 5); the boss is not timed. Playing time leaves out pauses, menus, title cards, summaries and death beats, as for the victory screen. Entries show the time to hundredths (`4:41.32`), the seed and the date; equal times keep the older entry above. A run is entered when level 5 is finished, and the Shipped screen shows a new entry's place (`fastest run #3`). Score is not affected: it rewards thorough play, the time table rewards running.
 - High scores shows both tables as tabs, `score` and `time`. The screen opens on the tab row, where ←→ switches the tab; ↓ enters the list, where ←→ chooses play or copy.
 
+### 9.1 Daily seed
+
+An offline daily challenge: everyone plays the same seed each day, and players compare by sharing a one-line result. Nothing is sent anywhere; the place to compare is a GitHub Discussion linked from the README.
+
+- **The day** is the UTC date, so it is the same everywhere and changes at UTC midnight. The day's seed comes from the date through the seeded generator. Each day has a number, `#1` being the release day (`DAILY_EPOCH`, fixed once at release and never changed).
+- **Daily seed** in the main menu opens a submenu with **Play** and **High scores**. Top left it shows the time left for today's challenge, `6h 52m left`, `52m left` under an hour and `<1m left` in the last minute, updated live; at UTC midnight the screen moves to the new day by itself. Top right is the fire glyph (`nf-fa-fire` of the game's Nerd Font, in the theme's colour) and the current streak, muted at 0. Esc goes back to the main menu.
+- **Play** starts today's challenge as an ordinary run with the intro. Attempts are unlimited, so players can learn the seed. Every attempt counts as a try when it starts, whether it ends or is abandoned; Continue does not start a new one. A run belongs to the day it started, even when it ends after midnight. Restart and Retry of a daily run start a new attempt of that day while it is still today; once the day is over, they replay its seed as an ordinary run. Only runs started from Daily seed → Play count: today's seed entered by hand or played from the high scores is practice.
+- **The day's result** is its best-scoring ended run, by game over or victory; an abandoned run never counts. Equal scores keep the older run. The result shows that run's score, its playing time (levels and boss, as on the victory screen), and `(incomplete)` after the time unless the run beat the boss. A day's result can only be improved on that day.
+- **High scores** shows one day at a time: `daily #3 · 2026-11-25`, the result (score, time, tries) or `no result yet`, and **Share** when there is a result. ←→ moves between today and the six days before it (never before `#1`). Results older than that are deleted.
+- **Share** copies the result line, with the toast `copied`:
+  `glyphrun daily #3 · 2026-11-25 · 12,340 · 4:41.32 (incomplete) · 7 tries · github.com/smetak13/glyphrun` (`1 try` for one).
+- **Streak**: the number of consecutive UTC days with at least one ended daily run. It breaks when a whole UTC day passes without one. Only the current streak is shown.
+- Daily runs are also entered in the score and fastest-runs tables like any run; otherwise the daily results are kept apart.
+
 ## 10. Screens, menus and controls
 
-- **Main menu**: Continue (only when a run is in progress), New run, Enter seed, High scores, Controls, Settings. There is no quit item: the window is closed like Omatris, from the bar icon or the window manager. Going to the main menu from a run keeps the run for Continue.
+- **Main menu**: Continue (only when a run is in progress), New run, Daily seed (section 9.1), Enter seed, High scores, Controls, Settings. There is no quit item: the window is closed like Omatris, from the bar icon or the window manager. Going to the main menu from a run keeps the run for Continue.
 - **P**: freeze. The game stops in place with `[ PAUSED ]`; P again resumes.
 - **Esc**: in-game menu, pausing the game: Resume, Restart, Controls, Copy seed, Main menu. Restart starts the seed over from level 1 with everything fresh, as retrying it after a game over, without a confirmation; the abandoned run is not recorded. There is no restart of a single level: a run is one attempt, and starting over means retrying the seed from level 1.
 - **Closing the window** during play hides it and opens the in-game menu, so nothing runs in the background. Opening it again from the bar shows that menu.
@@ -352,7 +366,7 @@ A visual redesign before the release, so the game looks less old school while st
 
 ## 14. Storage
 
-- High scores, fastest runs and settings (music volume, sound volume, mute) are stored locally in `~/.config/glyphrun.ini` through Qt's `Settings`, as Omatris stores its own.
+- High scores, fastest runs, daily results and the streak, and settings (music volume, sound volume, mute) are stored locally in `~/.config/glyphrun.ini` through Qt's `Settings`, as Omatris stores its own.
 - Nothing is sent anywhere.
 
 ## 15. Tests

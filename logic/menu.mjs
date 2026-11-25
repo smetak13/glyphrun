@@ -1,6 +1,7 @@
 export const PAUSE_ITEMS = ["Resume", "Restart", "Controls", "Copy seed", "Main menu"];
 export const GAME_OVER_ITEMS = ["Retry", "New seed", "Copy seed", "Main menu"];
 export const VICTORY_ITEMS = ["New run", "Copy seed", "Main menu"];
+export const DAILY_ITEMS = ["Play", "High scores"];
 export const SCORE_ACTIONS = ["play", "copy"];
 export const SCORE_TABS = ["score", "time"];
 export const CONTROLS = [
@@ -17,7 +18,7 @@ export function canContinue(run) {
 }
 
 export function mainMenuItems(run) {
-  const items = ["New run", "Enter seed", "High scores", "Controls", "Settings"];
+  const items = ["New run", "Daily seed", "Enter seed", "High scores", "Controls", "Settings"];
   return canContinue(run) ? ["Continue"].concat(items) : items;
 }
 

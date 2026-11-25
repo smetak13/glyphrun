@@ -6,6 +6,7 @@ import "../../logic/cells.mjs" as Cells
 import "../../logic/bossFigure.mjs" as BossFigure
 import "../../logic/chunks.mjs" as Chunks
 import "../../logic/clock.mjs" as Clock
+import "../../logic/daily.mjs" as Daily
 import "../../logic/effects.mjs" as Effects
 import "../../logic/enemies.mjs" as Enemies
 import "../../logic/enemyFigure.mjs" as EnemyFigure
@@ -55,6 +56,10 @@ QtObject {
       for (const family of Terrain.TERRAIN_FAMILIES) Level.levelSections(generated, Terrain.buildTerrain(family, Random.createRandom(3)))
       for (const family of Backdrop.BACKDROP_FAMILIES) Backdrop.buildBackdrop(family, Random.createRandom(3))
       Cells.mergeCells([])
+      const daily = Daily.endAttempt(Daily.startAttempt(Daily.emptyDaily(), Daily.DAILY_EPOCH), Daily.DAILY_EPOCH, { score: 12340, seconds: 281, won: false })
+      Daily.shareLine(Daily.DAILY_EPOCH, Daily.dayRecord(daily, Daily.DAILY_EPOCH))
+      Daily.timeLeft(Date.now())
+      Daily.dailySeed(Daily.utcDay(Date.now()))
       Validator.playableLevel(Seed.parseSeed("7f3a-91c2"), 5)
       const arena = World.createWorld(Boss.arenaLevel(0x7f3a91c2))
       for (let i = 0; i < 600; i++) World.stepWorld(arena, input, 1 / 60)
