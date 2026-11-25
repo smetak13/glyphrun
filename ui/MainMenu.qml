@@ -12,7 +12,7 @@ Rectangle {
 
   Glyph {
     anchors.horizontalCenter: parent.horizontalCenter
-    y: 90
+    y: 50
     text: "@ GLYPHRUN"
     size: 56
     color: screen.colors.hero
@@ -20,7 +20,7 @@ Rectangle {
 
   Glyph {
     anchors.horizontalCenter: parent.horizontalCenter
-    y: 168
+    y: 128
     text: Story.TAGLINE
     size: 14
     color: screen.colors.muted
@@ -28,7 +28,7 @@ Rectangle {
 
   MenuList {
     anchors.horizontalCenter: parent.horizontalCenter
-    y: 220
+    y: 172
     width: 320
     items: screen.items
     index: screen.index
@@ -37,7 +37,7 @@ Rectangle {
 
   Glyph {
     anchors.horizontalCenter: parent.horizontalCenter
-    y: 500
+    y: 488
     text: "↑↓ · choose   Enter · select"
     size: 12
     color: screen.colors.muted
