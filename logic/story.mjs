@@ -8,20 +8,26 @@ export const LEVELS = [
   { title: "deploy --prod", subtitle: "Friday, 16:58." },
 ];
 
-export const TAGLINE = "one small change. five minutes, tops.";
+export const TAGLINE = "TICKET-1337: change a button colour, ship to prod.";
 export const TICKET = "TICKET-1337";
 export const ESTIMATE_SECONDS = 5 * 60;
 
 export const INTRO_TEXT = [
+  "$ whoami",
+  "@",
+  "",
   "$ cat " + TICKET + ".md",
-  "# Change the button colour",
+  "# Change the Submit button colour",
+  "assignee: @",
   "priority: low",
   "estimate: 5 min",
   "",
   "$ git checkout -b quick-fix",
+  "warning: the codebase is full of bugs.",
+  "warning: 5 zombie processes refuse to die.",
+  "hint: get the change to production. stomp what's in the way.",
 ].join("\n");
 export const TYPING_CHARS_PER_SECOND = 30;
-export const INTRO_HOLD_SECONDS = 1.2;
 export const TITLE_SECONDS = 2.8;
 
 const SHIPPED_BEFORE_PAUSE = [
@@ -100,8 +106,8 @@ export function introShown(seconds) {
   return INTRO_TEXT.slice(0, typedLength(seconds, TYPING_CHARS_PER_SECOND));
 }
 
-export function introDone(seconds) {
-  return seconds >= INTRO_TEXT.length / TYPING_CHARS_PER_SECOND + INTRO_HOLD_SECONDS;
+export function stepLine(levelNumber) {
+  return "step " + levelNumber + " of " + LEVELS.length + " on the way to production";
 }
 
 export const SHIPPED_TYPED_SECONDS = SHIPPED_TEXT.length / SHIPPED_CHARS_PER_SECOND + SHIPPED_PAUSE_SECONDS;

@@ -22,7 +22,7 @@ Rectangle {
     anchors.horizontalCenter: parent.horizontalCenter
     y: 104
     text: Story.TAGLINE
-    size: 14
+    size: 11
     color: screen.colors.muted
   }
 

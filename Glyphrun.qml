@@ -478,7 +478,9 @@ Item {
     else if (screen === "controls") {
       if (key === Qt.Key_Escape || isConfirm(key)) closeControls()
     }
-    else if (screen === "intro") showScreen("title")
+    else if (screen === "intro") {
+      if (key === Qt.Key_Space) showScreen("title")
+    }
     else if (screen === "title") {
       showScreen("play")
       setHeld(key, true)
@@ -514,8 +516,7 @@ Item {
     if (screen !== "play") {
       FrameRate.resetFrameWatcher(frameWatcher)
       screenTime += frameTime
-      if (screen === "intro" && Story.introDone(screenTime)) showScreen("title")
-      else if (screen === "title" && screenTime >= Story.TITLE_SECONDS) showScreen("play")
+      if (screen === "title" && screenTime >= Story.TITLE_SECONDS) showScreen("play")
       return
     }
     if (paused || menuOpen) {

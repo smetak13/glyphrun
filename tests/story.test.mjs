@@ -19,9 +19,9 @@ import {
   commitMessage,
   fireworks,
   gameOverTip,
-  introDone,
   introShown,
   shippedShown,
+  stepLine,
   sparkAt,
   victoryScene,
 } from "../logic/story.mjs";
@@ -33,13 +33,25 @@ test("there is a title card for each of the five levels", () => {
   assert.equal(LEVELS[4].title, "deploy --prod");
 });
 
-test("the intro types itself and is done a moment after the last character", () => {
+test("the intro types itself out", () => {
   const typed = INTRO_TEXT.length / 30;
 
   assert.equal(introShown(0), "");
   assert.equal(introShown(typed), INTRO_TEXT);
-  assert.equal(introDone(typed), false);
-  assert.equal(introDone(typed + 1.2), true);
+});
+
+test("the intro introduces the hero, the ticket, the enemies and the goal", () => {
+  const lines = INTRO_TEXT.split("\n");
+
+  assert.deepEqual(lines.slice(0, 2), ["$ whoami", "@"]);
+  assert.ok(lines.indexOf("# Change the Submit button colour") >= 0);
+  assert.ok(lines.indexOf("warning: 5 zombie processes refuse to die.") >= 0);
+  assert.equal(lines[lines.length - 1], "hint: get the change to production. stomp what's in the way.");
+});
+
+test("each title card says which step of the way to production it is", () => {
+  assert.equal(stepLine(1), "step 1 of 5 on the way to production");
+  assert.equal(stepLine(5), "step 5 of 5 on the way to production");
 });
 
 test("the boot log reports the run's real statistics and closes the ticket with the run's time", () => {

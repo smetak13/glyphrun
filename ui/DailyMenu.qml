@@ -16,7 +16,7 @@ Rectangle {
   Glyph {
     x: 32
     y: 28
-    text: screen.timeLeft
+    text: screen.today + " · " + screen.timeLeft
     size: 15
     color: screen.colors.muted
   }
@@ -53,8 +53,8 @@ Rectangle {
   Glyph {
     anchors.horizontalCenter: parent.horizontalCenter
     y: 176
-    text: screen.today + " · same seed for everyone, today only"
-    size: 14
+    text: "same level for everyone, a new one every day"
+    size: 12
     color: screen.colors.muted
   }
 

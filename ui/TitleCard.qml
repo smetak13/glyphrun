@@ -39,4 +39,13 @@ Rectangle {
       color: screen.colors.text
     }
   }
+
+  Glyph {
+    anchors.horizontalCenter: parent.horizontalCenter
+    y: 440
+    text: Story.stepLine(screen.levelNumber)
+    size: 12
+    color: screen.colors.muted
+    opacity: 0.7 * Math.min(1, screen.time * 3, (Story.TITLE_SECONDS - screen.time) * 3)
+  }
 }

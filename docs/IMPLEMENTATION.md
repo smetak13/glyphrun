@@ -301,7 +301,20 @@ Done when: with the window never opened, the shell's process has no Qt Multimedi
 
 Notes: measured with a temporary Quickshell: before the first open the process has no Qt Multimedia mapping and no PipeWire client; while open it has two PipeWire clients; after closing, one remains (Qt Multimedia's device monitor) and the library stays mapped, because Qt never unloads a loaded library. The audio controller has no logic of its own, so this task adds no Node tests.
 
-## 20. Release preparation
+## 20. Clearer story
+
+- Status: done
+
+Playtesting showed the story was unclear: the intro never said who `@` is, where the run is going or what stands in the way, any key skipped it, and the menu tagline and the daily screen needed context to make sense.
+
+- **Intro**: `whoami` shows `@`, the ticket names the Submit button and its assignee, and two warnings and a hint name the bugs, the zombie processes and the goal. It no longer moves on by itself: Space skips it at any moment, other keys do nothing. Retrying a seed still skips it.
+- **Title card**: a small, faint line near the bottom, `step 2 of 5 on the way to production`.
+- **Main menu tagline**: `TICKET-1337: change a button colour, ship to prod.`, smaller than before.
+- **Daily**: the date moves to the top left beside the time left (`2026-11-25 · 6h 52m left`); under the day's number, smaller: `same level for everyone, a new one every day`.
+
+Tests: the intro's text, the step line for each level.
+
+## 21. Release preparation
 
 - Status: todo
 

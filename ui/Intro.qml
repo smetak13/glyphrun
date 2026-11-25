@@ -11,10 +11,10 @@ Rectangle {
 
   Glyph {
     x: 120
-    y: 140
+    y: 72
     text: Story.introShown(screen.time) + (Math.floor(screen.time * 3) % 2 === 0 ? "_" : " ")
     lineHeightMode: Text.FixedHeight
-    lineHeight: 30
+    lineHeight: 28
     size: 20
     color: screen.colors.text
   }
@@ -22,7 +22,7 @@ Rectangle {
   Glyph {
     anchors.horizontalCenter: parent.horizontalCenter
     y: 490
-    text: "any key · skip"
+    text: "Space · continue"
     size: 12
     color: screen.colors.muted
   }

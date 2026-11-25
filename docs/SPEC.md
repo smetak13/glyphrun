@@ -53,17 +53,24 @@ The run is one innocent ticket: a five-minute fix that escalates. The five level
 
 The story is told only on transition screens, never during play:
 
-- **Main menu** tagline: `one small change. five minutes, tops.`
-- **Intro** (start of a new run, skippable with any key; retrying a seed skips it): a terminal types by itself:
+- **Main menu** tagline, small and muted: `TICKET-1337: change a button colour, ship to prod.`
+- **Intro** (start of a new run; retrying a seed skips it): a terminal types by itself, then waits. Space skips it at any moment; other keys do nothing.
   ```
+  $ whoami
+  @
+
   $ cat TICKET-1337.md
-  # Change the button colour
+  # Change the Submit button colour
+  assignee: @
   priority: low
   estimate: 5 min
 
   $ git checkout -b quick-fix
+  warning: the codebase is full of bugs.
+  warning: 5 zombie processes refuse to die.
+  hint: get the change to production. stomp what's in the way.
   ```
-- **Title card** before each level: the level's title and subtitle. It moves on by itself after a few seconds or with any key.
+- **Title card** before each level: the level's title and subtitle, and near the bottom a small, faint `step 2 of 5 on the way to production`. It moves on by itself after a few seconds or with any key.
 - **Level summary**: presented as a commit, with a message and hash drawn from the seed (`fix bugs (hopefully)`, `remove console.log`, `quick fix (3rd attempt)`, …), followed by this level's breakdown (bits, kills, sudo, time bonus) and the run's score.
 - **Game over**: `Segmentation fault (core dumped)`, the cause of the last death with the level reached, the score and seed, a new high score's place, and a tip at the bottom (`Tip: have you tried turning it off and on again?`, `Tip: it's not a bug, it's a feature.`, …).
 - **Shipped**, the punchline: finishing level 5 is a soft win. Its summary shows the run's score like any other level, then the one-line change is deployed and takes production down. The terminal types it by itself, pausing for a second after `Shipped.`; Space shows it all at once:
@@ -284,7 +291,7 @@ If a level fails, the generator tries again with the next attempt's sub-stream. 
 An offline daily challenge: everyone plays the same seed each day, and players compare by sharing a one-line result. Nothing is sent anywhere; the place to compare is a GitHub Discussion linked from the README.
 
 - **The day** is the UTC date, so it is the same everywhere and changes at UTC midnight. The day's seed comes from the date through the seeded generator. Each day has a number, `#1` being the release day (`DAILY_EPOCH`, fixed once at release and never changed).
-- **Daily seed** in the main menu opens a submenu with **Play** and **High scores**. Top left it shows the time left for today's challenge, `6h 52m left`, `52m left` under an hour and `<1m left` in the last minute, updated live; at UTC midnight the screen moves to the new day by itself. Top right is the fire glyph (`nf-fa-fire` of the game's Nerd Font, in the theme's colour) and the current streak, muted at 0. Esc goes back to the main menu.
+- **Daily seed** in the main menu opens a submenu with **Play** and **High scores**. Top left it shows today's date and the time left for today's challenge, `2026-11-25 · 6h 52m left`, `52m left` under an hour and `<1m left` in the last minute, updated live; at UTC midnight the screen moves to the new day by itself. Top right is the fire glyph (`nf-fa-fire` of the game's Nerd Font, in the theme's colour) and the current streak, muted at 0. Under the day's number, small: `same level for everyone, a new one every day`. Esc goes back to the main menu.
 - **Play** starts today's challenge as an ordinary run with the intro. Attempts are unlimited, so players can learn the seed. Every attempt counts as a try when it starts, whether it ends or is abandoned; Continue does not start a new one. A run belongs to the day it started, even when it ends after midnight. Restart and Retry of a daily run start a new attempt of that day while it is still today; once the day is over, they replay its seed as an ordinary run. Only runs started from Daily seed → Play count: today's seed entered by hand or played from the high scores is practice.
 - **The day's result** is its best-scoring ended run, by game over or victory; an abandoned run never counts. Equal scores keep the older run. The result shows that run's score, its playing time (levels and boss, as on the victory screen), and `(incomplete)` after the time unless the run beat the boss. A day's result can only be improved on that day.
 - **High scores** shows one day at a time: `daily #3 · 2026-11-25`, the result (score, time, tries) or `no result yet`, and **Share** when there is a result. ←→ moves between today and the six days before it (never before `#1`). Results older than that are deleted.
