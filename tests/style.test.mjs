@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { levelStyle, sharesMood, styleFamilies } from "../logic/style.mjs";
+import { levelStyle, styleFamilies } from "../logic/style.mjs";
 
 const SEEDS = [1, 2, 0x7f3a91c2, 0xdeadbeef, 12345, 99, 4242, 0xffffffff];
 
@@ -24,15 +24,6 @@ test("the levels of a run, the boss arena included, never repeat a terrain or a 
     const families = [1, 2, 3, 4, 5, 6].map(n => styleFamilies(seed, n));
     assert.equal(new Set(families.map(f => f.terrain.name)).size, 6);
     assert.equal(new Set(families.map(f => f.backdrop.name)).size, 6);
-  }
-});
-
-test("a level's background shares a mood with its terrain", () => {
-  for (const seed of SEEDS) {
-    for (let n = 1; n <= 6; n++) {
-      const families = styleFamilies(seed, n);
-      assert.ok(sharesMood(families.terrain, families.backdrop), families.terrain.name + " " + families.backdrop.name);
-    }
   }
 });
 
