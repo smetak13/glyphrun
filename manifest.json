@@ -4,7 +4,7 @@
   "name": "Glyphrun",
   "version": "0.1.0",
   "author": "Simon Smejkal",
-  "description": "Retro platformer made in ASCII, living in your Omarchy theme.",
+  "description": "Omarchy theme-aware ASCII platformer. Five levels and a boss, five minutes, tops. Endless generated runs, a daily seed to compete on, 4 weapons and 11 enemies. Native Quickshell, no dependencies.",
   "kinds": [
     "bar-widget",
     "panel"

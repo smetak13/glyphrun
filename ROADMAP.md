@@ -39,8 +39,3 @@ Music and sound effects moved into the MVP (`docs/IMPLEMENTATION.md`, task 10). 
 - Key remapping.
 - Gamepad support (not verified whether Qt in the Omarchy shell supports it).
 - Persisting the run in progress across shell restarts.
-
-## Publishing
-
-- Plugin description and tags. Working wording: *Retro platformer made in ASCII, living in your Omarchy theme. Procedurally generated runs, 11 enemies, one final boss.*
-- Discoverability without trademarks: no "Mario" in the name, description or tags. Use generic terms such as `platformer`, `retro-game`, `ascii-game`, `omarchy` as GitHub topics.

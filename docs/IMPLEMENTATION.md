@@ -347,9 +347,14 @@ Notes: `logic/weapons.mjs` holds the weapons, their shots, Claude's spark and th
 
 ## 22. Release preparation
 
-- Status: todo
+- Status: done
 
-README with screenshots, controls and install via `omarchy plugin add https://github.com/smetak13/glyphrun.git`, a final pass of `scripts/check.sh`, the plugin description and tags (see `ROADMAP.md`, Publishing), a first tagged release.
+README with screenshots, controls and install via `omarchy plugin add https://github.com/smetak13/glyphrun.git`, a final pass of `scripts/check.sh`, the plugin description and tags, a first tagged release.
+
+- **Marketplace**: plugins.omarchy.org lists plugins submitted through the issue form of `omacom/omarchy-plugin-marketplace`. It needs a public repository with `manifest.json`, a README with install and removal, and a license in the root; `preview.png` in the root is the listing's picture. The form asks for one category and one to three tags from fixed lists: category `Other`, tags `games` and `quickshell`.
+- **Preview**: `preview.png`, seed `c0bc-7f2d` level 3 in Retro 82, the hero mid-jump. A 2 × 2 grid of four themes was tried and dropped: each level was too small on the listing. Rendered offscreen at 1920 × 1080 with a throwaway copy of the game: theme `colors.toml` path patched, audio off, layer caching off (offscreen grabs drop cached layers).
+- **GitHub topics**, without trademarks such as "Mario": `platformer`, `retro-game`, `ascii-game`, `omarchy`, `omarchy-plugins`, `quickshell`.
+- **Released** on 2026-11-25 as `v0.1.0`, the manifest version. `DAILY_EPOCH` stays `2026-11-25`, the release day. Daily results go to the discussion [Daily seed results](https://github.com/smetak13/glyphrun/discussions/1), linked from the README.
 
 Daily seed: set `DAILY_EPOCH` in `logic/daily.mjs` to the release day, so the release day is daily #1. Set it once and never change it afterwards: every daily number and seed depends on it. Open a GitHub Discussion for daily results and link it from the README.
 
