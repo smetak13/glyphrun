@@ -81,6 +81,7 @@ Item {
     .concat([{ source: "fork", small: true }])
   property int devHitIndex: 0
   property int devKillIndex: 0
+  property string musicTrack: ""
 
   function open(payloadJson) {
     window.visible = true
@@ -116,6 +117,15 @@ Item {
     return Math.floor(Math.random() * 0x100000000)
   }
 
+  function playSound(name) {
+    if (audio.item) audio.item.play(name)
+  }
+
+  function startMusic(name) {
+    musicTrack = name
+    if (audio.item) audio.item.startTrack(name)
+  }
+
   function showScreen(name) {
     releaseKeys()
     screen = name
@@ -143,7 +153,7 @@ Item {
     summaryTime = 0
     stageEnded = false
     Effects.clearEffects(effects)
-    audio.startTrack(AudioLogic.trackFor(run.seed, run.levelNumber))
+    startMusic(AudioLogic.trackFor(run.seed, run.levelNumber))
     if (gameLoader.item) gameLoader.item.sync()
   }
 
@@ -218,7 +228,7 @@ Item {
     const day = dailyDays[dailyDayIndex]
     const record = Daily.dayRecord(daily, day)
     if (record.best === null) return
-    audio.play("menu-select")
+    playSound("menu-select")
     Quickshell.execDetached(["wl-copy", "--", Daily.shareLine(day, record)])
     showNotice(Messages.EVENTS.resultCopied, 1600)
   }
@@ -266,7 +276,7 @@ Item {
   function playCues() {
     for (const cue of Run.takeCues(run)) {
       Effects.applyCue(effects, cue)
-      audio.play(cue.name)
+      playSound(cue.name)
     }
   }
 
@@ -285,9 +295,9 @@ Item {
   function listKey(key, items, activate) {
     if (key === Qt.Key_Up || key === Qt.Key_Down) {
       menuIndex = Menu.moveIndex(menuIndex, key === Qt.Key_Up ? -1 : 1, items.length)
-      audio.play("menu-move")
+      playSound("menu-move")
     } else if (isConfirm(key)) {
-      audio.play("menu-select")
+      playSound("menu-select")
       activate(items[menuIndex])
     }
   }
@@ -367,13 +377,13 @@ Item {
     if (key === Qt.Key_Escape) showMainMenu()
     else if (key === Qt.Key_Up || key === Qt.Key_Down) {
       scoreRow = Menu.moveIndex(scoreRow + 1, key === Qt.Key_Up ? -1 : 1, entries.length + 1) - 1
-      audio.play("menu-move")
+      playSound("menu-move")
     } else if (key === Qt.Key_Left || key === Qt.Key_Right) {
       if (scoreRow < 0) scoreTab = Menu.moveIndex(scoreTab, 1, Menu.SCORE_TABS.length)
       else scoreAction = 1 - scoreAction
-      audio.play("menu-move")
+      playSound("menu-move")
     } else if (isConfirm(key) && scoreRow >= 0) {
-      audio.play("menu-select")
+      playSound("menu-select")
       const seed = entries[scoreRow].seed
       if (Menu.SCORE_ACTIONS[scoreAction] === "play") startRun(seed, true, "")
       else copySeed(seed)
@@ -399,7 +409,7 @@ Item {
       const next = Math.min(Math.max(dailyDayIndex + (key === Qt.Key_Left ? 1 : -1), 0), dailyDays.length - 1)
       if (next === dailyDayIndex) return
       dailyDayIndex = next
-      audio.play("menu-move")
+      playSound("menu-move")
     } else if (isConfirm(key)) shareDaily()
   }
 
@@ -407,7 +417,7 @@ Item {
     if (setting === "music") storage.musicVolume = Menu.stepVolume(storage.musicVolume, direction)
     else if (setting === "sound") storage.soundVolume = Menu.stepVolume(storage.soundVolume, direction)
     else if (setting === "mute") storage.muted = !storage.muted
-    audio.play(setting === "sound" ? "bit" : "menu-select")
+    playSound(setting === "sound" ? "bit" : "menu-select")
   }
 
   function settingsKey(key) {
@@ -436,7 +446,7 @@ Item {
     if (key === Qt.Key_Escape) {
       if (!event.isAutoRepeat) {
         openMenu()
-        audio.play("pause")
+        playSound("pause")
       }
       return true
     }
@@ -444,7 +454,7 @@ Item {
     if (devTools && devKey(key)) return true
     if (key === Qt.Key_P) {
       paused = !paused
-      audio.play("pause")
+      playSound("pause")
       return true
     }
     if (world.finished && isConfirm(key)) {
@@ -549,12 +559,18 @@ Item {
     property bool muted: false
   }
 
-  AudioController {
+  Loader {
     id: audio
-    musicVolume: storage.musicVolume
-    soundVolume: storage.soundVolume
-    muted: storage.muted
-    musicRunning: root.opened && root.screen === "play" && !root.paused && !root.menuOpen && !root.stageEnded
+    active: root.opened
+    source: "ui/AudioController.qml"
+
+    onLoaded: {
+      item.musicVolume = Qt.binding(() => storage.musicVolume)
+      item.soundVolume = Qt.binding(() => storage.soundVolume)
+      item.muted = Qt.binding(() => storage.muted)
+      item.musicRunning = Qt.binding(() => root.screen === "play" && !root.paused && !root.menuOpen && !root.stageEnded)
+      item.startTrack(root.musicTrack)
+    }
   }
 
   Process {

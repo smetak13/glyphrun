@@ -355,7 +355,7 @@ A visual redesign before the release, so the game looks less old school while st
 
 ## 12. Window and plugin integration
 
-- A bar widget opens and closes the game window, as Omatris does. The plugin stays loaded in the background (`keepLoaded`), but the game is paused whenever the window is hidden.
+- A bar widget opens and closes the game window, as Omatris does. The plugin stays loaded in the background (`keepLoaded`), but the game is paused whenever the window is hidden, and its audio exists only while the window is open.
 - The game renders at a fixed logical 960 × 540 and scales to the window, keeping the aspect ratio with bars at the sides or top and bottom. Everyone sees the same part of the level.
 - The plugin follows the Omarchy shell plugin manifest (`omarchy plugin validate` must pass).
 

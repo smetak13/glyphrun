@@ -291,7 +291,17 @@ The offline daily challenge (SPEC 9.1), shaped with the user before the release 
 
 Tests: the UTC day and its number, the daily seed, the time left, tries and best results, ties, results of a past day staying frozen, pruning to seven days, the streak, the share line.
 
-## 19. Release preparation
+## 19. Audio only while the window is open
+
+- Status: done
+
+The plugin stays loaded in the shell (`keepLoaded`), and its audio used to be created at login: a media player and 20 sound effects with their PipeWire streams lived in the shell's process all session, even for players who never opened the game. A fault in Qt Multimedia would then freeze the whole bar. The audio controller is now loaded only while the game window is open and destroyed when it closes, by path, so Qt Multimedia is not even loaded until the window first opens. The current music track is kept outside the controller and restarts from its beginning when the window is reopened.
+
+Done when: with the window never opened, the shell's process has no Qt Multimedia library loaded; music and sounds work as before once it opens.
+
+Notes: measured with a temporary Quickshell: before the first open the process has no Qt Multimedia mapping and no PipeWire client; while open it has two PipeWire clients; after closing, one remains (Qt Multimedia's device monitor) and the library stays mapped, because Qt never unloads a loaded library. The audio controller has no logic of its own, so this task adds no Node tests.
+
+## 20. Release preparation
 
 - Status: todo
 
