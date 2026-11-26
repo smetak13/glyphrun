@@ -9,6 +9,12 @@ export function parseSeed(text) {
 }
 
 export const SEED_LENGTH = 9;
+export const CLIPBOARD_LIMIT = 64;
+export const CLIPBOARD_COMMAND = "wl-paste --no-newline --type text | head -c " + (CLIPBOARD_LIMIT + 1);
+
+export function clipboardSeed(text, byteCount) {
+  return byteCount > CLIPBOARD_LIMIT ? null : parseSeed(text);
+}
 
 export function typeSeed(text, character) {
   const typed = character.toLowerCase();

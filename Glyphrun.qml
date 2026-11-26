@@ -348,8 +348,8 @@ Item {
     clipboardReader.running = true
   }
 
-  function clipboardRead(text) {
-    clipboardSeed = Seed.parseSeed(text)
+  function clipboardRead(text, byteCount) {
+    clipboardSeed = Seed.clipboardSeed(text, byteCount)
     if (!pasteRequested) return
     pasteRequested = false
     if (clipboardSeed === null) seedError = Messages.EVENTS.nothingToPaste
@@ -593,10 +593,10 @@ Item {
 
   Process {
     id: clipboardReader
-    command: ["wl-paste", "--no-newline", "--type", "text"]
+    command: ["sh", "-c", Seed.CLIPBOARD_COMMAND]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.clipboardRead(String(text))
+      onStreamFinished: root.clipboardRead(String(text), data.byteLength)
     }
   }
 

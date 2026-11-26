@@ -359,3 +359,18 @@ README with screenshots, controls and install via `omarchy plugin add https://gi
 Daily seed: set `DAILY_EPOCH` in `logic/daily.mjs` to the release day, so the release day is daily #1. Set it once and never change it afterwards: every daily number and seed depends on it. Open a GitHub Discussion for daily results and link it from the README.
 
 Done when: a clean install from GitHub works on the user's machine.
+
+## 23. Bounded clipboard read
+
+- Status: done
+
+A marketplace reviewer found that opening Enter seed ran `wl-paste` and read the whole clipboard into memory before parsing it as a seed ([review](https://github.com/omacom/omarchy-plugin-marketplace/issues/15948)). The game runs inside the Omarchy shell's process, so a very large text selection could make the shell stall or die. The reviewer asked for a small fixed byte limit while reading, rejecting rather than truncating, and stopping the reader once the limit is exceeded.
+
+- The clipboard is read with `wl-paste --no-newline --type text | head -c 65`: `head` exits after 65 bytes, which closes the pipe and ends `wl-paste`.
+- A read of more than 64 bytes counts as no seed, even when it starts with one. The limit is checked on the exact byte count (`StdioCollector.data.byteLength`), not on the decoded text, whose length cannot tell a truncated read from a full one.
+
+Done when: Enter seed still offers and pastes a copied seed; a clipboard longer than 64 bytes offers nothing.
+
+Tests: a seed within the limit is read; a clipboard over the limit is rejected even when it starts with a seed; the read stops one byte over the limit.
+
+Notes: checked in a temporary Quickshell with `wl-paste` swapped for `yes` (an endless stream): the collector got 65 bytes, rejected them, and `yes` ended. Release as `v0.1.1` after approval, then edit the marketplace issue so validation runs on the new commit.

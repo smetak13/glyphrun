@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "smetak13.glyphrun",
   "name": "Glyphrun",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Simon Smejkal",
   "description": "Omarchy theme-aware ASCII platformer. Five levels and a boss, five minutes, tops. Endless generated runs, a daily seed to compete on, 4 weapons and 11 enemies. Native Quickshell, no dependencies.",
   "kinds": [
